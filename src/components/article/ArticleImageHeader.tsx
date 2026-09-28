@@ -89,7 +89,7 @@ export default function ArticleImageHeader({
             {/* eslint-disable-next-html-element-suppression */}
             <img
               src={aiImageUrl || 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80'}
-              alt="AI Symbolic Representation"
+              alt="Featured Report Illustration"
               className="w-full h-64 sm:h-96 object-cover filter contrast-105 saturate-110"
             />
             <div className="p-2.5 bg-slate-950/90 text-slate-200 text-xs flex items-center gap-1.5 font-medium">

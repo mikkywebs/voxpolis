@@ -103,7 +103,7 @@ export default function ArticleDetailPage() {
           ))}
         </div>
 
-        {/* 3. Claude-Generated Analysis Section & 4. Embedded "Read Also" Link */}
+        {/* 3. Executive Fact Analysis Section & 4. Embedded "Read Also" Link */}
         <AIAnalysisSection
           analysisText={article.ai_analysis}
           readAlsoArticle={

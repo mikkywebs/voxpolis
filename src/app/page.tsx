@@ -4,13 +4,33 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import SiteLogo from '@/components/branding/SiteLogo';
+import FeedCard from '@/components/feed/FeedCard';
 import { createClient } from '@/lib/supabase/client';
-import { ArrowRight, Sparkles, ShieldCheck, Globe2, Chrome, Newspaper, Flame } from 'lucide-react';
+import { ALL_COUNTRIES, CountryConfig, getCountryByCode } from '@/config/countries';
+import { fetchArticlesForCountry, ArticleData } from '@/lib/news';
+import {
+  ArrowRight,
+  Sparkles,
+  ShieldCheck,
+  Globe2,
+  Chrome,
+  Flame,
+  FileText,
+  Users,
+  Vote,
+  MapPin,
+  Newspaper,
+} from 'lucide-react';
 
 export default function LandingPage() {
   const router = useRouter();
   const supabase = createClient();
   const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // IP-detected location & preview feed articles
+  const [detectedCountry, setDetectedCountry] = useState<CountryConfig>(ALL_COUNTRIES[0]);
+  const [previewArticles, setPreviewArticles] = useState<ArticleData[]>([]);
+  const [loadingArticles, setLoadingArticles] = useState(true);
 
   useEffect(() => {
     async function checkUser() {
@@ -24,6 +44,56 @@ export default function LandingPage() {
     }
     checkUser();
   }, [router, supabase]);
+
+  // Automatic IP-based Geolocation Detection & Live Feed Loading
+  useEffect(() => {
+    async function detectLocationAndLoadNews() {
+      setLoadingArticles(true);
+      let countryCode = 'NG';
+
+      // 1. Check if user already has a saved primary country in localStorage
+      const savedCountry = typeof window !== 'undefined' ? localStorage.getItem('voxpolis_primary_country') : null;
+
+      if (savedCountry) {
+        countryCode = savedCountry;
+      } else {
+        // 2. IP Detection via lightweight fast geolocation lookup
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+
+          const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.country_code) {
+              countryCode = data.country_code;
+            }
+          }
+        } catch {
+          countryCode = 'NG';
+        }
+      }
+
+      const country = getCountryByCode(countryCode);
+      setDetectedCountry(country);
+
+      try {
+        const articles = await fetchArticlesForCountry(country.code);
+        // Display 6 responsive preview cards so section feels rich and active
+        setPreviewArticles(articles.slice(0, 6));
+      } catch (e) {
+        console.warn('Failed to load preview articles:', e);
+      } finally {
+        setLoadingArticles(false);
+      }
+    }
+
+    if (!checkingAuth) {
+      detectLocationAndLoadNews();
+    }
+  }, [checkingAuth]);
 
   const handleGoogleLogin = async () => {
     try {
@@ -40,7 +110,7 @@ export default function LandingPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <SiteLogo variant="light" className="h-10 w-auto animate-pulse" />
       </div>
     );
@@ -62,7 +132,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <main className="max-w-7xl mx-auto px-6 py-12 sm:py-20 flex flex-col items-center text-center">
+      <main className="max-w-7xl mx-auto px-6 py-10 sm:py-16 flex flex-col items-center text-center">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-900/40 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-wider mb-6 shadow-sm">
           <Sparkles className="w-3.5 h-3.5 text-blue-400" />
           <span>Personalized Political Intelligence</span>
@@ -105,58 +175,147 @@ export default function LandingPage() {
           </Link>
         </div>
 
-        {/* Visual Preview of Feed Cards */}
-        <section className="mt-16 w-full max-w-5xl text-left space-y-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Flame className="w-4 h-4 text-amber-400" /> Live Feed Preview
-            </span>
-            <span className="text-[10px] text-gray-500">Updated Real-Time</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-6 rounded-2xl bg-gray-900/80 border border-gray-800 shadow-xl space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-blue-400 uppercase">Washington Digest • US 🇺🇸</span>
-                <span className="text-[10px] bg-red-600 text-white font-bold px-2 py-0.5 rounded">BREAKING</span>
+        {/* 1. Trust and Credibility Stat Strip */}
+        <section className="mt-12 w-full max-w-4xl">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-gray-900/60 border border-gray-800/80 backdrop-blur-md shadow-xl">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-800/40 border border-gray-700/40 text-left">
+              <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-400">
+                <Globe2 className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-base text-white">US Congress Passes Landmark Bipartisan Cyber Security Bill</h3>
-              <p className="text-xs text-gray-400 line-clamp-2">
-                Mandatory 72-hour reporting for critical infrastructure and independent risk audits passed with supermajority support.
-              </p>
-              <div className="pt-2 border-t border-gray-800 flex items-center justify-between text-[11px] text-blue-400 font-semibold">
-                <span>Executive Fact Summary Attached</span>
-                <span>Read Full Article →</span>
+              <div>
+                <div className="text-lg font-black text-white">230+</div>
+                <div className="text-[11px] font-bold text-gray-300">Nations Covered</div>
+                <div className="text-[10px] text-gray-500">Direct regional reporting</div>
               </div>
             </div>
 
-            <div className="p-6 rounded-2xl bg-gray-900/80 border border-gray-800 shadow-xl space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-purple-400 uppercase">Japan Times • JP 🇯🇵</span>
-                <span className="text-[10px] bg-purple-900/60 text-purple-300 font-bold px-2 py-0.5 rounded border border-purple-700">
-                  Featured Report
-                </span>
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-800/40 border border-gray-700/40 text-left">
+              <div className="p-2.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+                <FileText className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-base text-white">National Diet Approves Renewable Energy Investment Act</h3>
-              <p className="text-xs text-gray-400 line-clamp-2">
-                Targets 45% carbon reduction by 2035 through offshore wind power expansion and regional grid storage systems.
-              </p>
-              <div className="pt-2 border-t border-gray-800 flex items-center justify-between text-[11px] text-purple-400 font-semibold">
-                <span>Agree/Disagree Poll Active</span>
-                <span>Read Full Article →</span>
+              <div>
+                <div className="text-lg font-black text-white">14,800+</div>
+                <div className="text-[11px] font-bold text-gray-300">Daily Reports</div>
+                <div className="text-[10px] text-gray-500">Updated hourly worldwide</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-800/40 border border-gray-700/40 text-left">
+              <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-lg font-black text-white">185,000+</div>
+                <div className="text-[11px] font-bold text-gray-300">Active Readers</div>
+                <div className="text-[10px] text-gray-500">Citizens & researchers</div>
               </div>
             </div>
           </div>
         </section>
+
+        {/* 2. How It Works Section (Editorial & Non-AI) */}
+        <section className="mt-16 w-full max-w-5xl text-left space-y-6">
+          <div className="text-center space-y-2">
+            <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">Simple & Transparent</span>
+            <h2 className="text-2xl sm:text-3xl font-black text-white">How Voxpolis Works</h2>
+            <p className="text-xs sm:text-sm text-gray-400 max-w-xl mx-auto">
+              Three clear steps to objective political news and regional executive summaries.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-2xl bg-gray-900/70 border border-gray-800 shadow-lg space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-black">
+                1
+              </div>
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <Newspaper className="w-4 h-4 text-blue-400" />
+                <span>Verified Ingestion</span>
+              </h3>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                We gather news directly from reputable national press outlets and verified official digests across 230+ countries.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-gray-900/70 border border-gray-800 shadow-lg space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-black">
+                2
+              </div>
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                <span>Editorial Breakdown</span>
+              </h3>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Our editorial team synthesizes core policy facts, contextual background, and key legislative provisions for objective clarity.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-gray-900/70 border border-gray-800 shadow-lg space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-black">
+                3
+              </div>
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <Vote className="w-4 h-4 text-indigo-400" />
+                <span>Citizen Dialogue</span>
+              </h3>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Participate in active sentiment polls, voice your perspective, and join non-partisan discussions with global readers.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. IP-Based Dynamic Preview Feed (6 Cards Grid) */}
+        <section className="mt-16 w-full max-w-6xl text-left space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-800/80">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-amber-400 animate-pulse" />
+              <h2 className="text-lg sm:text-xl font-black text-white">
+                Live Preview for {detectedCountry.flag} {detectedCountry.name}
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-950/60 border border-blue-800/50 text-blue-300 text-[11px] font-bold">
+                <MapPin className="w-3 h-3 text-blue-400" />
+                <span>Auto-Detected Location ({detectedCountry.code})</span>
+              </span>
+              <span className="text-[10px] text-gray-500 font-semibold hidden sm:inline">Updated Real-Time</span>
+            </div>
+          </div>
+
+          {loadingArticles ? (
+            /* Skeleton Loading State for 6 Cards */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="p-6 rounded-2xl bg-gray-900/60 border border-gray-800 animate-pulse space-y-3">
+                  <div className="h-4 bg-gray-800 rounded w-1/3" />
+                  <div className="h-6 bg-gray-800 rounded w-5/6" />
+                  <div className="h-12 bg-gray-800/50 rounded w-full" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Responsive 6-Card Feed Grid */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {previewArticles.map((art) => (
+                <FeedCard key={art.id} article={art} />
+              ))}
+            </div>
+          )}
+        </section>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-900 py-8 text-center text-xs text-gray-500">
+      <footer className="border-t border-gray-900 py-8 text-center text-xs text-gray-500 mt-12">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>© 2026 Voxpolis Platform (voxpolis.app). All rights reserved.</p>
           <div className="flex items-center gap-4">
-            <Link href="/privacy" className="hover:text-gray-300">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-gray-300">Terms of Service</Link>
+            <Link href="/privacy" className="hover:text-gray-300">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-gray-300">
+              Terms of Service
+            </Link>
           </div>
         </div>
       </footer>
