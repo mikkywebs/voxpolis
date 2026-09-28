@@ -76,7 +76,7 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-sm sm:text-base text-gray-400 max-w-2xl mt-4 leading-relaxed">
-          Vospolis aggregates, analyzes, and contextualizes news from 23+ nations using AI factual extraction. Read full articles end-to-end without paywalls.
+          Voxpolis aggregates, analyzes, and contextualizes news from 23+ nations using AI factual extraction. Read full articles end-to-end without paywalls.
         </p>
 
         {/* CTAs */}
@@ -153,7 +153,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-gray-900 py-8 text-center text-xs text-gray-500">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 Vospolis Platform (vospolis.app). All rights reserved.</p>
+          <p>© 2026 Voxpolis Platform (voxpolis.app). All rights reserved.</p>
           <div className="flex items-center gap-4">
             <Link href="/privacy" className="hover:text-gray-300">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-gray-300">Terms of Service</Link>

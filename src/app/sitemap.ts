@@ -3,7 +3,7 @@ import { SUPPORTED_COUNTRIES } from '@/config/countries';
 import { fetchArticlesForCountry } from '@/lib/news';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://vospolis.app';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://voxpolis.app';
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {

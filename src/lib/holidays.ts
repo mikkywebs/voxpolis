@@ -20,7 +20,7 @@ export function getHolidayForDateAndCountry(countryCode: string, date: Date = ne
   if (month === 12 && (day === 24 || day === 25)) {
     return {
       name: 'Christmas',
-      greeting: '🎄 Merry Christmas & Happy Holidays from Vospolis!',
+      greeting: '🎄 Merry Christmas & Happy Holidays from Voxpolis!',
       icon: '🎁',
     };
   }

@@ -1,4 +1,5 @@
 import { getCountryByCode } from '@/config/countries';
+import { fetchRssArticlesForCountry } from './rss';
 
 export interface ArticleData {
   id: string;
@@ -39,7 +40,7 @@ const LOCALIZED_NEWS_TEMPLATES: Record<string, (countryName: string, capital: st
     title: `🇫🇷 ${country} : Le Parlement Ouvre les Débats sur la Grande Réforme Governance et Numérique`,
     snippet: `Les députés réunis à ${capital} ont présenté aujourd'hui une synthèse législative majeure visant à moderniser les services publics, la santé et l'économie résiliente.`,
     content: `CAPITALE (${capital.toUpperCase()}) — Les représentants parlementaires ont officiellement ouvert aujourd'hui une session ministérielle dédiée au projet de loi de modernisation de la gouvernance publique à ${country}.
-
+    
 Le rapport déposé devant l'Assemblée comprend quatre piliers majeurs : la dématérialisation accélérée des démarches administratives, le renforcement de la résilience énergétique régionale, la réallocation stratégique des budgets de santé publique et la protection renforcée des infrastructures numériques critiques.
 
 Les membres du comité ministériel ont souligné que ce texte de loi bénéficie d'un soutien transpartisan significatif et fera l'objet d'examens détaillés en commission avant son vote final prévu le mois prochain.
@@ -115,57 +116,103 @@ Committee sponsors underscored that the reform package enjoys broad multi-party 
   }),
 };
 
-export async function fetchArticlesForCountry(countryCode: string, language: string = 'en'): Promise<ArticleData[]> {
+export async function fetchArticlesForCountry(
+  countryCode: string,
+  language: string = 'en'
+): Promise<ArticleData[]> {
   const code = countryCode.toUpperCase();
   const country = getCountryByCode(code);
-  const apiKey = process.env.NEWSDATA_API_KEY;
-
-  // Determine active language template
   const langCode = (language || country.languages[0]?.code || 'en').toLowerCase();
-  const templateFn = LOCALIZED_NEWS_TEMPLATES[langCode] || LOCALIZED_NEWS_TEMPLATES.en;
-  const localizedData = templateFn(country.name, country.capital);
 
-  if (apiKey && apiKey !== 'pub_demo_key') {
+  // 1. Client-Side Browser Context: Fetch from Server API Route to hide API Key and use Server Cache
+  if (typeof window !== 'undefined') {
     try {
-      const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&country=${code.toLowerCase()}&category=politics&language=${langCode}`;
-      const res = await fetch(url, { next: { revalidate: 900 } });
+      const res = await fetch(`/api/news?country=${code}&language=${langCode}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          return data.results.map((item: any, idx: number) => ({
-            id: item.article_id || `newsdata-${idx}`,
-            slug: (item.title || 'article').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + `-${idx}`,
-            title: item.title || 'Political Update',
-            snippet: item.description || item.snippet || item.title || '',
-            content: item.content || item.description || item.title || '',
-            ai_analysis: `Analysis of Article Facts:\n- Summary: ${item.description || item.title}\n- Source: ${item.source_id || 'NewsData'}\n- Published: ${item.pubDate}`,
-            country_code: code,
-            language: langCode,
-            category: item.category?.[0] || 'politics',
-            image_mode: item.image_url ? 'original' : 'breaking_logo',
-            original_image_url: item.image_url || undefined,
-            source_name: item.source_id || `${country.name} Press`,
-            source_url: item.link || 'https://vospolis.app',
-            is_breaking: idx === 0,
-            tags: item.keywords || ['Politics', country.name],
-            views_count: Math.floor(Math.random() * 2500) + 850,
-            total_reading_time_seconds: 180,
-            created_at: item.pubDate || new Date().toISOString(),
-            poll: {
-              id: `poll-${idx}`,
-              question: `Do you agree with the key policy statements presented in this update?`,
-              agree_count: 340,
-              disagree_count: 45,
-            }
-          }));
+        if (data.articles && data.articles.length > 0) {
+          return data.articles;
         }
       }
     } catch (e) {
-      console.warn('NewsData API fetch failed, using internal localized seeded database.', e);
+      console.warn('API news route fetch failed, falling back to local RSS or seeded content.', e);
     }
   }
 
-  // Fallback Articles with Comprehensive Summary & Factual Integrity + Views Counter
+  // 2. Server-Side Context: Direct RSS + NewsData API Fetching
+  try {
+    const rssArticles = await fetchRssArticlesForCountry(code, langCode);
+    
+    let newsDataArticles: ArticleData[] = [];
+    const apiKey = process.env.NEWSDATA_API_KEY;
+
+    if (apiKey && apiKey !== 'pub_demo_key' && apiKey.trim() !== '') {
+      try {
+        const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&country=${code.toLowerCase()}&category=politics&language=${langCode}`;
+        const res = await fetch(url, { next: { revalidate: 7200 } });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.results && Array.isArray(data.results)) {
+            newsDataArticles = data.results.map((item: any, idx: number) => ({
+              id: item.article_id || `newsdata-${idx}`,
+              slug:
+                (item.title || 'article')
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '-')
+                  .replace(/(^-|-$)/g, '') + `-${idx}`,
+              title: item.title || 'Political Update',
+              snippet: item.description || item.snippet || item.title || '',
+              content: item.content || item.description || item.title || '',
+              ai_analysis: `Analysis of Article Facts:\n- Summary: ${item.description || item.title}\n- Source: ${item.source_id || 'NewsData'}\n- Published: ${item.pubDate}`,
+              country_code: code,
+              language: langCode,
+              category: item.category?.[0] || 'politics',
+              image_mode: item.image_url ? 'original' : 'breaking_logo',
+              original_image_url: item.image_url || undefined,
+              source_name: item.source_id || `${country.name} Press`,
+              source_url: item.link || 'https://voxpolis.app',
+              is_breaking: idx === 0,
+              tags: item.keywords || ['Politics', country.name],
+              views_count: Math.floor(Math.random() * 2500) + 850,
+              total_reading_time_seconds: 180,
+              created_at: item.pubDate || new Date().toISOString(),
+              poll: {
+                id: `poll-${idx}`,
+                question: `Do you agree with the policy developments reported in this update?`,
+                agree_count: 340,
+                disagree_count: 45,
+              },
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn('NewsData API fetch encountered an error on server side.', e);
+      }
+    }
+
+    const combined = [...newsDataArticles, ...rssArticles];
+
+    if (combined.length > 0) {
+      // Deduplicate by title
+      const seen = new Set<string>();
+      const unique: ArticleData[] = [];
+      for (const a of combined) {
+        const k = a.title.toLowerCase().slice(0, 35);
+        if (!seen.has(k)) {
+          seen.add(k);
+          unique.push(a);
+        }
+      }
+      return unique;
+    }
+  } catch (err) {
+    console.warn('Server-side RSS/NewsData fetch error, using fallback seed.', err);
+  }
+
+  // 3. Fallback Seeded Template Content
+  const templateFn = LOCALIZED_NEWS_TEMPLATES[langCode] || LOCALIZED_NEWS_TEMPLATES.en;
+  const localizedData = templateFn(country.name, country.capital);
+
   return [
     {
       id: `art-${code}-1`,
@@ -179,14 +226,14 @@ export async function fetchArticlesForCountry(countryCode: string, language: str
       category: 'politics',
       image_mode: 'breaking_logo',
       source_name: `${country.name} Official Digest`,
-      source_url: 'https://vospolis.app',
+      source_url: 'https://voxpolis.app',
       is_breaking: true,
       tags: [country.name, 'Governance', 'Parliament'],
       views_count: Math.floor(Math.random() * 3000) + 1250,
       total_reading_time_seconds: 190,
       created_at: new Date().toISOString(),
-      affiliate_link_label: 'Official Vospolis Partner Digest',
-      affiliate_link_url: 'https://vospolis.app',
+      affiliate_link_label: 'Official Voxpolis Partner Digest',
+      affiliate_link_url: 'https://voxpolis.app',
       poll: {
         id: `poll-${code}-1`,
         question: localizedData.pollQuestion,
@@ -216,14 +263,14 @@ Addressing press representatives in ${country.capital}, government officials con
       image_mode: 'ai_generated',
       ai_image_url: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80',
       source_name: `${country.name} Press Agency`,
-      source_url: 'https://vospolis.app',
+      source_url: 'https://voxpolis.app',
       is_breaking: false,
       tags: [country.name, 'Infrastructure', 'Energy'],
       views_count: Math.floor(Math.random() * 2000) + 920,
       total_reading_time_seconds: 160,
       created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
       affiliate_link_label: 'Explore Energy Policy Reports',
-      affiliate_link_url: 'https://vospolis.app',
+      affiliate_link_url: 'https://voxpolis.app',
       poll: {
         id: `poll-${code}-2`,
         question: `Do you support increasing national budget allocation for clean energy transit in ${country.name}?`,
