@@ -13,24 +13,24 @@ export default function CookieConsentBanner() {
   });
 
   useEffect(() => {
-    const consent = localStorage.getItem('vospolis_cookie_consent');
+    const consent = localStorage.getItem('voxpolis_cookie_consent');
     if (!consent) {
       setShowBanner(true);
     }
   }, []);
 
   const handleAcceptAll = () => {
-    localStorage.setItem('vospolis_cookie_consent', JSON.stringify({ essential: true, analytics: true, advertising: true }));
+    localStorage.setItem('voxpolis_cookie_consent', JSON.stringify({ essential: true, analytics: true, advertising: true }));
     setShowBanner(false);
   };
 
   const handleRejectNonEssential = () => {
-    localStorage.setItem('vospolis_cookie_consent', JSON.stringify({ essential: true, analytics: false, advertising: false }));
+    localStorage.setItem('voxpolis_cookie_consent', JSON.stringify({ essential: true, analytics: false, advertising: false }));
     setShowBanner(false);
   };
 
   const handleSavePreferences = () => {
-    localStorage.setItem('vospolis_cookie_consent', JSON.stringify(preferences));
+    localStorage.setItem('voxpolis_cookie_consent', JSON.stringify(preferences));
     setShowBanner(false);
     setShowPreferences(false);
   };
@@ -44,7 +44,7 @@ export default function CookieConsentBanner() {
           <ShieldCheck className="w-6 h-6 text-blue-400 shrink-0 mt-0.5" />
           <div className="text-xs text-gray-300 leading-relaxed">
             <p className="font-semibold text-white mb-1">We value your privacy (GDPR Compliance)</p>
-            Vospolis uses cookies to enhance feed personalization, deliver non-intrusive political news ads, and analyze traffic. You can accept all, reject non-essential cookies, or customize your preferences anytime.
+            Voxpolis uses cookies to enhance feed personalization, deliver non-intrusive political news ads, and analyze traffic. You can accept all, reject non-essential cookies, or customize your preferences anytime.
           </div>
         </div>
 

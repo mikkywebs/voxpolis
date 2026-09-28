@@ -42,9 +42,9 @@ export default function OnboardingPage() {
   };
 
   const handleSave = () => {
-    localStorage.setItem('vospolis_primary_country', primaryCountry);
-    localStorage.setItem('vospolis_followed_countries', JSON.stringify(followedCountries));
-    localStorage.setItem('vospolis_preferred_language', preferredLanguage);
+    localStorage.setItem('voxpolis_primary_country', primaryCountry);
+    localStorage.setItem('voxpolis_followed_countries', JSON.stringify(followedCountries));
+    localStorage.setItem('voxpolis_preferred_language', preferredLanguage);
 
     router.push('/feed');
   };

@@ -17,8 +17,8 @@ export default function FeedPage() {
 
   // Load saved country & language from onboarding or localStorage
   useEffect(() => {
-    const savedCountry = localStorage.getItem('vospolis_primary_country');
-    const savedLang = localStorage.getItem('vospolis_preferred_language');
+    const savedCountry = localStorage.getItem('voxpolis_primary_country');
+    const savedLang = localStorage.getItem('voxpolis_preferred_language');
 
     if (savedCountry) {
       const c = getCountryByCode(savedCountry);
@@ -46,13 +46,13 @@ export default function FeedPage() {
     setSelectedCountry(c);
     const defaultLang = c.languages[0]?.code || 'en';
     setSelectedLanguage(defaultLang);
-    localStorage.setItem('vospolis_primary_country', c.code);
-    localStorage.setItem('vospolis_preferred_language', defaultLang);
+    localStorage.setItem('voxpolis_primary_country', c.code);
+    localStorage.setItem('voxpolis_preferred_language', defaultLang);
   };
 
   const handleLanguageChange = (lang: string) => {
     setSelectedLanguage(lang);
-    localStorage.setItem('vospolis_preferred_language', lang);
+    localStorage.setItem('voxpolis_preferred_language', lang);
   };
 
   return (

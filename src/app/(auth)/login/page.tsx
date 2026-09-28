@@ -60,7 +60,7 @@ export default function LoginPage() {
           <Link href="/">
             <SiteLogo variant="full" className="h-10 w-auto mx-auto mb-3" />
           </Link>
-          <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">Sign In to Vospolis</h2>
+          <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">Sign In to Voxpolis</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Access personalized global political intelligence</p>
         </div>
 

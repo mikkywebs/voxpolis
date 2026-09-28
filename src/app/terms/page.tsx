@@ -14,7 +14,7 @@ export default function TermsOfServicePage() {
 
         <div className="prose dark:prose-invert text-xs space-y-4 leading-relaxed">
           <p>
-            Welcome to Vospolis (&quot;vospolis.app&quot;). By accessing or using our personalized political news platform, you agree to these Terms of Service.
+            Welcome to Voxpolis (&quot;voxpolis.app&quot;). By accessing or using our personalized political news platform, you agree to these Terms of Service.
           </p>
 
           <h3 className="font-bold text-sm">1. Use of Content</h3>
@@ -30,7 +30,7 @@ export default function TermsOfServicePage() {
 
         <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
           <Link href="/feed" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
-            ← Back to Vospolis Feed
+            ← Back to Voxpolis Feed
           </Link>
         </div>
       </div>

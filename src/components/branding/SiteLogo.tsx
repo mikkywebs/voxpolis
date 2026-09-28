@@ -53,7 +53,7 @@ export default function SiteLogo({
       {/* eslint-disable-next-html-element-suppression */}
       <img
         src={src}
-        alt="Vospolis Logo"
+        alt="Voxpolis Logo"
         className={`${className} object-contain transition-opacity duration-200`}
       />
     </div>

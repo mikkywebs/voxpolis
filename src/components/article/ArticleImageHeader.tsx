@@ -104,7 +104,7 @@ export default function ArticleImageHeader({
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-600/20 via-transparent to-transparent pointer-events-none" />
             <SiteLogo variant="light" className="h-12 sm:h-16 w-auto mb-4" />
             <span className="bg-red-600/90 text-white font-black text-xs sm:text-sm px-4 py-1.5 rounded-full uppercase tracking-widest border border-red-400/40 shadow-lg">
-              VOSPOLIS OFFICIAL BREAKING REPORT
+              VOXPOLIS OFFICIAL BREAKING REPORT
             </span>
           </div>
         )}

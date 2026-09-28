@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
 
         <div className="prose dark:prose-invert text-xs space-y-4 leading-relaxed">
           <p>
-            Vospolis (&quot;vospolis.app&quot;) is committed to protecting your personal data and upholding GDPR, CCPA, and global privacy standards.
+            Voxpolis (&quot;voxpolis.app&quot;) is committed to protecting your personal data and upholding GDPR, CCPA, and global privacy standards.
           </p>
 
           <h3 className="font-bold text-sm">1. Data We Collect</h3>
@@ -35,7 +35,7 @@ export default function PrivacyPolicyPage() {
 
         <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
           <Link href="/feed" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
-            ← Back to Vospolis Feed
+            ← Back to Voxpolis Feed
           </Link>
         </div>
       </div>

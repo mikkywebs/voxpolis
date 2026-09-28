@@ -205,7 +205,7 @@ export default function CommentSection({ articleId, onRequireAuth, isLoggedIn = 
                   SPONSORED ADVERTISEMENT
                 </span>
                 <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">
-                  Upgrade to Vospolis Pro for Ad-Free Political Intelligence & Real-Time Alerts
+                  Upgrade to Voxpolis Pro for Ad-Free Political Intelligence & Real-Time Alerts
                 </p>
               </div>
             )}

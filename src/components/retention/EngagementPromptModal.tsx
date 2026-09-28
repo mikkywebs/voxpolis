@@ -31,7 +31,7 @@ export default function EngagementPromptModal({ userId, isOpen, onClose }: Engag
       console.warn('Feedback tracking error:', e);
     }
     // Redirect to Google Play Store rating URL
-    window.open('https://play.google.com/store/apps/details?id=app.vospolis', '_blank');
+    window.open('https://play.google.com/store/apps/details?id=app.voxpolis', '_blank');
     onClose();
   };
 
@@ -78,7 +78,7 @@ export default function EngagementPromptModal({ userId, isOpen, onClose }: Engag
             <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto mb-3">
               <Star className="w-6 h-6 fill-blue-600 dark:fill-blue-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">How is your experience with Vospolis?</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">How is your experience with Voxpolis?</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-6">
               Your honest feedback helps us deliver accurate, unbiased political news intelligence.
             </p>
@@ -140,7 +140,7 @@ export default function EngagementPromptModal({ userId, isOpen, onClose }: Engag
             <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
             <h3 className="text-base font-bold text-gray-900 dark:text-white">Thank You!</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Your review has been saved. We appreciate your contribution to Vospolis!
+              Your review has been saved. We appreciate your contribution to Voxpolis!
             </p>
           </div>
         )}

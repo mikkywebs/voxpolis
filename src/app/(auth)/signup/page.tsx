@@ -64,8 +64,8 @@ export default function SignupPage() {
           <Link href="/">
             <SiteLogo variant="full" className="h-10 w-auto mx-auto mb-3" />
           </Link>
-          <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">Create Vospolis Account</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Get personalized political feeds & AI insights</p>
+          <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">Create Voxpolis Account</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Get personalized political feeds & executive insights</p>
         </div>
 
         {errorMsg && (

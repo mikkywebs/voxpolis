@@ -206,7 +206,7 @@ export default function AdminDashboardPage() {
                     type="url"
                     value={affiliateUrl}
                     onChange={(e) => setAffiliateUrl(e.target.value)}
-                    placeholder="https://vospolis.app/partner"
+                    placeholder="https://voxpolis.app/partner"
                     className="w-full text-xs p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
                   />
                 </div>

@@ -46,15 +46,15 @@ export default function ArticleDetailPage() {
 
   // Interstitial Ad Logic: Capped to appear once every 4 article views (Requirement 11)
   useEffect(() => {
-    const views = parseInt(sessionStorage.getItem('vospolis_article_views') || '0', 10) + 1;
-    sessionStorage.setItem('vospolis_article_views', views.toString());
+    const views = parseInt(sessionStorage.getItem('voxpolis_article_views') || '0', 10) + 1;
+    sessionStorage.setItem('voxpolis_article_views', views.toString());
 
     if (views % 4 === 1 && views > 1) {
       setShowInterstitialAd(true);
     }
 
     // Engagement feedback prompt trigger after reading 3 articles
-    const hasFeedback = localStorage.getItem('vospolis_feedback_submitted');
+    const hasFeedback = localStorage.getItem('voxpolis_feedback_submitted');
     if (!hasFeedback && views >= 3 && views % 3 === 0) {
       setTimeout(() => {
         setShowEngagementModal(true);
@@ -190,14 +190,14 @@ export default function ArticleDetailPage() {
               <Sparkles className="w-3.5 h-3.5 inline mr-1" /> SPONSORED INTERSTITIAL
             </span>
 
-            <h3 className="text-lg font-bold text-white mb-2">Vospolis Global Policy Report 2026</h3>
+            <h3 className="text-lg font-bold text-white mb-2">Voxpolis Global Policy Report 2026</h3>
             <p className="text-xs text-gray-300 mb-6">
               Access in-depth policy whitepapers, trade flow data, and regional political risk assessments.
             </p>
 
             <div className="space-y-2">
               <a
-                href="https://vospolis.app"
+                href="https://voxpolis.app"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setShowInterstitialAd(false)}

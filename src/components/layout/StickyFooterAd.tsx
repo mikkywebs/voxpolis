@@ -42,7 +42,7 @@ export default function StickyFooterAd() {
                 <p className="text-[11px] text-gray-400">Stay informed on policy shifts and international trade updates.</p>
               </div>
               <a
-                href="https://vospolis.app"
+                href="https://voxpolis.app"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="shrink-0 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow transition"
