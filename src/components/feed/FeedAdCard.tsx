@@ -1,26 +1,73 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { Mail, CheckCircle2, Send, Bell } from 'lucide-react';
 
-export default function FeedAdCard() {
+interface FeedAdCardProps {
+  countryCode?: string;
+  countryName?: string;
+}
+
+export default function FeedAdCard({ countryCode = 'NG', countryName = 'Nigeria' }: FeedAdCardProps) {
+  const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes('@')) return;
+
+    setLoading(true);
+    setTimeout(() => {
+      // Save subscription in localStorage
+      localStorage.setItem(`voxpolis_newsletter_${countryCode}`, email);
+      setLoading(false);
+      setSubscribed(true);
+    }, 600);
+  };
+
   return (
-    <div className="bg-gradient-to-r from-slate-900 via-gray-900 to-slate-900 text-white rounded-2xl p-6 border border-gray-700/60 shadow-lg text-center my-6">
-      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block mb-1">
-        <Sparkles className="w-3 h-3 inline mr-1" />
-        SPONSORED FEED ADVERTISEMENT
-      </span>
-      <h3 className="text-base font-bold text-white mb-1">Voxpolis Political Briefing Newsletter</h3>
-      <p className="text-xs text-gray-300 max-w-lg mx-auto mb-4">
-        Get daily un-biased policy summaries, legislative tracking, and geopolitical insights delivered straight to your inbox.
+    <div className="bg-gradient-to-r from-slate-900 via-gray-900 to-slate-900 text-white rounded-2xl p-6 border border-gray-700/60 shadow-lg my-6 text-center">
+      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-900/50 border border-blue-500/40 text-blue-300 text-[10px] font-bold uppercase tracking-widest mb-3">
+        <Bell className="w-3 h-3 text-amber-400 animate-bounce" />
+        <span>Country Briefing Alert ({countryName})</span>
+      </div>
+
+      <h3 className="text-base sm:text-lg font-black text-white mb-1">
+        Subscribe to {countryName} Political News Alerts
+      </h3>
+      <p className="text-xs text-gray-300 max-w-md mx-auto mb-5 leading-relaxed">
+        Get direct breaking reports, legislative updates, and policy analysis for {countryName} delivered straight to your inbox daily. Zero spam.
       </p>
-      <a
-        href="https://voxpolis.app"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-block bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow transition"
-      >
-        Subscribe Free
-      </a>
+
+      {subscribed ? (
+        <div className="p-3.5 bg-emerald-950/60 border border-emerald-600/60 text-emerald-300 rounded-xl text-xs font-bold inline-flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>Subscribed! You will receive daily political briefings for {countryName}.</span>
+        </div>
+      ) : (
+        <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row items-center justify-center gap-2 max-w-md mx-auto">
+          <div className="relative w-full">
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={`Enter email for ${countryName} news...`}
+              className="w-full text-xs p-3 pl-10 rounded-xl border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full sm:w-auto shrink-0 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-3 rounded-xl shadow transition flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <span>{loading ? 'Subscribing...' : 'Subscribe Free'}</span>
+            <Send className="w-3.5 h-3.5" />
+          </button>
+        </form>
+      )}
     </div>
   );
 }

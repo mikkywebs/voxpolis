@@ -6,6 +6,8 @@ import { MessageSquare, Send, Sparkles, AlertCircle } from 'lucide-react';
 interface Comment {
   id: string;
   user_name: string;
+  country_flag: string;
+  country_code: string;
   content: string;
   created_at: string;
   reactions: { agree: number; disagree: number; angry: number; insightful: number };
@@ -13,39 +15,55 @@ interface Comment {
 
 interface CommentSectionProps {
   articleId: string;
+  userCountryFlag?: string;
+  userCountryCode?: string;
   onRequireAuth?: () => void;
   isLoggedIn?: boolean;
 }
 
-export default function CommentSection({ articleId, onRequireAuth, isLoggedIn = true }: CommentSectionProps) {
+export default function CommentSection({
+  articleId,
+  userCountryFlag = '🇳🇬',
+  userCountryCode = 'NG',
+  onRequireAuth,
+  isLoggedIn = true,
+}: CommentSectionProps) {
   const [comments, setComments] = useState<Comment[]>([
     {
       id: 'c1',
       user_name: 'Dr. Evelyn Vance',
+      country_flag: '🇺🇸',
+      country_code: 'US',
       content: 'Clear legislative oversight is critical for maintaining public trust in digital governance systems.',
       created_at: '2 hours ago',
       reactions: { agree: 18, disagree: 2, angry: 0, insightful: 12 },
     },
     {
       id: 'c2',
+      user_name: 'Chief Adebayo Williams',
+      country_flag: '🇳🇬',
+      country_code: 'NG',
+      content: 'The regional infrastructure allocation must prioritize inter-state rail networks to boost commerce.',
+      created_at: '3 hours ago',
+      reactions: { agree: 34, disagree: 1, angry: 0, insightful: 19 },
+    },
+    {
+      id: 'c3',
       user_name: 'Markus Lindqvist',
+      country_flag: '🇩🇪',
+      country_code: 'DE',
       content: 'The 72-hour incident reporting window strikes a pragmatic balance for infrastructure contractors.',
       created_at: '4 hours ago',
       reactions: { agree: 14, disagree: 1, angry: 0, insightful: 9 },
     },
     {
-      id: 'c3',
-      user_name: 'Sarah O’Connor',
-      content: 'Bipartisan cooperation on tech infrastructure is long overdue. Excellent step forward.',
-      created_at: '5 hours ago',
-      reactions: { agree: 25, disagree: 3, angry: 1, insightful: 15 },
-    },
-    {
       id: 'c4',
-      user_name: 'Kenji Takahashi',
-      content: 'Looking forward to seeing how regional municipalities implement these guidelines effectively.',
-      created_at: '6 hours ago',
-      reactions: { agree: 9, disagree: 0, angry: 0, insightful: 7 },
+      user_name: 'Kwame Mensah',
+      country_flag: '🇬🇭',
+      country_code: 'GH',
+      content: 'Cross-border digital governance protocols will help streamline trade across West Africa.',
+      created_at: '5 hours ago',
+      reactions: { agree: 22, disagree: 0, angry: 0, insightful: 14 },
     },
   ]);
 
@@ -86,6 +104,8 @@ export default function CommentSection({ articleId, onRequireAuth, isLoggedIn = 
       const added: Comment = {
         id: data.id || `c-${Date.now()}`,
         user_name: data.user_name || 'You',
+        country_flag: userCountryFlag,
+        country_code: userCountryCode,
         content: data.content,
         created_at: 'Just now',
         reactions: { agree: 0, disagree: 0, angry: 0, insightful: 0 },
@@ -125,7 +145,7 @@ export default function CommentSection({ articleId, onRequireAuth, isLoggedIn = 
     <div className="my-8 p-6 bg-white dark:bg-gray-800/80 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md">
       <div className="flex items-center gap-2 mb-6">
         <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-        <h3 className="text-base font-bold text-gray-900 dark:text-white">Analysis & Reader Comments ({comments.length})</h3>
+        <h3 className="text-base font-bold text-gray-900 dark:text-white">Global Citizen Discussion ({comments.length})</h3>
       </div>
 
       {/* Moderated Comment Input */}
@@ -141,7 +161,7 @@ export default function CommentSection({ articleId, onRequireAuth, isLoggedIn = 
             rows={3}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder={isLoggedIn ? "Add your perspective... (Links are prohibited, profanity is filtered)" : "Log in to join the conversation..."}
+            placeholder={isLoggedIn ? `Add your perspective... (Your comment will display your nationality ${userCountryFlag})` : "Log in to join the conversation..."}
             className="w-full text-xs p-3 pr-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
@@ -153,17 +173,20 @@ export default function CommentSection({ articleId, onRequireAuth, isLoggedIn = 
           </button>
         </div>
         <p className="text-[10px] text-gray-400 mt-1.5">
-          Automated Moderation Active: Mild profanity is auto-censored (`****`). Links (`http`, `www`) and slurs are blocked outright.
+          Global Civic Moderation: Profanity is auto-censored (`****`). External links & hate speech are blocked. Your nationality flag ({userCountryFlag}) is attached to your comment.
         </p>
       </form>
 
-      {/* Comment List with Ad Unit inserted every 3 comments */}
+      {/* Comment List with Country Flags */}
       <div className="space-y-6">
         {comments.map((c, idx) => (
           <div key={c.id}>
             <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-700/60 space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-gray-900 dark:text-white">{c.user_name}</span>
+                <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                  <span>{c.user_name}</span>
+                  <span className="text-base" title={`Country: ${c.country_code}`}>{c.country_flag}</span>
+                </span>
                 <span className="text-[10px] text-gray-400">{c.created_at}</span>
               </div>
               <p className="text-xs text-gray-700 dark:text-gray-200 leading-relaxed">{c.content}</p>
@@ -171,33 +194,37 @@ export default function CommentSection({ articleId, onRequireAuth, isLoggedIn = 
               {/* Comment Reactions */}
               <div className="pt-2 flex items-center gap-2 text-[11px]">
                 <button
+                  type="button"
                   onClick={() => handleCommentReaction(c.id, 'agree')}
-                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-gray-700 dark:text-gray-300 font-semibold transition"
+                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-gray-700 dark:text-gray-300 font-semibold transition cursor-pointer"
                 >
                   👍 Agree {c.reactions.agree > 0 && `(${c.reactions.agree})`}
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleCommentReaction(c.id, 'disagree')}
-                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-gray-700 dark:text-gray-300 font-semibold transition"
+                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-gray-700 dark:text-gray-300 font-semibold transition cursor-pointer"
                 >
                   👎 Disagree {c.reactions.disagree > 0 && `(${c.reactions.disagree})`}
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleCommentReaction(c.id, 'angry')}
-                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-gray-700 dark:text-gray-300 font-semibold transition"
+                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-gray-700 dark:text-gray-300 font-semibold transition cursor-pointer"
                 >
                   😡 Angry {c.reactions.angry > 0 && `(${c.reactions.angry})`}
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleCommentReaction(c.id, 'insightful')}
-                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-gray-700 dark:text-gray-300 font-semibold transition"
+                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-gray-700 dark:text-gray-300 font-semibold transition cursor-pointer"
                 >
                   💡 Insightful {c.reactions.insightful > 0 && `(${c.reactions.insightful})`}
                 </button>
               </div>
             </div>
 
-            {/* AD BANNER INSERTED EVERY 3 COMMENTS (Requirement 4 & 11) */}
+            {/* AD BANNER INSERTED EVERY 3 COMMENTS */}
             {(idx + 1) % 3 === 0 && (
               <div className="my-4 p-3 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 rounded-xl border border-gray-300 dark:border-gray-600 text-center">
                 <span className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest block mb-1">

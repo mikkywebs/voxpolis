@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getGroupedRegions, CountryConfig, Continent, ALL_COUNTRIES } from '@/config/countries';
+import { getGroupedRegions, CountryConfig, Continent } from '@/config/countries';
 import { Search, ChevronDown, X, Globe, Check } from 'lucide-react';
 
 interface RegionalCountrySelectorModalProps {
@@ -26,6 +26,17 @@ export default function RegionalCountrySelectorModal({
     'Western/Northern Europe': true,
     'East Asia': true,
   });
+
+  // Handle ESC key to close modal instantly
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const allRegionGroups = useMemo(() => getGroupedRegions(), []);
 
@@ -71,33 +82,41 @@ export default function RegionalCountrySelectorModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      {/* Backdrop with direct click to exit */}
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto cursor-pointer"
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl w-full max-w-2xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden"
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          onClick={(e) => e.stopPropagation()} // Stop click propagation inside modal
+          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl w-full max-w-2xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden cursor-default my-auto"
         >
           {/* Header Bar */}
-          <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50/80 dark:bg-gray-900">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                <Globe className="w-4 h-4" />
+              <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                <Globe className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="font-extrabold text-sm sm:text-base text-gray-900 dark:text-white">
                   Select Country & Region
                 </h3>
                 <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
-                  Choose from 119 regional political intelligence feeds
+                  Switch political coverage between 119 countries
                 </p>
               </div>
             </div>
 
+            {/* Prominent Easy Exit Button */}
             <button
               onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+              type="button"
+              className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+              title="Close (Esc)"
             >
               <X className="w-5 h-5" />
             </button>
@@ -110,14 +129,15 @@ export default function RegionalCountrySelectorModal({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search 119 countries or regions (e.g. Nigeria, Japan, Middle East)..."
+                placeholder="Search 119 countries (e.g. Nigeria, Ghana, United States)..."
                 className="w-full text-xs p-3 pl-10 pr-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               />
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-3.5 text-xs text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-3.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 >
                   Clear
                 </button>
@@ -139,6 +159,7 @@ export default function RegionalCountrySelectorModal({
               return (
                 <button
                   key={tab}
+                  type="button"
                   onClick={() => setActiveContinent(tab)}
                   className={`px-3 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap ${
                     isSelected
@@ -168,6 +189,7 @@ export default function RegionalCountrySelectorModal({
                   >
                     {/* Region Header Accordion Toggle */}
                     <button
+                      type="button"
                       onClick={() => toggleRegion(group.regionName)}
                       className="w-full flex items-center justify-between p-3 sm:px-4 bg-gray-50/80 dark:bg-gray-800/80 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition text-left"
                     >
@@ -195,7 +217,7 @@ export default function RegionalCountrySelectorModal({
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.25, ease: 'easeInOut' }}
+                          transition={{ duration: 0.2, ease: 'easeInOut' }}
                           className="overflow-hidden"
                         >
                           <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -204,11 +226,12 @@ export default function RegionalCountrySelectorModal({
                               return (
                                 <button
                                   key={c.code}
+                                  type="button"
                                   onClick={() => {
                                     onSelectCountry(c);
                                     onClose();
                                   }}
-                                  className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold transition ${
+                                  className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
                                     isSelected
                                       ? 'bg-blue-600 text-white border-blue-600 shadow'
                                       : 'bg-gray-50 dark:bg-gray-900/60 text-gray-800 dark:text-gray-200 border-gray-200/80 dark:border-gray-700/80 hover:bg-blue-50 dark:hover:bg-gray-700'

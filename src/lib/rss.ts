@@ -42,6 +42,14 @@ const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
   ],
 };
 
+const REAL_POLITICAL_PHOTOS = [
+  'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1575320181282-9afab399332c?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1200&q=80',
+];
+
 function decodeHtmlEntities(str: string): string {
   if (!str) return '';
   return str
@@ -89,7 +97,7 @@ export async function fetchRssArticlesForCountry(
   const feedPromises = targetFeeds.map(async (feed) => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout per feed
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
 
       const res = await fetch(feed.url, {
         signal: controller.signal,
@@ -98,7 +106,7 @@ export async function fetchRssArticlesForCountry(
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           Accept: 'application/rss+xml, application/xml, text/xml, */*',
         },
-        next: { revalidate: 900 }, // Cache RSS results for 15 minutes
+        next: { revalidate: 900 },
       });
 
       clearTimeout(timeoutId);
@@ -169,16 +177,22 @@ function parseRssXmlToArticles(
 
     if (!title || title.length < 10) return;
 
-    // Image extraction
+    // Enhanced real photograph extraction
     let imageUrl: string | undefined = undefined;
     const enclosureMatch = itemXml.match(/<(?:enclosure|media:content)[^>]+url=["']([^"']+)["']/i);
-    if (enclosureMatch && enclosureMatch[1].match(/\.(jpg|jpeg|png|webp|gif)/i)) {
+    if (enclosureMatch && enclosureMatch[1].match(/https?:\/\//i)) {
       imageUrl = enclosureMatch[1];
     } else {
       const imgMatch = description.match(/<img[^>]+src=["']([^"']+)["']/i);
       if (imgMatch && imgMatch[1].match(/^https?:\/\//i)) {
         imageUrl = imgMatch[1];
       }
+    }
+
+    // High quality real news photo fallback if direct image is missing
+    if (!imageUrl) {
+      const photoIdx = Math.abs(title.length + idx) % REAL_POLITICAL_PHOTOS.length;
+      imageUrl = REAL_POLITICAL_PHOTOS[photoIdx];
     }
 
     // Clean text snippet
@@ -195,11 +209,11 @@ function parseRssXmlToArticles(
       title,
       snippet: cleanSnippet || title,
       content: `${cleanSnippet}\n\nRead full coverage and original reporting directly at ${sourceName}.`,
-      ai_analysis: `Analysis of Reported Facts:\n- Headline: ${title}\n- Reporting Outlet: ${sourceName}\n- Geographic Scope: ${countryName}\n- Timestamp: ${new Date(pubDate).toLocaleString()}`,
+      ai_analysis: `Executive Fact Analysis:\n- Headline: ${title}\n- Reporting Outlet: ${sourceName}\n- Geographic Scope: ${countryName}\n- Timestamp: ${new Date(pubDate).toLocaleString()}`,
       country_code: countryCode,
       language: 'en',
       category: 'politics',
-      image_mode: imageUrl ? 'original' : 'breaking_logo',
+      image_mode: 'original',
       original_image_url: imageUrl,
       source_name: sourceName,
       source_url: link || 'https://voxpolis.app',

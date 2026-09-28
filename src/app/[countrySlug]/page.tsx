@@ -1,0 +1,158 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Header from '@/components/layout/Header';
+import HolidayBanner from '@/components/feed/HolidayBanner';
+import FeedCard from '@/components/feed/FeedCard';
+import FeedAdCard from '@/components/feed/FeedAdCard';
+import { ALL_COUNTRIES, CountryConfig, getCountryByCode } from '@/config/countries';
+import { fetchArticlesForCountry, ArticleData } from '@/lib/news';
+import { createClient } from '@/lib/supabase/client';
+import { Newspaper, Lock, ArrowRight, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+
+export default function CountryFeedPage() {
+  const params = useParams();
+  const router = useRouter();
+  const supabase = createClient();
+  const countrySlug = (params?.countrySlug as string || 'nigeria').toLowerCase();
+
+  const [selectedCountry, setSelectedCountry] = useState<CountryConfig>(ALL_COUNTRIES[0]);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
+  const [articles, setArticles] = useState<ArticleData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+
+  // Match country slug (e.g. "nigeria" -> NG, "united-states" -> US)
+  useEffect(() => {
+    const matched = ALL_COUNTRIES.find((c) => {
+      const nameSlug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      return nameSlug === countrySlug || c.code.toLowerCase() === countrySlug;
+    }) || ALL_COUNTRIES[0];
+
+    setSelectedCountry(matched);
+    const defaultLang = matched.languages[0]?.code || 'en';
+    setSelectedLanguage(defaultLang);
+  }, [countrySlug]);
+
+  // Check auth status for guest vs member rules
+  useEffect(() => {
+    async function checkAuth() {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user) {
+        setUser(data.session.user);
+      }
+    }
+    checkAuth();
+  }, [supabase]);
+
+  // Fetch articles when country or language changes
+  useEffect(() => {
+    async function loadNews() {
+      setLoading(true);
+      const data = await fetchArticlesForCountry(selectedCountry.code, selectedLanguage);
+      setArticles(data);
+      setLoading(false);
+    }
+    if (selectedCountry) {
+      loadNews();
+    }
+  }, [selectedCountry, selectedLanguage]);
+
+  const handleCountryChange = (c: CountryConfig) => {
+    const nameSlug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    router.push(`/${nameSlug}`);
+  };
+
+  const handleLanguageChange = (lang: string) => {
+    setSelectedLanguage(lang);
+    localStorage.setItem('voxpolis_preferred_language', lang);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
+      <Header
+        user={user ? { id: user.id, email: user.email, fullName: user.user_metadata?.full_name } : null}
+        selectedCountry={selectedCountry}
+        onSelectCountry={handleCountryChange}
+        selectedLanguage={selectedLanguage}
+        onSelectLanguage={handleLanguageChange}
+      />
+
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-8">
+        {/* Country & Holiday Greeting Banner */}
+        <HolidayBanner countryCode={selectedCountry.code} />
+
+        {/* Guest Access Prompt Banner if user is not logged in and viewing secondary country */}
+        {!user && (
+          <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-900/40 via-indigo-950/60 to-slate-900 border border-blue-500/30 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div className="text-left">
+                <div className="font-bold text-xs sm:text-sm text-blue-200">
+                  Viewing {selectedCountry.flag} {selectedCountry.name} Political Feed
+                </div>
+                <div className="text-[11px] text-gray-300">
+                  Members get unlimited access to political feeds for all 230+ countries.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link
+                href="/login"
+                className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs rounded-xl transition"
+              >
+                Log In
+              </Link>
+              <Link
+                href="/signup"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1"
+              >
+                <span>Sign Up Free</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Feed Header */}
+        <div className="flex items-center justify-between mb-6 pb-3 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex items-center gap-2">
+            <Newspaper className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <h1 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white">
+              {selectedCountry.flag} {selectedCountry.name} Political Intelligence
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800">
+              {selectedLanguage.toUpperCase()}
+            </span>
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-800 px-2.5 py-1 rounded-full">
+              {articles.length} Reports
+            </span>
+          </div>
+        </div>
+
+        {/* News Feed Items with Ad Insertion */}
+        {loading ? (
+          <div className="space-y-4 py-8 text-center">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-xs text-gray-500">Loading {selectedCountry.name} political coverage...</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {articles.map((art, idx) => (
+              <div key={art.id}>
+                <FeedCard article={art} />
+                {(idx + 1) % 2 === 0 && <FeedAdCard countryCode={selectedCountry.code} countryName={selectedCountry.name} />}
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
