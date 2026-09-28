@@ -14,7 +14,13 @@ export default function EngagementPromptModal({ userId, isOpen, onClose }: Engag
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!isOpen) return null;
+  // Feedback modal is strictly intended for installed mobile app builds; hidden for web browser users.
+  const isNativeApp = typeof window !== 'undefined' && (
+    Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+    Boolean((window as any).ReactNativeWebView)
+  );
+
+  if (!isOpen || !isNativeApp) return null;
 
   const handlePositiveSentiment = async () => {
     try {

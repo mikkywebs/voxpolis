@@ -53,9 +53,13 @@ export default function ArticleDetailPage() {
       setShowInterstitialAd(true);
     }
 
-    // Engagement feedback prompt trigger after reading 3 articles
+    // Engagement feedback prompt trigger: Native mobile app builds only (hidden for browser users)
+    const isNativeApp = typeof window !== 'undefined' && (
+      Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+      Boolean((window as any).ReactNativeWebView)
+    );
     const hasFeedback = localStorage.getItem('voxpolis_feedback_submitted');
-    if (!hasFeedback && views >= 3 && views % 3 === 0) {
+    if (isNativeApp && !hasFeedback && views >= 3 && views % 3 === 0) {
       setTimeout(() => {
         setShowEngagementModal(true);
       }, 5000);
