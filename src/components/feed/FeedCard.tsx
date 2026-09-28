@@ -2,13 +2,18 @@
 
 import Link from 'next/link';
 import { ArticleData } from '@/lib/news';
-import { ExternalLink, AlertCircle, Sparkles } from 'lucide-react';
+import { ExternalLink, AlertCircle, Sparkles, Eye } from 'lucide-react';
 
 interface FeedCardProps {
   article: ArticleData;
 }
 
 export default function FeedCard({ article }: FeedCardProps) {
+  const viewsFormatted =
+    article.views_count >= 1000
+      ? `${(article.views_count / 1000).toFixed(1)}k`
+      : article.views_count.toString();
+
   return (
     <article className="group bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/70 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-lg transition duration-200 flex flex-col justify-between">
       <div>
@@ -16,7 +21,14 @@ export default function FeedCard({ article }: FeedCardProps) {
           <span className="font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
             {article.source_name}
           </span>
-          <span className="text-gray-400 text-[11px]">{new Date(article.created_at).toLocaleDateString()}</span>
+          <div className="flex items-center gap-2 text-gray-400 text-[11px]">
+            {/* Viewer counter badge */}
+            <span className="flex items-center gap-1 font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/60 px-2 py-0.5 rounded-full">
+              <Eye className="w-3 h-3 text-blue-500" />
+              <span>{viewsFormatted} views</span>
+            </span>
+            <span>{new Date(article.created_at).toLocaleDateString()}</span>
+          </div>
         </div>
 
         {article.is_breaking && (
@@ -55,7 +67,7 @@ export default function FeedCard({ article }: FeedCardProps) {
           href={`/article/${article.slug}`}
           className="font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-0.5 transition inline-flex items-center gap-1"
         >
-          <span>Read Full Analysis</span>
+          <span>Read Full Summary</span>
           <ExternalLink className="w-3.5 h-3.5" />
         </Link>
       </div>

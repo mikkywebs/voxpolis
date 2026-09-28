@@ -6,7 +6,7 @@ import SiteLogo from '@/components/branding/SiteLogo';
 import RegionalCountrySelectorModal from '@/components/layout/RegionalCountrySelectorModal';
 import { CountryConfig } from '@/config/countries';
 import { WeatherData } from '@/lib/weather';
-import { Sun, Moon, Palette, ChevronDown, User, Shield, LogOut, Globe } from 'lucide-react';
+import { Sun, Moon, Palette, ChevronDown, User, Shield, LogOut, Languages } from 'lucide-react';
 
 interface HeaderProps {
   user?: {
@@ -18,13 +18,22 @@ interface HeaderProps {
   } | null;
   selectedCountry: CountryConfig;
   onSelectCountry: (country: CountryConfig) => void;
+  selectedLanguage?: string;
+  onSelectLanguage?: (lang: string) => void;
 }
 
-export default function Header({ user, selectedCountry, onSelectCountry }: HeaderProps) {
+export default function Header({
+  user,
+  selectedCountry,
+  onSelectCountry,
+  selectedLanguage = 'en',
+  onSelectLanguage,
+}: HeaderProps) {
   const [greeting, setGreeting] = useState<string>('');
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isLangOpen, setIsLangOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [accentColor, setAccentColor] = useState<'blue' | 'emerald' | 'purple' | 'amber' | 'rose'>('blue');
 
@@ -82,6 +91,8 @@ export default function Header({ user, selectedCountry, onSelectCountry }: Heade
     document.documentElement.setAttribute('data-accent', nextColor);
   };
 
+  const activeLangObj = selectedCountry.languages.find((l) => l.code === selectedLanguage) || selectedCountry.languages[0];
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
@@ -95,7 +106,7 @@ export default function Header({ user, selectedCountry, onSelectCountry }: Heade
           </div>
         </div>
 
-        {/* Right: Weather Chip, Sleek Regional Country Switcher, Theme & User */}
+        {/* Right: Weather Chip, Regional Country Switcher, Recognized Language Toggle, Theme & User */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Weather Chip */}
           {weather && (
@@ -106,7 +117,7 @@ export default function Header({ user, selectedCountry, onSelectCountry }: Heade
             </div>
           )}
 
-          {/* Sleek Regional Country Selector Trigger */}
+          {/* Regional Country Selector Trigger */}
           <button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 hover:from-blue-100 hover:to-indigo-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs font-bold px-3 py-1.5 rounded-xl border border-blue-200 dark:border-gray-700 shadow-sm transition"
@@ -116,6 +127,46 @@ export default function Header({ user, selectedCountry, onSelectCountry }: Heade
             <span className="sm:hidden font-mono">{selectedCountry.code}</span>
             <ChevronDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           </button>
+
+          {/* Country Recognized Language Switcher (User Request) */}
+          {selectedCountry.languages.length > 1 && (
+            <div className="relative">
+              <button
+                onClick={() => setIsLangOpen(!isLangOpen)}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-xs font-bold text-gray-700 dark:text-gray-200 rounded-xl border border-gray-200 dark:border-gray-700 transition"
+                title="Change Country Recognized Language"
+              >
+                <Languages className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span className="uppercase">{activeLangObj?.code || 'EN'}</span>
+                <ChevronDown className="w-3 h-3 text-gray-400" />
+              </button>
+
+              {isLangOpen && (
+                <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 py-1">
+                  <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    {selectedCountry.name} Languages
+                  </div>
+                  {selectedCountry.languages.map((l) => (
+                    <button
+                      key={l.code}
+                      onClick={() => {
+                        if (onSelectLanguage) onSelectLanguage(l.code);
+                        setIsLangOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-blue-50 dark:hover:bg-gray-700 flex items-center justify-between ${
+                        selectedLanguage === l.code
+                          ? 'text-blue-600 font-bold bg-blue-50/50 dark:bg-gray-700/50'
+                          : 'text-gray-700 dark:text-gray-200'
+                      }`}
+                    >
+                      <span>{l.name}</span>
+                      <span className="uppercase text-[10px] text-gray-400">{l.code}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Theme & Accent Switchers */}
           <button
@@ -200,7 +251,7 @@ export default function Header({ user, selectedCountry, onSelectCountry }: Heade
         </div>
       </div>
 
-      {/* Sleek Regional Selector Modal */}
+      {/* Regional Selector Modal */}
       <RegionalCountrySelectorModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

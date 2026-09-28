@@ -1,7 +1,7 @@
 'use client';
 
 import SiteLogo from '@/components/branding/SiteLogo';
-import { ExternalLink, Sparkles, AlertCircle } from 'lucide-react';
+import { ExternalLink, Sparkles, AlertCircle, Eye, Clock } from 'lucide-react';
 
 interface ArticleImageHeaderProps {
   title: string;
@@ -12,6 +12,8 @@ interface ArticleImageHeaderProps {
   sourceName: string;
   sourceUrl: string;
   isBreaking?: boolean;
+  viewsCount?: number;
+  totalReadingTimeSeconds?: number;
 }
 
 export default function ArticleImageHeader({
@@ -23,16 +25,35 @@ export default function ArticleImageHeader({
   sourceName,
   sourceUrl,
   isBreaking,
+  viewsCount = 1420,
+  totalReadingTimeSeconds = 180,
 }: ArticleImageHeaderProps) {
+  const readingTimeMin = Math.ceil(totalReadingTimeSeconds / 60);
+
   return (
     <div className="mb-6 space-y-4">
-      {/* Breaking Badge */}
-      {isBreaking && (
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600 text-white font-bold text-xs rounded-full uppercase tracking-wider shadow-sm animate-pulse">
-          <AlertCircle className="w-3.5 h-3.5" />
-          <span>Breaking News</span>
+      {/* Breaking Badge & Meta Bar */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        {isBreaking && (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600 text-white font-bold text-xs rounded-full uppercase tracking-wider shadow-sm animate-pulse">
+            <AlertCircle className="w-3.5 h-3.5" />
+            <span>Breaking Report</span>
+          </div>
+        )}
+
+        {/* Viewer Counter & Reading Time (User Request) */}
+        <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800/80 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">
+          <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+            <Eye className="w-3.5 h-3.5" />
+            <span>{viewsCount.toLocaleString()} Readers</span>
+          </span>
+          <span className="text-gray-300 dark:text-gray-600">•</span>
+          <span className="flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5" />
+            <span>{readingTimeMin} min read</span>
+          </span>
         </div>
-      )}
+      </div>
 
       <h1 className="text-2xl sm:text-4xl font-extrabold text-gray-900 dark:text-white leading-tight tracking-tight">
         {title}

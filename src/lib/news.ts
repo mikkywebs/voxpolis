@@ -33,110 +33,86 @@ export interface ArticleData {
   };
 }
 
-// Seed articles generator for high-quality fallback & demo
-const SEED_ARTICLES: Record<string, Partial<ArticleData>[]> = {
-  US: [
-    {
-      slug: 'us-congress-passes-landmark-bipartisan-tech-regulation-bill',
-      title: 'US Congress Passes Landmark Bipartisan Tech & Security Bill',
-      snippet: 'The House and Senate have reached a historic consensus on new digital infrastructure standards and cyber security guidelines.',
-      content: `WASHINGTON — In a rare moment of bipartisan unity, both chambers of the United States Congress voted overwhelmingly today to approve the National Digital Infrastructure and Cyber Resilience Act.
+// Multi-language template content for localized news reports
+const LOCALIZED_NEWS_TEMPLATES: Record<string, (countryName: string, capital: string) => { title: string; snippet: string; content: string; analysis: string; pollQuestion: string }> = {
+  fr: (country, capital) => ({
+    title: `🇫🇷 ${country} : Le Parlement Ouvre les Débats sur la Grande Réforme Governance et Numérique`,
+    snippet: `Les députés réunis à ${capital} ont présenté aujourd'hui une synthèse législative majeure visant à moderniser les services publics, la santé et l'économie résiliente.`,
+    content: `CAPITALE (${capital.toUpperCase()}) — Les représentants parlementaires ont officiellement ouvert aujourd'hui une session ministérielle dédiée au projet de loi de modernisation de la gouvernance publique à ${country}.
 
-The legislation establishes strict standards for data privacy, critical infrastructure protection, and AI safety oversight across federal agencies and government contractors.
+Le rapport déposé devant l'Assemblée comprend quatre piliers majeurs : la dématérialisation accélérée des démarches administratives, le renforcement de la résilience énergétique régionale, la réallocation stratégique des budgets de santé publique et la protection renforcée des infrastructures numériques critiques.
 
-Key provisions include mandatory 72-hour reporting for major cyber incidents, federal grants for local government cybersecurity upgrades, and independent risk assessments for autonomous public service algorithms.
+Les membres du comité ministériel ont souligné que ce texte de loi bénéficie d'un soutien transpartisan significatif et fera l'objet d'examens détaillés en commission avant son vote final prévu le mois prochain.
 
-"Today we demonstrate that protecting American digital infrastructure transcends political parties," stated the lead senate sponsor during a press conference outside the Capitol building.`,
-      ai_analysis: `Analysis of Article Facts:
-- Congress passed the National Digital Infrastructure and Cyber Resilience Act with bipartisan support.
-- The bill focuses on data privacy, critical infrastructure protection, and AI safety oversight.
-- Key requirements include 72-hour incident reporting, local security grants, and algorithmic risk audits.
+"Cette réforme répond directement aux attentes des citoyens en matière de transparence, de rapidité administrative et de souveraineté numérique," a déclaré le rapporteur de la commission lors d'un point presse à ${capital}.`,
+    analysis: `Analyse Factuelle de l'Article :
+• Fait 1 : Le Parlement à ${capital} a engagé les débats sur le projet de modernisation administrative et numérique de ${country}.
+• Fait 2 : Les dispositions clés couvrent la dématérialisation des démarches, l'efficacité budgétaire de la santé et la sécurité des données publiques.
+• Fait 3 : Le texte dispose d'un soutien multi-parti et passe en révision de commission avant le vote final.`,
+    pollQuestion: `Approuvez-vous la priorité accordée à la dématérialisation des services publics à ${country} ?`,
+  }),
 
-Fact-Based Impact: The policy standardizes cyber risk management protocols across federal contractors and municipal infrastructure networks.`,
-      affiliate_link_label: 'Recommended VPN for Secure Browsing',
-      affiliate_link_url: 'https://vospolis.app/sponsored/secure-net',
-      country_code: 'US',
-      language: 'en',
-      category: 'politics',
-      image_mode: 'breaking_logo',
-      original_image_url: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80',
-      source_name: 'Washington Political Digest',
-      source_url: 'https://washingtonpost.com',
-      is_breaking: true,
-      tags: ['Congress', 'Cybersecurity', 'Bipartisan'],
-      views_count: 1420,
-      total_reading_time_seconds: 180,
-      poll: {
-        id: 'poll-us-1',
-        question: 'Do you support mandatory federal cybersecurity audits for public infrastructure?',
-        agree_count: 412,
-        disagree_count: 58,
-      },
-    },
-    {
-      slug: 'federal-reserve-signals-monetary-policy-shift-amid-stable-growth',
-      title: 'Federal Reserve Signals Monetary Policy Shift Amid Stable Growth',
-      snippet: 'Central bank officials hint at benchmark interest rate recalibration following recent economic indicators.',
-      content: `NEW YORK — Central bank leadership indicated today that the Federal Reserve will consider adjusting interest rates at its upcoming FOMC meeting as inflation figures align with targets.
+  es: (country, capital) => ({
+    title: `🇪🇸 ${country}: El Congreso Inicia el Debate sobre la Ley de Modernización Digital y Eficiencia`,
+    snippet: `Los parlamentarios reunidos en ${capital} presentaron hoy un paquete legislativo integral para fortalecer la infraestructura pública y los servicios de salud.`,
+    content: `SEDE PARLAMENTARIA (${capital.toUpperCase()}) — Representantes legislativos introdujeron oficialmente hoy una amplia agenda de reforma gubernamental destinada a optimizar los servicios públicos, mejorar la financiación sanitaria y consolidar la ciberseguridad en ${country}.
 
-Economic analysts note that job creation remains steady while consumer price indices reflect moderate stabilization across energy and housing sectors.
+El paquete normativo aborda proyectos prioritarios como la modernización de redes de transporte, subvenciones regionales para la transición energética y auditorías de transparencia en la administración pública.
 
-Markets reacted favorably to the announcement, with national indices showing modest gains during morning trading sessions.`,
-      ai_analysis: `Analysis of Article Facts:
-- Federal Reserve officials signaled potential interest rate adjustments at the next FOMC meeting.
-- Inflation data has moved closer to central bank target levels.
-- Economic indicators reflect steady employment growth and stabilized consumer price metrics.`,
-      affiliate_link_label: 'Explore Political Economy Books on Amazon',
-      affiliate_link_url: 'https://vospolis.app/sponsored/books',
-      country_code: 'US',
-      language: 'en',
-      category: 'economy',
-      image_mode: 'original',
-      original_image_url: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=800&q=80',
-      source_name: 'Financial Reuters',
-      source_url: 'https://reuters.com',
-      is_breaking: false,
-      tags: ['Economy', 'Federal Reserve', 'Inflation'],
-      views_count: 980,
-      total_reading_time_seconds: 140,
-      poll: {
-        id: 'poll-us-2',
-        question: 'Should the Federal Reserve prioritize rate cuts over inflation containment?',
-        agree_count: 230,
-        disagree_count: 180,
-      },
-    },
-  ],
-  JP: [
-    {
-      slug: 'japan-diet-approves-renewable-energy-investment-framework',
-      title: 'Japan National Diet Approves Expanded Renewable Energy Framework',
-      snippet: 'Lawmakers approve new incentives for offshore wind and solar storage initiatives to boost energy resilience.',
-      content: `TOKYO — The National Diet of Japan has officially passed the 2026 Energy Transition and Security Act, approving a landmark funding package aimed at accelerating renewable energy adoption.
+Fuentes oficiales confirmaron que las propuestas pasarán a la comisión parlamentaria para su evaluación detallada antes de la votación definitiva programada para las próximas semanas.`,
+    analysis: `Análisis Factual del Artículo:
+• Hecho 1: El Congreso en ${capital} inició la discusión sobre la reforma de gobernanza digital de ${country}.
+• Hecho 2: La iniciativa abarca infraestructura de transporte, sanidad pública e inspecciones de ciberseguridad.
+• Hecho 3: El proyecto cuenta con amplio respaldo institucional y avanza a dictamen de comisión.`,
+    pollQuestion: `¿Apoya incrementar la inversión estatal en infraestructuras digitales públicas en ${country}?`,
+  }),
 
-The plan targets a 45% reduction in carbon emissions by 2035 through heavy investments in offshore wind farms, next-generation solar cells, and grid-scale storage systems across regional prefectures.`,
-      ai_analysis: `Analysis of Article Facts:
-- The National Diet passed the 2026 Energy Transition and Security Act.
-- Target set for 45% emissions reduction by 2035 via offshore wind and solar storage projects.`,
-      country_code: 'JP',
-      language: 'en',
-      category: 'environment',
-      image_mode: 'ai_generated',
-      ai_image_url: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=800&q=80',
-      source_name: 'Japan Times Wire',
-      source_url: 'https://japantimes.co.jp',
-      is_breaking: false,
-      tags: ['Japan', 'Energy', 'Diet'],
-      views_count: 650,
-      total_reading_time_seconds: 120,
-      poll: {
-        id: 'poll-jp-1',
-        question: 'Should Japan increase subsidies for residential solar power systems?',
-        agree_count: 310,
-        disagree_count: 45,
-      },
-    }
-  ]
+  de: (country, capital) => ({
+    title: `🇩🇪 ${country}: Gesetzgeber Beraten über Umfassendes Paket zur Verwaltungserneuerung`,
+    snippet: `Abgeordnete in ${capital} haben heute neue Gesetzesinitiativen zur Stärkung der digitalen Infrastruktur und der wirtschaftlichen Resilienz vorgestellt.`,
+    content: `PARLAMENTSVIERTEL (${capital.toUpperCase()}) — Die Abgeordneten haben heute offiziell einen Gesetzentwurf zur Modernisierung der öffentlichen Verwaltung in ${country} eingebracht.
+
+Der Entwurf umfasst verbindliche Standards für Cybersicherheit, Fördermittel für Kommunen zur digitalen Transformation sowie Leitlinien für nachhaltige Energienetze.
+
+Die Gesetzesinitiative wird nun in den zuständigen Ausschüssen detailliert geprüft, bevor die abschließende Abstimmung im Parlament ansteht.`,
+    analysis: `Faktenbasierte Analyse:
+• Fakt 1: Das Parlament in ${capital} berät über ein Gesetzpaket zur Verwaltungsmodernisierung in ${country}.
+• Fakt 2: Die Schwerpunkte liegen auf Cybersicherheitsstandards, Kommunalförderung und Netzstabilität.
+• Fakt 3: Der Entwurf befindet sich in der Ausschussberatung vor der Schlussabstimmung.`,
+    pollQuestion: `Sollte ${country} die staatlichen Ausgaben für digitale Verwaltung priorisieren?`,
+  }),
+
+  ja: (country, capital) => ({
+    title: `🇯🇵 ${country}国会：デジタル行政改革と経済安全保障に関する包括法案を審議`,
+    snippet: `${capital}の国会議事堂にて、公共サービスのデジタル化推進と医療基盤の効率化を目指す主要法案が提出されました。`,
+    content: `首都（${capital.toUpperCase()}）— ${country}の国会にて本日、行政手続きの効率化、地域医療支援の最適化、ならびにデジタルインフラのセキュリティ強化を目的とした包括的改革法案が正式に上程されました。
+
+本法案には、主要なサイバーインシデント報告の義務化、地方自治体へのデジタル移行補助金の交付、および独立したリスク監査システムの導入が含まれています。
+
+超党派による調整が進められており、各専門委員会での審議を経て、来月にも最終採決が行われる見通しです。`,
+    analysis: `記事の事実分析：
+・事実 1：${capital}の国会にて、${country}の行政・デジタル基盤改革法案の審議が開始されました。
+・事実 2：主要項目には、サイバーセキュリティ監査、地方自治体支援、および行政手続きのデジタル化が含まれます。
+・事実 3：超党派の合意に基づき、委員会審議を経て最終採決へ進みます。`,
+    pollQuestion: `${country}における行政手続きの完全デジタル化推進に賛成ですか？`,
+  }),
+
+  en: (country, capital) => ({
+    title: `${country} National Parliament Opens Debate on Governance & Digital Administration Reform`,
+    snippet: `Lawmakers in ${capital} gathered today to introduce a comprehensive multi-year legislative summary aimed at improving public health efficiency, transit resilience, and digital oversight.`,
+    content: `PARLIAMENT BUILDING (${capital.toUpperCase()}) — Parliamentary representatives officially introduced a major governance reform package today designed to streamline public administration, expand healthcare funding protocols, and solidify cybersecurity protections across ${country}.
+
+The legislative agenda includes detailed provisions for 72-hour mandatory reporting on critical infrastructure cyber incidents, grants for municipal digital service upgrades, and independent risk audits for public sector algorithms.
+
+Committee sponsors underscored that the reform package enjoys broad multi-party backing and will undergo rigorous committee evaluation before coming to a final vote next month.
+
+"This legislation establishes clear, enforceable standards to ensure our public institutions remain resilient, transparent, and responsive to citizens," remarked the committee chair during a briefing outside parliament in ${capital}.`,
+    analysis: `Analysis of Reported Facts:
+- Fact 1: Parliamentary representatives in ${capital} introduced a comprehensive governance reform proposal for ${country}.
+- Fact 2: Key provisions address public administration efficiency, healthcare funding, transit resilience, and cybersecurity audits.
+- Fact 3: The bill has multi-party backing and moves to detailed committee review prior to a final vote.`,
+    pollQuestion: `Do you agree with prioritizing digital governance and cybersecurity standards in ${country}?`,
+  }),
 };
 
 export async function fetchArticlesForCountry(countryCode: string, language: string = 'en'): Promise<ArticleData[]> {
@@ -144,9 +120,14 @@ export async function fetchArticlesForCountry(countryCode: string, language: str
   const country = getCountryByCode(code);
   const apiKey = process.env.NEWSDATA_API_KEY;
 
+  // Determine active language template
+  const langCode = (language || country.languages[0]?.code || 'en').toLowerCase();
+  const templateFn = LOCALIZED_NEWS_TEMPLATES[langCode] || LOCALIZED_NEWS_TEMPLATES.en;
+  const localizedData = templateFn(country.name, country.capital);
+
   if (apiKey && apiKey !== 'pub_demo_key') {
     try {
-      const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&country=${code.toLowerCase()}&category=politics&language=${language}`;
+      const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&country=${code.toLowerCase()}&category=politics&language=${langCode}`;
       const res = await fetch(url, { next: { revalidate: 900 } });
       if (res.ok) {
         const data = await res.json();
@@ -159,113 +140,96 @@ export async function fetchArticlesForCountry(countryCode: string, language: str
             content: item.content || item.description || item.title || '',
             ai_analysis: `Analysis of Article Facts:\n- Summary: ${item.description || item.title}\n- Source: ${item.source_id || 'NewsData'}\n- Published: ${item.pubDate}`,
             country_code: code,
-            language: language,
+            language: langCode,
             category: item.category?.[0] || 'politics',
             image_mode: item.image_url ? 'original' : 'breaking_logo',
             original_image_url: item.image_url || undefined,
-            source_name: item.source_id || 'Global News Network',
+            source_name: item.source_id || `${country.name} Press`,
             source_url: item.link || 'https://vospolis.app',
             is_breaking: idx === 0,
             tags: item.keywords || ['Politics', country.name],
-            views_count: Math.floor(Math.random() * 500) + 100,
-            total_reading_time_seconds: 150,
+            views_count: Math.floor(Math.random() * 2500) + 850,
+            total_reading_time_seconds: 180,
             created_at: item.pubDate || new Date().toISOString(),
             poll: {
               id: `poll-${idx}`,
               question: `Do you agree with the key policy statements presented in this update?`,
-              agree_count: 140,
-              disagree_count: 35,
+              agree_count: 340,
+              disagree_count: 45,
             }
           }));
         }
       }
     } catch (e) {
-      console.warn('NewsData API fetch failed, using internal seeded database.', e);
+      console.warn('NewsData API fetch failed, using internal localized seeded database.', e);
     }
   }
 
-  // Fallback / Seed articles for all 23 countries
-  const countryArticles = SEED_ARTICLES[code] || [
+  // Fallback Articles with Comprehensive Summary & Factual Integrity + Views Counter
+  return [
     {
+      id: `art-${code}-1`,
       slug: `${code.toLowerCase()}-national-parliament-debates-key-policy-reform`,
-      title: `${country.flag} ${country.name} Parliament Opens Debate on National Governance Reform`,
-      snippet: `Lawmakers in ${country.capital} gathered today to present new legislative proposals addressing economic resilience and digital administration.`,
-      content: `LAWMAKERS IN ${country.capital.toUpperCase()} — Member representatives officially introduced a comprehensive legislative agenda today aimed at streamlining public administration, improving healthcare funding efficiency, and expanding digital governance services across ${country.name}.
-
-The reform package enjoys multi-party sponsorship and is expected to undergo committee review over the coming weeks before a final vote in parliament.`,
-      ai_analysis: `Analysis of Article Facts:
-- Parliamentary representatives in ${country.capital} introduced a national governance reform proposal.
-- The initiative addresses public administration efficiency, healthcare funding, and digital governance in ${country.name}.
-- The bill has multi-party support and moves to committee review.`,
+      title: localizedData.title,
+      snippet: localizedData.snippet,
+      content: localizedData.content,
+      ai_analysis: localizedData.analysis,
       country_code: code,
-      language: language,
+      language: langCode,
       category: 'politics',
       image_mode: 'breaking_logo',
-      source_name: `${country.name} National Digest`,
+      source_name: `${country.name} Official Digest`,
       source_url: 'https://vospolis.app',
       is_breaking: true,
       tags: [country.name, 'Governance', 'Parliament'],
-      views_count: 520,
-      total_reading_time_seconds: 120,
+      views_count: Math.floor(Math.random() * 3000) + 1250,
+      total_reading_time_seconds: 190,
+      created_at: new Date().toISOString(),
+      affiliate_link_label: 'Official Vospolis Partner Digest',
+      affiliate_link_url: 'https://vospolis.app',
       poll: {
-        id: `poll-${code}-gen`,
-        question: `Should ${country.name} prioritize digital governance over traditional administrative processes?`,
-        agree_count: 380,
-        disagree_count: 42,
+        id: `poll-${code}-1`,
+        question: localizedData.pollQuestion,
+        agree_count: 512,
+        disagree_count: 64,
       },
     },
     {
-      slug: `${code.toLowerCase()}-infrastructure-investment-plan-announced`,
-      title: `${country.flag} ${country.name} Announces Major Infrastructure & Transportation Plan`,
-      snippet: `Government ministry outlines a multi-year investment project to modernize transit links and renewable energy grids in ${country.name}.`,
-      content: `CAPITAL CITY (${country.capital.toUpperCase()}) — Government ministers today unveiled a multi-billion national infrastructure blueprint designed to modernize rail transport, upgrade regional ports, and expand renewable power integration.
+      id: `art-${code}-2`,
+      slug: `${code.toLowerCase()}-infrastructure-and-energy-transition-bill`,
+      title: `${country.flag} ${country.name}: Multi-Billion Transit & Clean Energy Blueprint Approved`,
+      snippet: `Government ministry presents full technical guidelines to modernize rail networks, upgrade regional ports, and integrate grid-scale storage systems in ${country.name}.`,
+      content: `CAPITAL CITY (${country.capital.toUpperCase()}) — Government ministers officially introduced a multi-billion national infrastructure blueprint today aimed at modernizing regional transit networks, expanding clean power grids, and reinforcing trade infrastructure across ${country.name}.
 
-"This investment will drive economic productivity for decades to come," said the Minister of Transport during the press briefing.`,
-      ai_analysis: `Analysis of Article Facts:
-- Government ministers announced a multi-billion national infrastructure investment plan for ${country.name}.
-- Targets include upgrading rail transport, regional ports, and renewable energy integration.`,
+The comprehensive strategy outlines three primary implementation phases: immediate grid upgrades to absorb renewable power generation, modernization of cargo transport facilities to reduce logistics bottlenecks, and state grants for municipal clean energy adoption.
+
+Addressing press representatives in ${country.capital}, government officials confirmed that independent environmental and economic impact assessments will be published prior to project execution.
+
+"This long-term investment ensures sustainable economic growth and transport reliability for decades to come," stated the Ministry spokesperson.`,
+      ai_analysis: `Analysis of Reported Facts:
+- Fact 1: Government ministers unveiled a multi-billion national infrastructure plan for ${country.name}.
+- Fact 2: Key pillars include regional transit modernization, clean grid integration, and port upgrades.
+- Fact 3: Environmental and economic impact assessments will be published before implementation.`,
       country_code: code,
-      language: language,
+      language: langCode,
       category: 'infrastructure',
       image_mode: 'ai_generated',
       ai_image_url: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80',
       source_name: `${country.name} Press Agency`,
       source_url: 'https://vospolis.app',
       is_breaking: false,
-      tags: [country.name, 'Infrastructure', 'Transit'],
-      views_count: 310,
-      total_reading_time_seconds: 110,
+      tags: [country.name, 'Infrastructure', 'Energy'],
+      views_count: Math.floor(Math.random() * 2000) + 920,
+      total_reading_time_seconds: 160,
+      created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+      affiliate_link_label: 'Explore Energy Policy Reports',
+      affiliate_link_url: 'https://vospolis.app',
       poll: {
-        id: `poll-${code}-infra`,
-        question: `Do you support increasing national budget allocation for clean energy transit?`,
-        agree_count: 290,
-        disagree_count: 30,
+        id: `poll-${code}-2`,
+        question: `Do you support increasing national budget allocation for clean energy transit in ${country.name}?`,
+        agree_count: 420,
+        disagree_count: 58,
       },
-    }
+    },
   ];
-
-  return countryArticles.map((art, i) => ({
-    id: art.id || `seed-${code}-${i}`,
-    slug: art.slug || `${code.toLowerCase()}-article-${i}`,
-    title: art.title || 'Political Report',
-    snippet: art.snippet || '',
-    content: art.content || '',
-    ai_analysis: art.ai_analysis || '',
-    country_code: code,
-    language: language,
-    category: art.category || 'politics',
-    image_mode: art.image_mode || 'breaking_logo',
-    original_image_url: art.original_image_url,
-    ai_image_url: art.ai_image_url,
-    source_name: art.source_name || 'Vospolis News',
-    source_url: art.source_url || 'https://vospolis.app',
-    is_breaking: art.is_breaking || false,
-    tags: art.tags || [country.name],
-    views_count: art.views_count || 100,
-    total_reading_time_seconds: art.total_reading_time_seconds || 120,
-    created_at: new Date().toISOString(),
-    affiliate_link_label: art.affiliate_link_label || 'Official Vospolis Partner Digest',
-    affiliate_link_url: art.affiliate_link_url || 'https://vospolis.app',
-    poll: art.poll,
-  }));
 }
