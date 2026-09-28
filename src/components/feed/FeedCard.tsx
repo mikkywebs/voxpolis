@@ -52,8 +52,8 @@ export default function FeedCard({ article }: FeedCardProps) {
       <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700/60 flex items-center justify-between text-xs">
         <div className="flex items-center gap-2">
           {article.image_mode === 'ai_generated' && (
-            <span className="flex items-center gap-1 text-[10px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800">
-              <Sparkles className="w-3 h-3" /> AI Art
+            <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+              <Sparkles className="w-3 h-3" /> Featured Report
             </span>
           )}
           {article.tags?.slice(0, 2).map((t) => (

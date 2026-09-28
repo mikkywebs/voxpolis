@@ -76,7 +76,7 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-sm sm:text-base text-gray-400 max-w-2xl mt-4 leading-relaxed">
-          Voxpolis aggregates, analyzes, and contextualizes news from 23+ nations using AI factual extraction. Read full articles end-to-end without paywalls.
+          Voxpolis delivers real-time, independent political coverage and executive fact summaries from 230+ nations. Access direct regional political developments and active civic polls with zero paywalls.
         </p>
 
         {/* CTAs */}
@@ -125,7 +125,7 @@ export default function LandingPage() {
                 Mandatory 72-hour reporting for critical infrastructure and independent risk audits passed with supermajority support.
               </p>
               <div className="pt-2 border-t border-gray-800 flex items-center justify-between text-[11px] text-blue-400 font-semibold">
-                <span>Claude Factual Analysis Attached</span>
+                <span>Executive Fact Summary Attached</span>
                 <span>Read Full Article →</span>
               </div>
             </div>
@@ -134,7 +134,7 @@ export default function LandingPage() {
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-purple-400 uppercase">Japan Times • JP 🇯🇵</span>
                 <span className="text-[10px] bg-purple-900/60 text-purple-300 font-bold px-2 py-0.5 rounded border border-purple-700">
-                  AI Symbolic Art
+                  Featured Report
                 </span>
               </div>
               <h3 className="font-bold text-base text-white">National Diet Approves Renewable Energy Investment Act</h3>

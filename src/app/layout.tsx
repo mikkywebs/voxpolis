@@ -4,13 +4,13 @@ import CookieConsentBanner from '@/components/layout/CookieConsentBanner';
 import StickyFooterAd from '@/components/layout/StickyFooterAd';
 
 export const metadata: Metadata = {
-  title: 'Voxpolis - Personalized Global Political News Platform',
+  title: 'Voxpolis - Global Political Intelligence & News Platform',
   description:
-    'Tailored political news intelligence, Claude AI factual analysis, public sentiment polls, and multi-country feeds without content paywalls.',
+    'Direct global political intelligence, executive fact summaries, multi-nation coverage, and real-time civic sentiment analysis without content paywalls.',
   metadataBase: new URL('https://voxpolis.app'),
   openGraph: {
-    title: 'Voxpolis - Personalized Global Political News',
-    description: 'Factual AI political analysis and global news feeds.',
+    title: 'Voxpolis - Independent Global Political Intelligence',
+    description: 'Direct global political news coverage and citizen sentiment analysis.',
     url: 'https://voxpolis.app',
     siteName: 'Voxpolis',
     type: 'website',

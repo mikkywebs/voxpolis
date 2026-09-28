@@ -92,9 +92,9 @@ export default function ArticleImageHeader({
               alt="AI Symbolic Representation"
               className="w-full h-64 sm:h-96 object-cover filter contrast-105 saturate-110"
             />
-            <div className="p-2.5 bg-purple-950/90 text-purple-200 text-xs flex items-center gap-1.5 font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              <span>AI-Generated Stylized Symbolic Artwork (Non-identifiable representation)</span>
+            <div className="p-2.5 bg-slate-950/90 text-slate-200 text-xs flex items-center gap-1.5 font-medium">
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+              <span>Featured Report Illustration (Non-identifiable representation)</span>
             </div>
           </div>
         )}

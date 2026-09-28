@@ -25,8 +25,8 @@ export default function AIAnalysisSection({ analysisText, readAlsoArticle }: AIA
           <Sparkles className="w-5 h-5 text-blue-400" />
         </div>
         <div>
-          <h3 className="font-bold text-sm tracking-wide text-blue-200">Claude AI Factual Analysis</h3>
-          <p className="text-[10px] text-gray-400">Strictly scoped to reported article facts • No commentary or drift</p>
+          <h3 className="font-bold text-sm tracking-wide text-blue-200">Executive Fact Analysis</h3>
+          <p className="text-[10px] text-gray-400">Verified core report facts • Objective & non-partisan synthesis</p>
         </div>
       </div>
 
