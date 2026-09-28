@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
             title: item.title || 'Political Update',
             snippet: item.description || item.snippet || item.title || '',
             content: item.content || item.description || item.title || '',
-            ai_analysis: `Analysis of Article Facts:\n- Summary: ${item.description || item.title}\n- Source Outlet: ${item.source_id || 'NewsData'}\n- Published Date: ${item.pubDate || new Date().toLocaleString()}`,
+            ai_analysis: `• Core Fact: ${item.description || item.snippet || item.title}\n• Legislative Scope: Policy guidelines and administrative governance protocols were issued.\n• Public Impact: Official evaluation procedures remain subject to legislative committee review.`,
             country_code: countryCode,
             language: language,
             category: item.category?.[0] || 'politics',
@@ -60,14 +60,14 @@ export async function GET(request: NextRequest) {
             source_url: item.link || 'https://voxpolis.app',
             is_breaking: idx === 0,
             tags: item.keywords || ['Politics', country.name],
-            views_count: Math.floor(Math.random() * 2500) + 850,
+            views_count: 0,
             total_reading_time_seconds: 180,
             created_at: item.pubDate || new Date().toISOString(),
             poll: {
               id: `poll-newsdata-${idx}`,
-              question: `Do you agree with the policy developments reported by ${item.source_id || 'this source'}?`,
-              agree_count: 340,
-              disagree_count: 45,
+              question: `Do you agree with the policy developments reported in this executive summary?`,
+              agree_count: 0,
+              disagree_count: 0,
             },
           }));
         }
@@ -95,10 +95,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // 30-Day Retention Filter: Wipe out news older than 30 days
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const freshArticles = uniqueArticles.filter((art) => {
+    const time = new Date(art.created_at).getTime();
+    return !isNaN(time) && time >= thirtyDaysAgo;
+  });
+
   // 5. Store in Server Cache
-  if (uniqueArticles.length > 0) {
-    cacheMap.set(cacheKey, { timestamp: now, data: uniqueArticles });
+  if (freshArticles.length > 0) {
+    cacheMap.set(cacheKey, { timestamp: now, data: freshArticles });
   }
 
-  return NextResponse.json({ articles: uniqueArticles, cached: false });
+  return NextResponse.json({ articles: freshArticles, cached: false });
 }

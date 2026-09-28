@@ -9,31 +9,49 @@ interface EmojiReactionsProps {
 }
 
 export default function EmojiReactions({ articleId, onRequireAuth, isLoggedIn = true }: EmojiReactionsProps) {
-  const [counts, setCounts] = useState({
-    thumbs_up: 42,
-    sad: 8,
-    angry: 14,
-    insightful: 31,
+  // Real reactions stored locally per article ID (starts at 0)
+  const [counts, setCounts] = useState<{ [key: string]: number }>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`voxpolis_reactions_${articleId}`);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return { thumbs_up: 0, sad: 0, angry: 0, insightful: 0 };
   });
 
-  const [userReaction, setUserReaction] = useState<string | null>(null);
+  const [userReaction, setUserReaction] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(`voxpolis_my_reaction_${articleId}`);
+    }
+    return null;
+  });
 
   const handleReact = (type: 'thumbs_up' | 'sad' | 'angry' | 'insightful') => {
-    if (!isLoggedIn && onRequireAuth) {
-      onRequireAuth();
-      return;
-    }
+    // Both visitors and members can react in real time
+    let nextCounts = { ...counts };
+    let nextReaction: string | null = type;
 
     if (userReaction === type) {
-      setUserReaction(null);
-      setCounts({ ...counts, [type]: counts[type] - 1 });
+      nextReaction = null;
+      nextCounts[type] = Math.max(0, (nextCounts[type] || 0) - 1);
     } else {
-      const prev = userReaction;
-      const nextCounts = { ...counts };
-      if (prev) nextCounts[prev as keyof typeof counts] -= 1;
-      nextCounts[type] += 1;
-      setUserReaction(type);
-      setCounts(nextCounts);
+      if (userReaction && nextCounts[userReaction]) {
+        nextCounts[userReaction] = Math.max(0, nextCounts[userReaction] - 1);
+      }
+      nextCounts[type] = (nextCounts[type] || 0) + 1;
+    }
+
+    setUserReaction(nextReaction);
+    setCounts(nextCounts);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`voxpolis_reactions_${articleId}`, JSON.stringify(nextCounts));
+      if (nextReaction) {
+        localStorage.setItem(`voxpolis_my_reaction_${articleId}`, nextReaction);
+      } else {
+        localStorage.removeItem(`voxpolis_my_reaction_${articleId}`);
+      }
     }
   };
 

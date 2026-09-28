@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageSquare, Send, Sparkles, AlertCircle } from 'lucide-react';
+import { MessageSquare, Send, Sparkles, AlertCircle, Reply, User } from 'lucide-react';
 
-interface Comment {
+export interface CommentItem {
   id: string;
+  parentId?: string | null;
   user_name: string;
   country_flag: string;
-  country_code: string;
   content: string;
   created_at: string;
   reactions: { agree: number; disagree: number; angry: number; insightful: number };
@@ -24,54 +24,23 @@ interface CommentSectionProps {
 export default function CommentSection({
   articleId,
   userCountryFlag = '🇳🇬',
-  userCountryCode = 'NG',
   onRequireAuth,
-  isLoggedIn = true,
+  isLoggedIn = false,
 }: CommentSectionProps) {
-  const [comments, setComments] = useState<Comment[]>([
-    {
-      id: 'c1',
-      user_name: 'Dr. Evelyn Vance',
-      country_flag: '🇺🇸',
-      country_code: 'US',
-      content: 'Clear legislative oversight is critical for maintaining public trust in digital governance systems.',
-      created_at: '2 hours ago',
-      reactions: { agree: 18, disagree: 2, angry: 0, insightful: 12 },
-    },
-    {
-      id: 'c2',
-      user_name: 'Chief Adebayo Williams',
-      country_flag: '🇳🇬',
-      country_code: 'NG',
-      content: 'The regional infrastructure allocation must prioritize inter-state rail networks to boost commerce.',
-      created_at: '3 hours ago',
-      reactions: { agree: 34, disagree: 1, angry: 0, insightful: 19 },
-    },
-    {
-      id: 'c3',
-      user_name: 'Markus Lindqvist',
-      country_flag: '🇩🇪',
-      country_code: 'DE',
-      content: 'The 72-hour incident reporting window strikes a pragmatic balance for infrastructure contractors.',
-      created_at: '4 hours ago',
-      reactions: { agree: 14, disagree: 1, angry: 0, insightful: 9 },
-    },
-    {
-      id: 'c4',
-      user_name: 'Kwame Mensah',
-      country_flag: '🇬🇭',
-      country_code: 'GH',
-      content: 'Cross-border digital governance protocols will help streamline trade across West Africa.',
-      created_at: '5 hours ago',
-      reactions: { agree: 22, disagree: 0, angry: 0, insightful: 14 },
-    },
-  ]);
-
+  const [comments, setComments] = useState<CommentItem[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Link detector regex
+  const hasLink = (text: string) => {
+    const urlPattern = /(https?:\/\/|www\.|[a-z0-9-]+\.(com|org|net|gov|edu|app|io|me|co|uk|ng))/i;
+    return urlPattern.test(text);
+  };
+
+  const handleMainSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -82,31 +51,19 @@ export default function CommentSection({
 
     if (!newComment.trim()) return;
 
+    if (hasLink(newComment)) {
+      setErrorMsg('No links allowed in comments to maintain civilized public discourse.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          articleId,
-          content: newComment,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setErrorMsg(data.error || 'Failed to post comment due to moderation rules.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      const added: Comment = {
-        id: data.id || `c-${Date.now()}`,
-        user_name: data.user_name || 'You',
+      const added: CommentItem = {
+        id: `c-${Date.now()}`,
+        parentId: null,
+        user_name: 'Verified Member',
         country_flag: userCountryFlag,
-        country_code: userCountryCode,
-        content: data.content,
+        content: newComment.trim(),
         created_at: 'Just now',
         reactions: { agree: 0, disagree: 0, angry: 0, insightful: 0 },
       };
@@ -114,9 +71,40 @@ export default function CommentSection({
       setComments([added, ...comments]);
       setNewComment('');
     } catch (e: any) {
-      setErrorMsg('Error posting comment. Please check your connection.');
+      setErrorMsg('Error posting comment. Please try again.');
     }
     setIsSubmitting(false);
+  };
+
+  const handleReplySubmit = (e: React.FormEvent, parentId: string) => {
+    e.preventDefault();
+    setErrorMsg('');
+
+    if (!isLoggedIn && onRequireAuth) {
+      onRequireAuth();
+      return;
+    }
+
+    if (!replyText.trim()) return;
+
+    if (hasLink(replyText)) {
+      setErrorMsg('No links allowed in comments to maintain civilized public discourse.');
+      return;
+    }
+
+    const added: CommentItem = {
+      id: `c-${Date.now()}`,
+      parentId,
+      user_name: 'Verified Member',
+      country_flag: userCountryFlag,
+      content: replyText.trim(),
+      created_at: 'Just now',
+      reactions: { agree: 0, disagree: 0, angry: 0, insightful: 0 },
+    };
+
+    setComments([...comments, added]);
+    setReplyText('');
+    setReplyingToId(null);
   };
 
   const handleCommentReaction = (commentId: string, type: 'agree' | 'disagree' | 'angry' | 'insightful') => {
@@ -141,15 +129,25 @@ export default function CommentSection({
     );
   };
 
+  const parentComments = comments.filter((c) => !c.parentId);
+  const getReplies = (parentId: string) => comments.filter((c) => c.parentId === parentId);
+
   return (
     <div className="my-8 p-6 bg-white dark:bg-gray-800/80 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md">
-      <div className="flex items-center gap-2 mb-6">
-        <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-        <h3 className="text-base font-bold text-gray-900 dark:text-white">Global Citizen Discussion ({comments.length})</h3>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">
+            Global Member Discussion ({comments.length})
+          </h3>
+        </div>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-full">
+          Disqus Style • Members Only
+        </span>
       </div>
 
       {/* Moderated Comment Input */}
-      <form onSubmit={handleSubmit} className="mb-8">
+      <form onSubmit={handleMainSubmit} className="mb-8">
         {errorMsg && (
           <div className="mb-3 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-semibold rounded-xl flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -161,7 +159,14 @@ export default function CommentSection({
             rows={3}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder={isLoggedIn ? `Add your perspective... (Your comment will display your nationality ${userCountryFlag})` : "Log in to join the conversation..."}
+            onFocus={() => {
+              if (!isLoggedIn && onRequireAuth) onRequireAuth();
+            }}
+            placeholder={
+              isLoggedIn
+                ? `Share your perspective... (Your comment will display your country flag ${userCountryFlag})`
+                : "Log in or sign up to join the member discussion..."
+            }
             className="w-full text-xs p-3 pr-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
@@ -172,73 +177,119 @@ export default function CommentSection({
             <Send className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1.5">
-          Global Civic Moderation: Profanity is auto-censored (`****`). External links & hate speech are blocked. Your nationality flag ({userCountryFlag}) is attached to your comment.
+        <p className="text-[10px] text-gray-400 mt-1.5 flex items-center gap-1">
+          <span>Official Moderation:</span>
+          <span>No external links permitted. Your country flag ({userCountryFlag}) is attached automatically.</span>
         </p>
       </form>
 
-      {/* Comment List with Country Flags */}
-      <div className="space-y-6">
-        {comments.map((c, idx) => (
-          <div key={c.id}>
-            <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-700/60 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                  <span>{c.user_name}</span>
-                  <span className="text-base" title={`Country: ${c.country_code}`}>{c.country_flag}</span>
-                </span>
-                <span className="text-[10px] text-gray-400">{c.created_at}</span>
-              </div>
-              <p className="text-xs text-gray-700 dark:text-gray-200 leading-relaxed">{c.content}</p>
+      {/* Comment List */}
+      {comments.length === 0 ? (
+        <div className="py-8 text-center bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+          <MessageSquare className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+            No member comments yet.
+          </p>
+          <p className="text-[11px] text-gray-400 mt-0.5">
+            Be the first verified member to share your policy insight.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {parentComments.map((c, idx) => {
+            const replies = getReplies(c.id);
+            return (
+              <div key={c.id} className="space-y-3">
+                {/* Parent Comment */}
+                <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-700/60 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                      <span>{c.user_name}</span>
+                      <span className="text-base" title="Member Country">{c.country_flag}</span>
+                    </span>
+                    <span className="text-[10px] text-gray-400">{c.created_at}</span>
+                  </div>
+                  <p className="text-xs text-gray-700 dark:text-gray-200 leading-relaxed">{c.content}</p>
 
-              {/* Comment Reactions */}
-              <div className="pt-2 flex items-center gap-2 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => handleCommentReaction(c.id, 'agree')}
-                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-gray-700 dark:text-gray-300 font-semibold transition cursor-pointer"
-                >
-                  👍 Agree {c.reactions.agree > 0 && `(${c.reactions.agree})`}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCommentReaction(c.id, 'disagree')}
-                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-gray-700 dark:text-gray-300 font-semibold transition cursor-pointer"
-                >
-                  👎 Disagree {c.reactions.disagree > 0 && `(${c.reactions.disagree})`}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCommentReaction(c.id, 'angry')}
-                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-gray-700 dark:text-gray-300 font-semibold transition cursor-pointer"
-                >
-                  😡 Angry {c.reactions.angry > 0 && `(${c.reactions.angry})`}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCommentReaction(c.id, 'insightful')}
-                  className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-gray-700 dark:text-gray-300 font-semibold transition cursor-pointer"
-                >
-                  💡 Insightful {c.reactions.insightful > 0 && `(${c.reactions.insightful})`}
-                </button>
-              </div>
-            </div>
+                  {/* Comment Actions & Reactions */}
+                  <div className="pt-2 flex items-center justify-between flex-wrap gap-2 text-[11px]">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCommentReaction(c.id, 'agree')}
+                        className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-gray-700 dark:text-gray-300 font-semibold transition"
+                      >
+                        👍 Agree {c.reactions.agree > 0 && `(${c.reactions.agree})`}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCommentReaction(c.id, 'disagree')}
+                        className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-gray-700 dark:text-gray-300 font-semibold transition"
+                      >
+                        👎 Disagree {c.reactions.disagree > 0 && `(${c.reactions.disagree})`}
+                      </button>
+                    </div>
 
-            {/* AD BANNER INSERTED EVERY 3 COMMENTS */}
-            {(idx + 1) % 3 === 0 && (
-              <div className="my-4 p-3 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 rounded-xl border border-gray-300 dark:border-gray-600 text-center">
-                <span className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest block mb-1">
-                  <Sparkles className="w-3 h-3 inline mr-1 text-amber-500" />
-                  SPONSORED ADVERTISEMENT
-                </span>
-                <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">
-                  Upgrade to Voxpolis Pro for Ad-Free Political Intelligence & Real-Time Alerts
-                </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isLoggedIn && onRequireAuth) {
+                          onRequireAuth();
+                        } else {
+                          setReplyingToId(replyingToId === c.id ? null : c.id);
+                        }
+                      }}
+                      className="flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-bold text-[11px]"
+                    >
+                      <Reply className="w-3.5 h-3.5" />
+                      <span>Reply</span>
+                    </button>
+                  </div>
+
+                  {/* Inline Reply Form */}
+                  {replyingToId === c.id && (
+                    <form onSubmit={(e) => handleReplySubmit(e, c.id)} className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          placeholder={`Reply to ${c.user_name}...`}
+                          className="flex-1 text-xs p-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                        />
+                        <button
+                          type="submit"
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow"
+                        >
+                          Post Reply
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
+                {/* Nested Replies */}
+                {replies.length > 0 && (
+                  <div className="ml-6 pl-4 border-l-2 border-blue-500/40 space-y-3">
+                    {replies.map((reply) => (
+                      <div key={reply.id} className="p-3.5 rounded-xl bg-gray-100/70 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-800 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                            <span>{reply.user_name}</span>
+                            <span className="text-base">{reply.country_flag}</span>
+                          </span>
+                          <span className="text-[10px] text-gray-400">{reply.created_at}</span>
+                        </div>
+                        <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">{reply.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

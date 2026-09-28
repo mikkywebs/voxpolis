@@ -32,6 +32,9 @@ export default function ArticleDetailPage() {
   const [showInterstitialAd, setShowInterstitialAd] = useState(false);
   const [showEngagementModal, setShowEngagementModal] = useState(false);
 
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [realViews, setRealViews] = useState(0);
+
   useEffect(() => {
     async function loadArticle() {
       setLoading(true);
@@ -39,10 +42,31 @@ export default function ArticleDetailPage() {
       const found = list.find((a) => a.slug === slug) || list[0];
       setArticle(found);
       setRelatedArticles(list.filter((a) => a.slug !== found?.slug));
+
+      // Track real view count locally
+      if (found) {
+        const storedKey = `voxpolis_views_${found.id}`;
+        const prevViews = parseInt(localStorage.getItem(storedKey) || '0', 10);
+        const nextViews = prevViews + 1;
+        localStorage.setItem(storedKey, nextViews.toString());
+        setRealViews(nextViews);
+      }
+
       setLoading(false);
     }
     loadArticle();
   }, [slug, selectedCountry]);
+
+  // Check Supabase auth session
+  useEffect(() => {
+    async function checkUser() {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data } = await supabase.auth.getSession();
+      setIsLoggedIn(!!data?.session?.user);
+    }
+    checkUser();
+  }, []);
 
   // Interstitial Ad Logic: Capped to appear once every 4 article views (Requirement 11)
   useEffect(() => {
@@ -79,9 +103,9 @@ export default function ArticleDetailPage() {
       <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8">
-        {/* Exact Top-to-Bottom Layout Sequence (Requirement 4) */}
+        {/* Exact Top-to-Bottom Layout Sequence */}
 
-        {/* 1. Breaking Headline, Snippet & Image Mode Treatment */}
+        {/* 1. Headline, Snippet & Header (Views count hidden if < 100) */}
         <ArticleImageHeader
           title={article.title}
           snippet={article.snippet}
@@ -91,14 +115,23 @@ export default function ArticleDetailPage() {
           sourceName={article.source_name}
           sourceUrl={article.source_url}
           isBreaking={article.is_breaking}
+          viewsCount={realViews}
         />
 
-        {/* 2. Emoji Reaction Buttons Directly Under Snippet */}
+        {/* 2. Emoji Reaction Buttons (Real-time for both visitors & members) */}
         <EmojiReactions
           articleId={article.id}
           onRequireAuth={() => setShowAuthModal(true)}
-          isLoggedIn={true}
+          isLoggedIn={isLoggedIn}
         />
+
+        {/* Executive Article Summary Block before detailed body */}
+        <div className="my-6 p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border-l-4 border-blue-600 text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
+          <span className="font-bold text-blue-700 dark:text-blue-400 block uppercase tracking-wider text-[10px] mb-1">
+            EXECUTIVE REPORT SUMMARY
+          </span>
+          <p>{article.snippet || article.content.slice(0, 220) + '...'}</p>
+        </div>
 
         {/* Article Body Content */}
         <div className="prose dark:prose-invert max-w-none text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-relaxed space-y-4 my-6">
@@ -107,7 +140,7 @@ export default function ArticleDetailPage() {
           ))}
         </div>
 
-        {/* 3. Executive Fact Analysis Section & 4. Embedded "Read Also" Link */}
+        {/* 3. Executive Fact Analysis Section (Page-blended styling) */}
         <AIAnalysisSection
           analysisText={article.ai_analysis}
           readAlsoArticle={
@@ -117,24 +150,24 @@ export default function ArticleDetailPage() {
           }
         />
 
-        {/* 5. Admin-Manageable Affiliate Link Section ("Sponsored/Affiliate") */}
+        {/* 5. Sponsored/Affiliate Section */}
         <AffiliateSection label={article.affiliate_link_label} url={article.affiliate_link_url} />
 
-        {/* 6. Poll Section (Agree/Disagree style) */}
+        {/* 6. Poll Section (Members Only - empty initial counts) */}
         <PollSection
           poll={article.poll}
           onRequireAuth={() => setShowAuthModal(true)}
-          isLoggedIn={true}
+          isLoggedIn={isLoggedIn}
         />
 
         {/* 7. "Related Articles" Section */}
         <RelatedArticlesSection articles={relatedArticles} />
 
-        {/* 8. Comment Section with Reactions & Ad Banners Every 3 Comments */}
+        {/* 8. Comment Section (Disqus style, members only) */}
         <CommentSection
           articleId={article.id}
           onRequireAuth={() => setShowAuthModal(true)}
-          isLoggedIn={true}
+          isLoggedIn={isLoggedIn}
         />
 
         {/* 9. Small, Quiet Credited Link to Original Source at Very Bottom */}

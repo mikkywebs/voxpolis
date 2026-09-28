@@ -70,6 +70,23 @@ export default function CountryFeedPage() {
     localStorage.setItem('voxpolis_preferred_language', lang);
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ARTICLES_PER_PAGE = 12;
+
+  const totalPages = Math.ceil(articles.length / ARTICLES_PER_PAGE) || 1;
+  const startIndex = (currentPage - 1) * ARTICLES_PER_PAGE;
+  const currentArticles = articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
+
+  const firstHalf = currentArticles.slice(0, 6);
+  const secondHalf = currentArticles.slice(6, 12);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 200, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
       <Header
@@ -80,11 +97,11 @@ export default function CountryFeedPage() {
         onSelectLanguage={handleLanguageChange}
       />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8">
         {/* Country & Holiday Greeting Banner */}
         <HolidayBanner countryCode={selectedCountry.code} />
 
-        {/* Guest Access Prompt Banner if user is not logged in and viewing secondary country */}
+        {/* Guest Access Prompt Banner if user is not logged in */}
         {!user && (
           <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-900/40 via-indigo-950/60 to-slate-900 border border-blue-500/30 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
             <div className="flex items-center gap-3">
@@ -136,20 +153,63 @@ export default function CountryFeedPage() {
           </div>
         </div>
 
-        {/* News Feed Items with Ad Insertion */}
+        {/* News Feed Grid with 12 articles per page & Ad placed after 6 articles */}
         {loading ? (
-          <div className="space-y-4 py-8 text-center">
+          <div className="space-y-4 py-12 text-center">
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-xs text-gray-500">Loading {selectedCountry.name} political coverage...</p>
           </div>
+        ) : articles.length === 0 ? (
+          <div className="py-12 text-center text-gray-500 text-xs">
+            No political updates published in the last 30 days.
+          </div>
         ) : (
-          <div className="space-y-6">
-            {articles.map((art, idx) => (
-              <div key={art.id}>
-                <FeedCard article={art} />
-                {(idx + 1) % 2 === 0 && <FeedAdCard countryCode={selectedCountry.code} countryName={selectedCountry.name} />}
+          <div className="space-y-8">
+            {/* First 6 Articles Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {firstHalf.map((art) => (
+                <FeedCard key={art.id} article={art} />
+              ))}
+            </div>
+
+            {/* Advert Space After 6 Articles */}
+            {currentArticles.length > 0 && (
+              <div className="w-full">
+                <FeedAdCard countryCode={selectedCountry.code} countryName={selectedCountry.name} />
               </div>
-            ))}
+            )}
+
+            {/* Remaining Articles (up to 6) */}
+            {secondHalf.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {secondHalf.map((art) => (
+                  <FeedCard key={art.id} article={art} />
+                ))}
+              </div>
+            )}
+
+            {/* Pagination Navigation */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-800">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 disabled:opacity-40 text-xs font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                >
+                  ← Previous Page
+                </button>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 bg-blue-600 text-white disabled:opacity-40 text-xs font-bold rounded-xl hover:bg-blue-700 shadow transition"
+                >
+                  Next Page →
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>

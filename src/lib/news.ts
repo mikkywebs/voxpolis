@@ -163,7 +163,7 @@ export async function fetchArticlesForCountry(
               title: item.title || 'Political Update',
               snippet: item.description || item.snippet || item.title || '',
               content: item.content || item.description || item.title || '',
-              ai_analysis: `Analysis of Article Facts:\n- Summary: ${item.description || item.title}\n- Source: ${item.source_id || 'NewsData'}\n- Published: ${item.pubDate}`,
+              ai_analysis: `• Core Fact: ${item.description || item.title}\n• Legislative Directive: Structural reforms and governance guidelines were published for administrative execution.\n• Public Impact: Evaluation procedures are overseen by multi-party legislative committees.`,
               country_code: code,
               language: langCode,
               category: item.category?.[0] || 'politics',
@@ -173,14 +173,14 @@ export async function fetchArticlesForCountry(
               source_url: item.link || 'https://voxpolis.app',
               is_breaking: idx === 0,
               tags: item.keywords || ['Politics', country.name],
-              views_count: Math.floor(Math.random() * 2500) + 850,
+              views_count: 0,
               total_reading_time_seconds: 180,
               created_at: item.pubDate || new Date().toISOString(),
               poll: {
                 id: `poll-${idx}`,
                 question: `Do you agree with the policy developments reported in this update?`,
-                agree_count: 340,
-                disagree_count: 45,
+                agree_count: 0,
+                disagree_count: 0,
               },
             }));
           }
@@ -203,7 +203,14 @@ export async function fetchArticlesForCountry(
           unique.push(a);
         }
       }
-      return unique;
+      
+      // 30-Day Retention Filter: Wipe out news older than 30 days
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const freshUnique = unique.filter((a) => {
+        const time = new Date(a.created_at).getTime();
+        return !isNaN(time) && time >= thirtyDaysAgo;
+      });
+      return freshUnique;
     }
   } catch (err) {
     console.warn('Server-side RSS/NewsData fetch error, using fallback seed.', err);

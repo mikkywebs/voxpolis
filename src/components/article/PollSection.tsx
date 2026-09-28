@@ -14,19 +14,19 @@ interface PollSectionProps {
   isLoggedIn?: boolean;
 }
 
-export default function PollSection({ poll, onRequireAuth, isLoggedIn = true }: PollSectionProps) {
-  const initialAgree = poll?.agree_count || 120;
-  const initialDisagree = poll?.disagree_count || 30;
+export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }: PollSectionProps) {
+  const initialAgree = poll?.agree_count || 0;
+  const initialDisagree = poll?.disagree_count || 0;
 
   const [agree, setAgree] = useState(initialAgree);
   const [disagree, setDisagree] = useState(initialDisagree);
   const [userVote, setUserVote] = useState<'agree' | 'disagree' | null>(null);
 
-  const question = poll?.question || 'Do you support the proposed legislative measures outlined in this report?';
+  const question = poll?.question || 'Do you support the policy developments reported in this executive summary?';
 
   const total = agree + disagree;
-  const agreePercent = Math.round((agree / total) * 100);
-  const disagreePercent = 100 - agreePercent;
+  const agreePercent = total > 0 ? Math.round((agree / total) * 100) : 0;
+  const disagreePercent = total > 0 ? 100 - agreePercent : 0;
 
   const handleVote = (type: 'agree' | 'disagree') => {
     if (!isLoggedIn && onRequireAuth) {
@@ -38,10 +38,10 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = true }: 
 
     if (type === 'agree') {
       setAgree(agree + 1);
-      if (userVote === 'disagree') setDisagree(disagree - 1);
+      if (userVote === 'disagree') setDisagree(Math.max(0, disagree - 1));
     } else {
       setDisagree(disagree + 1);
-      if (userVote === 'agree') setAgree(agree - 1);
+      if (userVote === 'agree') setAgree(Math.max(0, agree - 1));
     }
     setUserVote(type);
   };
@@ -51,7 +51,7 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = true }: 
       <div className="flex items-center gap-2 mb-3">
         <Vote className="w-5 h-5 text-blue-600 dark:text-blue-400" />
         <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          Public Opinion Poll
+          Public Opinion Poll (Members Only)
         </span>
       </div>
 
@@ -59,14 +59,25 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = true }: 
 
       {/* Progress Bar */}
       <div className="mb-4">
-        <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex">
-          <div style={{ width: `${agreePercent}%` }} className="bg-emerald-500 transition-all duration-500" />
-          <div style={{ width: `${disagreePercent}%` }} className="bg-rose-500 transition-all duration-500" />
-        </div>
-        <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-gray-300 mt-1.5">
-          <span className="text-emerald-600 dark:text-emerald-400">Agree: {agreePercent}% ({agree})</span>
-          <span className="text-rose-600 dark:text-rose-400">Disagree: {disagreePercent}% ({disagree})</span>
-        </div>
+        {total === 0 ? (
+          <div>
+            <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden" />
+            <div className="text-center text-xs text-gray-400 dark:text-gray-500 mt-1.5 font-medium">
+              No member votes cast yet. Be the first verified member to vote!
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex">
+              <div style={{ width: `${agreePercent}%` }} className="bg-emerald-500 transition-all duration-500" />
+              <div style={{ width: `${disagreePercent}%` }} className="bg-rose-500 transition-all duration-500" />
+            </div>
+            <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-gray-300 mt-1.5">
+              <span className="text-emerald-600 dark:text-emerald-400">Agree: {agreePercent}% ({agree})</span>
+              <span className="text-rose-600 dark:text-rose-400">Disagree: {disagreePercent}% ({disagree})</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Vote Buttons */}

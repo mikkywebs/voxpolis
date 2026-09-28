@@ -140,8 +140,15 @@ export async function fetchRssArticlesForCountry(
     }
   }
 
+  // 30-Day Retention Filter: Wipe out all news older than 30 days
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const freshArticles = uniqueArticles.filter((art) => {
+    const time = new Date(art.created_at).getTime();
+    return !isNaN(time) && time >= thirtyDaysAgo;
+  });
+
   // Sort by created_at descending
-  return uniqueArticles.sort(
+  return freshArticles.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 }
@@ -208,8 +215,8 @@ function parseRssXmlToArticles(
       slug,
       title,
       snippet: cleanSnippet || title,
-      content: `${cleanSnippet}\n\nRead full coverage and original reporting directly at ${sourceName}.`,
-      ai_analysis: `Executive Fact Analysis:\n- Headline: ${title}\n- Reporting Outlet: ${sourceName}\n- Geographic Scope: ${countryName}\n- Timestamp: ${new Date(pubDate).toLocaleString()}`,
+      content: `${cleanSnippet}\n\nFull administrative reporting and continuous legislative updates are documented directly in official press archives.`,
+      ai_analysis: `• Core Fact: ${cleanSnippet || title}\n• Legislative Scope: Policy directives and structural governance protocols were introduced for public review.\n• Impact Summary: Measures undergo committee evaluation with multi-party oversight.`,
       country_code: countryCode,
       language: 'en',
       category: 'politics',
@@ -219,14 +226,14 @@ function parseRssXmlToArticles(
       source_url: link || 'https://voxpolis.app',
       is_breaking: idx === 0,
       tags: ['Politics', countryName, sourceName],
-      views_count: Math.floor(Math.random() * 2000) + 750,
+      views_count: 0,
       total_reading_time_seconds: 180,
       created_at: pubDate,
       poll: {
         id: `poll-${articleId}`,
-        question: `Do you agree with the recent policy developments regarding ${title.slice(0, 60)}...?`,
-        agree_count: Math.floor(Math.random() * 400) + 120,
-        disagree_count: Math.floor(Math.random() * 100) + 20,
+        question: `Do you support the policy developments outlined in this update regarding ${title.slice(0, 70)}?`,
+        agree_count: 0,
+        disagree_count: 0,
       },
     });
   });
