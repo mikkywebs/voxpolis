@@ -143,7 +143,7 @@ export default function CountryFeedPage() {
           <div className="flex items-center gap-2">
             <Newspaper className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <h1 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white">
-              {selectedCountry.flag} {selectedCountry.name} Political Intelligence
+              {selectedCountry.flag} {selectedCountry.name} | Politics
             </h1>
           </div>
           <div className="flex items-center gap-2">
