@@ -61,6 +61,7 @@ export async function runBackfillJob(
         art.title,
         art.snippet,
         art.created_at,
+        art.country_code || 'NG',
         true // Force reprocess
       );
 

@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
         body.headline || '',
         body.description || '',
         body.published_at,
+        body.country_code || 'NG',
         body.force || false
       );
 
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
             art.source_name,
             art.title,
             art.snippet,
-            art.created_at
+            art.created_at,
+            countryCode
           );
           processed.push({ url: art.source_url, status: res.status, slug: res.slug });
         }
@@ -110,7 +112,8 @@ export async function GET(request: NextRequest) {
           art.source_name,
           art.title,
           art.snippet,
-          art.created_at
+          art.created_at,
+          countryCode
         );
         processed.push({ url: art.source_url, status: res.status, slug: res.slug });
       }
