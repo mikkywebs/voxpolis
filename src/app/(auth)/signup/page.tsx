@@ -111,15 +111,32 @@ export default function SignupPage() {
   };
 
   const handleGoogleSignup = async () => {
+    setErrorMsg('');
+    setLoading(true);
     try {
-      await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/feed`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
+
+      if (error) {
+        if (
+          error.message?.toLowerCase().includes('not enabled') ||
+          error.message?.toLowerCase().includes('unsupported provider') ||
+          (error as any).code === 400 ||
+          (error as any).error_code === 'validation_failed'
+        ) {
+          setErrorMsg('Google Sign-In is not currently enabled in Supabase Auth settings. Please register using your Email Address below, or enable the Google provider in your Supabase Dashboard.');
+        } else {
+          setErrorMsg(error.message);
+        }
+        setLoading(false);
+      }
     } catch (e: any) {
       setErrorMsg(e.message || 'Google OAuth failed.');
+      setLoading(false);
     }
   };
 
