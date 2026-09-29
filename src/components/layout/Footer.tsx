@@ -16,7 +16,7 @@ export default function Footer() {
           />
         </Link>
 
-        {/* Footer Navigation Links for All 5 Indexable Trust Pages */}
+        {/* Footer Navigation Links for All Trust Pages (Historical Archive link removed per request) */}
         <nav className="flex items-center justify-center flex-wrap gap-5 text-xs font-semibold text-gray-300">
           <Link href="/" className="hover:text-blue-400 transition">
             Home
@@ -35,9 +35,6 @@ export default function Footer() {
           </Link>
           <Link href="/terms" className="hover:text-blue-400 transition">
             Terms of Service
-          </Link>
-          <Link href="/archive" className="hover:text-blue-400 transition">
-            Historical Archive
           </Link>
         </nav>
 

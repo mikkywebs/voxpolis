@@ -2,45 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchRssArticlesForCountry } from '@/lib/rss';
 import { getCountryByCode } from '@/config/countries';
 import { ArticleData } from '@/lib/news';
+import { isValidContentImage } from '@/lib/pipeline/extractor';
 
-// In-Memory Server Cache to strictly protect NewsData 200 API credits / day
-// TTL set to 2 hours (7,200,000 ms) per country
-interface CacheEntry {
-  timestamp: number;
-  data: ArticleData[];
-}
-
-const cacheMap = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 Hours
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const countryCode = (searchParams.get('country') || 'NG').toUpperCase();
   const language = (searchParams.get('language') || 'en').toLowerCase();
-  const cacheKey = `${countryCode}_${language}`;
-
-  // 1. Check Server Memory Cache
-  const cached = cacheMap.get(cacheKey);
-  const now = Date.now();
-
-  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
-    return NextResponse.json({ articles: cached.data, cached: true });
-  }
 
   const country = getCountryByCode(countryCode);
   const apiKey = process.env.NEWSDATA_API_KEY;
   let newsDataArticles: ArticleData[] = [];
 
-  // 2. Fetch from NewsData API if valid key is configured
+  // 1. Fetch from NewsData API if valid key is configured
   if (apiKey && apiKey !== 'pub_demo_key' && apiKey.trim() !== '') {
     try {
       const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&country=${countryCode.toLowerCase()}&category=politics&language=${language}`;
-      const res = await fetch(url, { next: { revalidate: 7200 } });
+      const res = await fetch(url, { cache: 'no-store' });
       
       if (res.ok) {
         const data = await res.json();
         if (data.results && Array.isArray(data.results)) {
-            newsDataArticles = data.results.map((item: any, idx: number) => {
+          newsDataArticles = data.results
+            .filter((item: any) => isValidContentImage(item.image_url))
+            .map((item: any, idx: number) => {
               const cleanTitle = (item.title || 'Political Update')
                 .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
                 .replace(/The post .* appeared first on .*/gi, '')
@@ -67,12 +54,12 @@ export async function GET(request: NextRequest) {
                 title: cleanTitle,
                 snippet: rawDesc,
                 content: rawContent,
-                ai_analysis: `Executive Summary & Core Impact:\n• Fact Analysis: ${rawDesc}\n• Legislative Scope: Structural policy directives remain under multi-party committee evaluation.`,
+                ai_analysis: `• News Recap: ${rawDesc}\n• Key Impact: Official evaluation procedures and regional report context.`,
                 country_code: countryCode,
                 language: language,
                 category: item.category?.[0] || 'politics',
-                image_mode: item.image_url ? 'original' : 'breaking_logo',
-                original_image_url: item.image_url || '/breaking-news-banner.png',
+                image_mode: 'original' as const,
+                original_image_url: item.image_url,
                 source_name: item.source_id || `${country.name} Press`,
                 source_url: item.link || 'https://voxpolis.app',
                 is_breaking: idx === 0,
@@ -82,7 +69,7 @@ export async function GET(request: NextRequest) {
                 created_at: item.pubDate || new Date().toISOString(),
                 poll: {
                   id: `poll-newsdata-${idx}`,
-                  question: `What is your perspective on "${cleanTitle.slice(0, 75)}"?`,
+                  question: `Do you agree with the stance regarding "${cleanTitle.slice(0, 75)}"?`,
                   agree_count: 0,
                   disagree_count: 0,
                 },
@@ -95,10 +82,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 3. Fetch Prompt RSS Country Feeds (DailyPost, Vanguard, Premium Times, Google News RSS, etc.)
+  // 2. Fetch Prompt RSS Country Feeds
   const rssArticles = await fetchRssArticlesForCountry(countryCode, language);
 
-  // 4. Combine NewsData + RSS Feeds (NewsData first, then RSS)
+  // 3. Combine NewsData + RSS Feeds
   const { isPoliticalNews, isRelevantToCountry } = await import('@/lib/news');
   const combined = [...newsDataArticles, ...rssArticles];
 
@@ -109,6 +96,7 @@ export async function GET(request: NextRequest) {
   for (const art of combined) {
     if (!isPoliticalNews(art.title, art.snippet, art.tags)) continue;
     if (!isRelevantToCountry(art.title, art.snippet, countryCode)) continue;
+    if (!isValidContentImage(art.original_image_url)) continue;
 
     const key = art.title.toLowerCase().slice(0, 35);
     if (!seenTitles.has(key)) {
@@ -117,15 +105,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 5. Fallback to country localized template if zero articles found
+  // 4. Fallback to country localized template if zero articles match
   if (uniqueArticles.length === 0) {
     const { fetchArticlesForCountry } = await import('@/lib/news');
     const fallbackArticles = await fetchArticlesForCountry(countryCode, language);
-    return NextResponse.json({ articles: fallbackArticles, cached: false });
+    return NextResponse.json(
+      { articles: fallbackArticles, cached: false },
+      { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } }
+    );
   }
 
-  // Store in Server Cache
-  cacheMap.set(cacheKey, { timestamp: now, data: uniqueArticles });
-
-  return NextResponse.json({ articles: uniqueArticles, cached: false });
+  return NextResponse.json(
+    { articles: uniqueArticles, cached: false },
+    { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } }
+  );
 }
