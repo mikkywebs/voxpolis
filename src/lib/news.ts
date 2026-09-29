@@ -43,6 +43,35 @@ export function isArticleArchived(createdAt: string): boolean {
   return age > fortyEightHoursMs;
 }
 
+// Strict Political News Filter: Ensures non-political gossip news is excluded
+const POLITICAL_KEYWORDS = [
+  'politic', 'politics', 'government', 'governance', 'parliament', 'parliamentary',
+  'congress', 'congressional', 'president', 'presidential', 'minister', 'ministry',
+  'senate', 'senator', 'lawmaker', 'election', 'electoral', 'policy', 'policies',
+  'legislation', 'legislative', 'assembly', 'governor', 'diplomacy', 'diplomatic',
+  'sanction', 'treaty', 'cabinet', 'party', 'democrat', 'republican', 'mp', 'mps',
+  'official', 'constitution', 'constitutional', 'court', 'judge', 'bill', 'reform',
+  'prime minister', 'supreme court', 'chancellor', 'bureau', 'federal', 'state department',
+  'national assembly', 'ballot', 'vote', 'voter', 'candidate', 'campaign', 'white house',
+  'kremlin', 'downing street', 'capitol', 'foreign affairs', 'defense minister'
+];
+
+const FORBIDDEN_NON_POLITICAL_KEYWORDS = [
+  'phone-sex', 'sex session', 'celebrity', 'nollywood', 'hollywood', 'relationship scandal',
+  'bitch', 'ex-girlfriend', 'ex-boyfriend', 'nude', 'onlyfans', 'big brother', 'bbnaija',
+  'grammy', 'oscar', 'box office', 'reality show', 'hookup'
+];
+
+export function isPoliticalNews(title: string, snippet: string = '', tags: string[] = []): boolean {
+  const text = `${title} ${snippet} ${tags.join(' ')}`.toLowerCase();
+
+  for (const forbidden of FORBIDDEN_NON_POLITICAL_KEYWORDS) {
+    if (text.includes(forbidden)) return false;
+  }
+
+  return POLITICAL_KEYWORDS.some((kw) => text.includes(kw));
+}
+
 // Multi-language template content for localized news reports
 const LOCALIZED_NEWS_TEMPLATES: Record<string, (countryName: string, capital: string) => { title: string; snippet: string; content: string; analysis: string; pollQuestion: string }> = {
   fr: (country, capital) => ({
@@ -203,10 +232,12 @@ export async function fetchArticlesForCountry(
     const combined = [...newsDataArticles, ...rssArticles];
 
     if (combined.length > 0) {
-      // Deduplicate by title & annotate archiving status
+      // Deduplicate by title, enforce strict political filtering & annotate archiving status
       const seen = new Set<string>();
       const unique: ArticleData[] = [];
       for (const a of combined) {
+        if (!isPoliticalNews(a.title, a.snippet, a.tags)) continue;
+
         const k = a.title.toLowerCase().slice(0, 35);
         if (!seen.has(k)) {
           seen.add(k);

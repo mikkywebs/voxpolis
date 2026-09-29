@@ -17,6 +17,8 @@ import { fetchArticlesForCountry, ArticleData } from '@/lib/news';
 import { X, Sparkles, LogIn } from 'lucide-react';
 import Link from 'next/link';
 
+import SocialShareButtons from '@/components/article/SocialShareButtons';
+
 export default function ArticleDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -127,6 +129,9 @@ export default function ArticleDetailPage() {
           viewsCount={realViews}
         />
 
+        {/* Social Media Sharing Buttons (Immediately After Title) */}
+        <SocialShareButtons title={article.title} slug={article.slug} />
+
         {/* 2. Emoji Reaction Buttons (Real-time for both visitors & members) */}
         <EmojiReactions
           articleId={article.id}
@@ -171,6 +176,9 @@ export default function ArticleDetailPage() {
 
         {/* 7. "Related Articles" Section */}
         <RelatedArticlesSection articles={relatedArticles} />
+
+        {/* Social Media Sharing Buttons (Immediately Before Comment Section) */}
+        <SocialShareButtons title={article.title} slug={article.slug} />
 
         {/* 8. Comment Section (Disqus style, members only) */}
         <CommentSection

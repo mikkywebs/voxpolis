@@ -3,6 +3,7 @@ import './globals.css';
 import Footer from '@/components/layout/Footer';
 import CookieConsentBanner from '@/components/layout/CookieConsentBanner';
 import StickyFooterAd from '@/components/layout/StickyFooterAd';
+import ScrollToTopButton from '@/components/layout/ScrollToTopButton';
 
 export const metadata: Metadata = {
   title: 'Voxpolis - Global Political Intelligence & News Platform',
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body className="min-h-screen antialiased flex flex-col justify-between">
         {children}
         <Footer />
+        <ScrollToTopButton />
         <CookieConsentBanner />
         <StickyFooterAd />
       </body>
