@@ -11,12 +11,12 @@ import PollSection from '@/components/article/PollSection';
 import RelatedArticlesSection from '@/components/article/RelatedArticlesSection';
 import { CommentInputForm, CommentList, CommentItem } from '@/components/article/CommentSection';
 import OriginalSourceLink from '@/components/article/OriginalSourceLink';
-import EngagementPromptModal from '@/components/retention/EngagementPromptModal';
-import { SUPPORTED_COUNTRIES, getCountryByCode } from '@/config/countries';
+import { SUPPORTED_COUNTRIES } from '@/config/countries';
 import { fetchArticlesForCountry, ArticleData } from '@/lib/news';
-import { X, Sparkles, LogIn } from 'lucide-react';
-import Link from 'next/link';
-
+import { getPipelineArticleBySlug } from '@/lib/pipeline';
+import { get301Redirect } from '@/lib/pipeline/redirects';
+import { PipelineArticleRecord } from '@/lib/pipeline/types';
+import { X, LogIn, ExternalLink, ShieldAlert, CheckCircle2, HelpCircle, FileText } from 'lucide-react';
 import SocialShareButtons from '@/components/article/SocialShareButtons';
 
 export default function ArticleDetailPage() {
@@ -26,17 +26,65 @@ export default function ArticleDetailPage() {
 
   const [selectedCountry, setSelectedCountry] = useState(SUPPORTED_COUNTRIES[0]);
   const [article, setArticle] = useState<ArticleData | null>(null);
+  const [pipelineArticle, setPipelineArticle] = useState<PipelineArticleRecord | null>(null);
   const [relatedArticles, setRelatedArticles] = useState<ArticleData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modals
+  // Modals & State
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showInterstitialAd, setShowInterstitialAd] = useState(false);
-  const [showEngagementModal, setShowEngagementModal] = useState(false);
-
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [realViews, setRealViews] = useState(0);
   const [comments, setComments] = useState<CommentItem[]>([]);
+
+  // 1. Check 301 Redirect for legacy/backfilled URLs
+  useEffect(() => {
+    if (slug) {
+      const redirectedSlug = get301Redirect(slug);
+      if (redirectedSlug) {
+        router.replace(`/article/${redirectedSlug}`);
+      }
+    }
+  }, [slug, router]);
+
+  useEffect(() => {
+    async function loadArticle() {
+      setLoading(true);
+
+      // Check if pipeline article exists
+      const pipeArt = getPipelineArticleBySlug(slug);
+      if (pipeArt && pipeArt.status === 'published') {
+        setPipelineArticle(pipeArt);
+      }
+
+      const list = await fetchArticlesForCountry(selectedCountry.code);
+      const found = list.find((a) => a.slug === slug) || list[0];
+      setArticle(found);
+      setRelatedArticles(list.filter((a) => a.slug !== found?.slug));
+
+      // Track view count
+      if (found) {
+        const storedKey = `voxpolis_views_${found.id}`;
+        const prevViews = parseInt(localStorage.getItem(storedKey) || '0', 10);
+        const nextViews = prevViews + 1;
+        localStorage.setItem(storedKey, nextViews.toString());
+        setRealViews(nextViews);
+      }
+
+      setLoading(false);
+    }
+    loadArticle();
+  }, [slug, selectedCountry]);
+
+  // Check auth session
+  useEffect(() => {
+    async function checkUser() {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data } = await supabase.auth.getSession();
+      setIsLoggedIn(!!data?.session?.user);
+    }
+    checkUser();
+  }, []);
 
   const handleAddComment = (newC: CommentItem) => {
     setComments((prev) => [newC, ...prev]);
@@ -63,62 +111,7 @@ export default function ArticleDetailPage() {
     );
   };
 
-  useEffect(() => {
-    async function loadArticle() {
-      setLoading(true);
-      const list = await fetchArticlesForCountry(selectedCountry.code);
-      const found = list.find((a) => a.slug === slug) || list[0];
-      setArticle(found);
-      setRelatedArticles(list.filter((a) => a.slug !== found?.slug));
-
-      // Track real view count locally
-      if (found) {
-        const storedKey = `voxpolis_views_${found.id}`;
-        const prevViews = parseInt(localStorage.getItem(storedKey) || '0', 10);
-        const nextViews = prevViews + 1;
-        localStorage.setItem(storedKey, nextViews.toString());
-        setRealViews(nextViews);
-      }
-
-      setLoading(false);
-    }
-    loadArticle();
-  }, [slug, selectedCountry]);
-
-  // Check Supabase auth session
-  useEffect(() => {
-    async function checkUser() {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-      const { data } = await supabase.auth.getSession();
-      setIsLoggedIn(!!data?.session?.user);
-    }
-    checkUser();
-  }, []);
-
-  // Interstitial Ad Logic: Capped to appear once every 4 article views (Requirement 11)
-  useEffect(() => {
-    const views = parseInt(sessionStorage.getItem('voxpolis_article_views') || '0', 10) + 1;
-    sessionStorage.setItem('voxpolis_article_views', views.toString());
-
-    if (views % 4 === 1 && views > 1) {
-      setShowInterstitialAd(true);
-    }
-
-    // Engagement feedback prompt trigger: Native mobile app builds only (hidden for browser users)
-    const isNativeApp = typeof window !== 'undefined' && (
-      Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
-      Boolean((window as any).ReactNativeWebView)
-    );
-    const hasFeedback = localStorage.getItem('voxpolis_feedback_submitted');
-    if (isNativeApp && !hasFeedback && views >= 3 && views % 3 === 0) {
-      setTimeout(() => {
-        setShowEngagementModal(true);
-      }, 5000);
-    }
-  }, [slug]);
-
-  if (loading || !article) {
+  if (loading || (!article && !pipelineArticle)) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -126,66 +119,235 @@ export default function ArticleDetailPage() {
     );
   }
 
+  // Pipeline Article Display (Unique distinct fields, zero duplication)
+  if (pipelineArticle) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
+        <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+
+        <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
+          {/* Headline & Deck */}
+          <div className="space-y-3">
+            <span className="px-3 py-1 bg-blue-600 text-white font-extrabold text-[11px] rounded-full uppercase tracking-wider">
+              VOXPOLIS BRIEF | {pipelineArticle.content_type.toUpperCase()}
+            </span>
+            <h1 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white leading-tight">
+              {pipelineArticle.headline}
+            </h1>
+            {pipelineArticle.dek && (
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 font-medium leading-relaxed">
+                {pipelineArticle.dek}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between text-xs text-gray-500 border-y border-gray-200 dark:border-gray-800 py-2.5">
+              <span>Source: <strong>{pipelineArticle.source_name}</strong></span>
+              <span>{pipelineArticle.read_minutes} min read ({pipelineArticle.word_count} words)</span>
+            </div>
+          </div>
+
+          <SocialShareButtons title={pipelineArticle.headline} slug={pipelineArticle.slug} />
+
+          {/* Featured Image */}
+          {pipelineArticle.original_image_url && (
+            <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-md">
+              {/* eslint-disable-next-html-element-suppression */}
+              <img
+                src={pipelineArticle.original_image_url}
+                alt={pipelineArticle.headline}
+                className="w-full h-64 sm:h-80 object-cover"
+              />
+              <div className="p-2.5 bg-gray-100 dark:bg-gray-900 text-[11px] text-gray-500 flex items-center justify-between">
+                <span>Source Image Credited to {pipelineArticle.source_name}</span>
+                <a
+                  href={pipelineArticle.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                >
+                  <span>View Original Page</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Executive Summary */}
+          {pipelineArticle.executive_summary && (
+            <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-1">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
+                EXECUTIVE BRIEF SUMMARY
+              </span>
+              <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 leading-relaxed">
+                {pipelineArticle.executive_summary}
+              </p>
+            </div>
+          )}
+
+          {/* Why It Matters */}
+          {pipelineArticle.why_it_matters && (
+            <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-1">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                WHY THIS MATTERS
+              </span>
+              <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-relaxed">
+                {pipelineArticle.why_it_matters}
+              </p>
+            </div>
+          )}
+
+          {/* Legislative Scope (Rendered ONLY if non-null) */}
+          {pipelineArticle.legislative_scope && (
+            <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-1">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-300 block flex items-center gap-1">
+                <FileText className="w-3.5 h-3.5" />
+                <span>LEGISLATIVE & REGULATORY DIRECTIVE</span>
+              </span>
+              <p className="text-xs sm:text-sm text-amber-900 dark:text-amber-100 font-medium leading-relaxed">
+                {pipelineArticle.legislative_scope}
+              </p>
+            </div>
+          )}
+
+          {/* Fact Analysis Cards */}
+          {pipelineArticle.fact_analysis && pipelineArticle.fact_analysis.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <span className="text-xs font-black uppercase tracking-wider text-gray-500 block">
+                FACT & ALLEGATION ANALYSIS
+              </span>
+              <div className="space-y-2.5">
+                {pipelineArticle.fact_analysis.map((fa, i) => (
+                  <div
+                    key={i}
+                    className="p-3.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-xs space-y-1.5 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 ${
+                          fa.status === 'confirmed'
+                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                            : fa.status === 'claimed'
+                            ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+                            : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                        }`}
+                      >
+                        {fa.status === 'confirmed' && <CheckCircle2 className="w-3 h-3" />}
+                        {fa.status === 'claimed' && <HelpCircle className="w-3 h-3" />}
+                        {fa.status === 'unverified' && <ShieldAlert className="w-3 h-3" />}
+                        <span>{fa.status}</span>
+                      </span>
+                      {fa.who_said && (
+                        <span className="text-gray-400 italic">Attributed to: {fa.who_said}</span>
+                      )}
+                    </div>
+                    <p className="text-gray-800 dark:text-gray-200 font-medium leading-relaxed">{fa.fact}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Listicle Items (Rendered if content_type === 'listicle') */}
+          {pipelineArticle.content_type === 'listicle' && pipelineArticle.items.length > 0 && (
+            <div className="space-y-4 pt-2">
+              <span className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
+                KEY BRIEFING ITEMS ({pipelineArticle.items.length})
+              </span>
+              <div className="space-y-4">
+                {pipelineArticle.items.map((item) => (
+                  <div
+                    key={item.position}
+                    className="p-4 rounded-2xl bg-gray-100/80 dark:bg-gray-900/80 border border-gray-200 dark:border-gray-800 space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                        {item.position}
+                      </span>
+                      <h3 className="font-bold text-sm text-gray-900 dark:text-white">{item.title}</h3>
+                    </div>
+                    <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed pl-8">
+                      {item.summary}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Main Body Markdown Content */}
+          <div className="prose dark:prose-invert max-w-none text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-relaxed space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+            {pipelineArticle.body_markdown.split('\n\n').map((para, i) => (
+              <p key={i}>{para}</p>
+            ))}
+          </div>
+
+          <OriginalSourceLink sourceName={pipelineArticle.source_name} sourceUrl={pipelineArticle.source_url} />
+
+          {/* Poll & Comments */}
+          <PollSection onRequireAuth={() => setShowAuthModal(true)} isLoggedIn={isLoggedIn} />
+          <CommentInputForm
+            userCountryFlag={selectedCountry.flag}
+            onRequireAuth={() => setShowAuthModal(true)}
+            isLoggedIn={isLoggedIn}
+            onCommentSubmitted={handleAddComment}
+          />
+          <CommentList
+            comments={comments}
+            userCountryFlag={selectedCountry.flag}
+            onRequireAuth={() => setShowAuthModal(true)}
+            isLoggedIn={isLoggedIn}
+            onAddReply={handleAddReply}
+            onReact={handleReact}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  // Fallback Standard Article Display
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
       <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8">
-        {/* Archived Report Badge */}
-        {article.is_archived && (
-          <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs font-semibold flex items-center gap-2">
-            <span className="text-base">🏛</span>
-            <span>
-              <strong>Archived Report:</strong> Originally published on{' '}
-              {new Date(article.created_at).toLocaleDateString()}. Preserved in the Voxpolis Political Archive for historical research & permanent URL access.
-            </span>
-          </div>
-        )}
-
-        {/* 1. Headline, Snippet & Header (Views count hidden if < 100) */}
         <ArticleImageHeader
-          title={article.title}
-          snippet={article.snippet}
-          imageMode={article.image_mode}
-          originalImageUrl={article.original_image_url}
-          aiImageUrl={article.ai_image_url}
-          sourceName={article.source_name}
-          sourceUrl={article.source_url}
-          isBreaking={article.is_breaking}
+          title={article!.title}
+          snippet={article!.snippet}
+          imageMode={article!.image_mode}
+          originalImageUrl={article!.original_image_url}
+          aiImageUrl={article!.ai_image_url}
+          sourceName={article!.source_name}
+          sourceUrl={article!.source_url}
+          isBreaking={article!.is_breaking}
           viewsCount={realViews}
-          createdAt={article.created_at}
+          createdAt={article!.created_at}
         />
 
-        {/* Social Media Sharing Buttons (Immediately After Title) */}
-        <SocialShareButtons title={article.title} slug={article.slug} />
+        <SocialShareButtons title={article!.title} slug={article!.slug} />
 
-        {/* 2. Emoji Reaction Buttons (Real-time for both visitors & members) */}
         <EmojiReactions
-          articleId={article.id}
+          articleId={article!.id}
           onRequireAuth={() => setShowAuthModal(true)}
           isLoggedIn={isLoggedIn}
         />
 
-        {/* Executive Article Summary Block before detailed body */}
         <div className="my-6 pt-2 text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
           <span className="font-bold text-blue-600 dark:text-blue-400 block uppercase tracking-wider text-[11px] mb-1">
             EXECUTIVE REPORT SUMMARY
           </span>
           <p className="text-gray-800 dark:text-gray-200 font-semibold leading-relaxed">
-            {article.snippet || article.content.slice(0, 220) + '...'}
+            {article!.snippet || article!.content.slice(0, 220) + '...'}
           </p>
         </div>
 
-        {/* Article Body Content */}
         <div className="prose dark:prose-invert max-w-none text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-relaxed space-y-4 my-6">
-          {article.content.split('\n\n').map((paragraph, i) => (
+          {article!.content.split('\n\n').map((paragraph, i) => (
             <p key={i}>{paragraph}</p>
           ))}
         </div>
 
-        {/* 3. Executive Fact Analysis Section (Page-blended styling) */}
         <AIAnalysisSection
-          analysisText={article.ai_analysis}
+          analysisText={article!.ai_analysis}
           readAlsoArticle={
             relatedArticles[0]
               ? { title: relatedArticles[0].title, slug: relatedArticles[0].slug }
@@ -193,17 +355,14 @@ export default function ArticleDetailPage() {
           }
         />
 
-        {/* 5. Sponsored/Affiliate Section */}
-        <AffiliateSection label={article.affiliate_link_label} url={article.affiliate_link_url} />
+        <AffiliateSection label={article!.affiliate_link_label} url={article!.affiliate_link_url} />
 
-        {/* 6. Poll Section (Members Only) */}
         <PollSection
-          poll={article.poll}
+          poll={article!.poll}
           onRequireAuth={() => setShowAuthModal(true)}
           isLoggedIn={isLoggedIn}
         />
 
-        {/* 7. Comment Input Window (Form placed immediately after the poll) */}
         <CommentInputForm
           userCountryFlag={selectedCountry.flag}
           onRequireAuth={() => setShowAuthModal(true)}
@@ -211,13 +370,8 @@ export default function ArticleDetailPage() {
           onCommentSubmitted={handleAddComment}
         />
 
-        {/* 8. "Related Articles" Section */}
         <RelatedArticlesSection articles={relatedArticles} />
 
-        {/* Social Media Sharing Buttons */}
-        <SocialShareButtons title={article.title} slug={article.slug} />
-
-        {/* 9. Global Member Discussion List (Placed after related posts) */}
         <CommentList
           comments={comments}
           userCountryFlag={selectedCountry.flag}
@@ -227,94 +381,8 @@ export default function ArticleDetailPage() {
           onReact={handleReact}
         />
 
-        {/* 10. Small, Quiet Credited Link to Original Source at Very Bottom */}
-        <OriginalSourceLink sourceName={article.source_name} sourceUrl={article.source_url} />
+        <OriginalSourceLink sourceName={article!.source_name} sourceUrl={article!.source_url} />
       </main>
-
-      {/* Guest Login Required Modal */}
-      {showAuthModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 max-w-sm w-full text-center relative shadow-2xl">
-            <button
-              onClick={() => setShowAuthModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto mb-3">
-              <LogIn className="w-6 h-6" />
-            </div>
-
-            <h3 className="font-bold text-base text-gray-900 dark:text-white">Account Required</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-6">
-              Guests can read all articles freely. Sign in to comment, react, or vote in polls.
-            </p>
-
-            <div className="space-y-2">
-              <Link
-                href="/login"
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow block transition"
-              >
-                Sign In / Sign Up
-              </Link>
-              <button
-                onClick={() => setShowAuthModal(false)}
-                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              >
-                Continue Reading as Guest
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Capped Interstitial Ad Modal (Requirement 11) */}
-      {showInterstitialAd && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 max-w-md w-full text-center text-white relative shadow-2xl">
-            <button
-              onClick={() => setShowInterstitialAd(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white bg-gray-800 p-1.5 rounded-full"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block mb-2">
-              <Sparkles className="w-3.5 h-3.5 inline mr-1" /> SPONSORED INTERSTITIAL
-            </span>
-
-            <h3 className="text-lg font-bold text-white mb-2">Voxpolis Global Policy Report 2026</h3>
-            <p className="text-xs text-gray-300 mb-6">
-              Access in-depth policy whitepapers, trade flow data, and regional political risk assessments.
-            </p>
-
-            <div className="space-y-2">
-              <a
-                href="https://voxpolis.app"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setShowInterstitialAd(false)}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 font-bold text-xs rounded-xl shadow block transition"
-              >
-                Explore Report
-              </a>
-              <button
-                onClick={() => setShowInterstitialAd(false)}
-                className="text-xs text-gray-400 hover:text-white pt-1"
-              >
-                Skip Advertisement →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Engagement Rating Prompt Modal */}
-      <EngagementPromptModal
-        isOpen={showEngagementModal}
-        onClose={() => setShowEngagementModal(false)}
-      />
     </div>
   );
 }

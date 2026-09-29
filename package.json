@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "pipeline": "ts-node --transpile-only scripts/run-pipeline.ts",
+    "backfill": "ts-node --transpile-only scripts/run-pipeline.ts --backfill"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.1",
