@@ -223,10 +223,9 @@ function parseRssXmlToArticles(
       }
     }
 
-    // High quality real news photo fallback if direct image is missing
+    // Breaking news banner fallback if direct image is missing
     if (!imageUrl) {
-      const photoIdx = Math.abs(titleText.length + idx) % REAL_POLITICAL_PHOTOS.length;
-      imageUrl = REAL_POLITICAL_PHOTOS[photoIdx];
+      imageUrl = '/breaking-news-banner.png';
     }
 
     // Clean text snippet

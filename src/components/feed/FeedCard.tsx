@@ -14,22 +14,26 @@ export default function FeedCard({ article }: FeedCardProps) {
       ? `${(article.views_count / 1000).toFixed(1)}k`
       : article.views_count.toString();
 
-  const imageUrl = article.original_image_url || article.ai_image_url;
+  const imageUrl =
+    article.image_mode === 'breaking_logo'
+      ? '/breaking-news-banner.png'
+      : article.original_image_url || article.ai_image_url || '/breaking-news-banner.png';
 
   return (
     <article className="group bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/70 rounded-2xl overflow-hidden p-5 sm:p-6 shadow-sm hover:shadow-lg transition duration-200 flex flex-col justify-between">
       <div>
-        {/* Real News Photograph Thumbnail */}
-        {imageUrl && (
-          <Link href={`/article/${article.slug}`} className="block mb-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900">
-            {/* eslint-disable-next-html-element-suppression */}
-            <img
-              src={imageUrl}
-              alt={article.title}
-              className="w-full h-44 sm:h-48 object-cover group-hover:scale-105 transition duration-300"
-            />
-          </Link>
-        )}
+        {/* News Featured Image Thumbnail */}
+        <Link href={`/article/${article.slug}`} className="block mb-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900">
+          {/* eslint-disable-next-html-element-suppression */}
+          <img
+            src={imageUrl}
+            alt={article.title}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/breaking-news-banner.png';
+            }}
+            className="w-full h-44 sm:h-48 object-cover group-hover:scale-105 transition duration-300"
+          />
+        </Link>
 
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">

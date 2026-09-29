@@ -104,12 +104,13 @@ export default function ArticleImageHeader({
         )}
 
         {imageMode === 'breaking_logo' && (
-          <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 p-8 sm:p-12 text-center flex flex-col items-center justify-center min-h-[220px] relative overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-600/20 via-transparent to-transparent pointer-events-none" />
-            <SiteLogo variant="light" className="h-12 sm:h-16 w-auto mb-4" />
-            <span className="bg-red-600/90 text-white font-black text-xs sm:text-sm px-4 py-1.5 rounded-full uppercase tracking-widest border border-red-400/40 shadow-lg">
-              VOXPOLIS OFFICIAL BREAKING REPORT
-            </span>
+          <div className="relative overflow-hidden group bg-slate-950">
+            {/* eslint-disable-next-html-element-suppression */}
+            <img
+              src="/breaking-news-banner.png"
+              alt="Voxpolis Breaking News"
+              className="w-full h-auto max-h-[450px] object-cover"
+            />
           </div>
         )}
       </div>

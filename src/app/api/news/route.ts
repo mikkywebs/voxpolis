@@ -40,36 +40,54 @@ export async function GET(request: NextRequest) {
       if (res.ok) {
         const data = await res.json();
         if (data.results && Array.isArray(data.results)) {
-          newsDataArticles = data.results.map((item: any, idx: number) => ({
-            id: item.article_id || `newsdata-${countryCode}-${idx}`,
-            slug:
-              (item.title || 'article')
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/(^-|-$)/g, '') + `-${idx}`,
-            title: item.title || 'Political Update',
-            snippet: item.description || item.snippet || item.title || '',
-            content: item.content || item.description || item.title || '',
-            ai_analysis: `• Core Fact: ${item.description || item.snippet || item.title}\n• Legislative Scope: Policy guidelines and administrative governance protocols were issued.\n• Public Impact: Official evaluation procedures remain subject to legislative committee review.`,
-            country_code: countryCode,
-            language: language,
-            category: item.category?.[0] || 'politics',
-            image_mode: item.image_url ? 'original' : 'breaking_logo',
-            original_image_url: item.image_url || undefined,
-            source_name: item.source_id || `${country.name} Press`,
-            source_url: item.link || 'https://voxpolis.app',
-            is_breaking: idx === 0,
-            tags: item.keywords || ['Politics', country.name],
-            views_count: 0,
-            total_reading_time_seconds: 180,
-            created_at: item.pubDate || new Date().toISOString(),
-            poll: {
-              id: `poll-newsdata-${idx}`,
-              question: `Do you agree with the policy developments reported in this executive summary?`,
-              agree_count: 0,
-              disagree_count: 0,
-            },
-          }));
+            newsDataArticles = data.results.map((item: any, idx: number) => {
+              const cleanTitle = (item.title || 'Political Update')
+                .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
+                .replace(/The post .* appeared first on .*/gi, '')
+                .replace(/appeared first on .*/gi, '')
+                .trim();
+              const rawDesc = (item.description || item.snippet || item.title || '')
+                .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
+                .replace(/The post .* appeared first on .*/gi, '')
+                .replace(/appeared first on .*/gi, '')
+                .trim();
+              const rawContent = (item.content || item.description || item.title || '')
+                .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
+                .replace(/The post .* appeared first on .*/gi, '')
+                .replace(/appeared first on .*/gi, '')
+                .trim();
+
+              return {
+                id: item.article_id || `newsdata-${countryCode}-${idx}`,
+                slug:
+                  cleanTitle
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/(^-|-$)/g, '') + `-${idx}`,
+                title: cleanTitle,
+                snippet: rawDesc,
+                content: rawContent,
+                ai_analysis: `Executive Summary & Core Impact:\n• Fact Analysis: ${rawDesc}\n• Legislative Scope: Structural policy directives remain under multi-party committee evaluation.`,
+                country_code: countryCode,
+                language: language,
+                category: item.category?.[0] || 'politics',
+                image_mode: item.image_url ? 'original' : 'breaking_logo',
+                original_image_url: item.image_url || '/breaking-news-banner.png',
+                source_name: item.source_id || `${country.name} Press`,
+                source_url: item.link || 'https://voxpolis.app',
+                is_breaking: idx === 0,
+                tags: item.keywords || ['Politics', country.name],
+                views_count: 0,
+                total_reading_time_seconds: 180,
+                created_at: item.pubDate || new Date().toISOString(),
+                poll: {
+                  id: `poll-newsdata-${idx}`,
+                  question: `What is your perspective on "${cleanTitle.slice(0, 75)}"?`,
+                  agree_count: 0,
+                  disagree_count: 0,
+                },
+              };
+            });
         }
       }
     } catch (err) {
