@@ -75,10 +75,15 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback`
+        : 'https://voxpolis.app/auth/callback';
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: redirectUrl,
           data: {
             full_name: fullName,
             primary_country: detectedCountry.code,
@@ -97,7 +102,8 @@ export default function SignupPage() {
       localStorage.setItem('voxpolis_primary_country', detectedCountry.code);
       localStorage.setItem('voxpolis_preferred_language', 'en');
 
-      router.push('/feed');
+      // Redirect to dedicated Email Verification Notice page
+      router.push(`/verify-email?email=${encodeURIComponent(email)}`);
     } catch (e: any) {
       setErrorMsg(e.message || 'Signup failed.');
       setLoading(false);
