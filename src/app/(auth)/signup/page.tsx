@@ -175,7 +175,12 @@ export default function SignupPage() {
       <div className="max-w-md mx-auto w-full space-y-6 bg-white dark:bg-gray-900 p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl">
         <div className="text-center">
           <Link href="/">
-            <SiteLogo variant="full" className="h-10 w-auto mx-auto mb-3" />
+            {/* eslint-disable-next-html-element-suppression */}
+            <img
+              src="/footer-logo.png"
+              alt="Voxpolis Logo"
+              className="h-12 sm:h-14 w-auto mx-auto object-contain mb-3"
+            />
           </Link>
           <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">Create Voxpolis Account</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Get personalized global political feeds & executive insights</p>
