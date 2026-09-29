@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageSquare, Send, Sparkles, AlertCircle, Reply, User } from 'lucide-react';
+import { MessageSquare, Send, AlertCircle, Reply } from 'lucide-react';
 
 export interface CommentItem {
   id: string;
@@ -13,28 +13,23 @@ export interface CommentItem {
   reactions: { agree: number; disagree: number; angry: number; insightful: number };
 }
 
-interface CommentSectionProps {
-  articleId: string;
+interface CommentInputFormProps {
   userCountryFlag?: string;
-  userCountryCode?: string;
   onRequireAuth?: () => void;
   isLoggedIn?: boolean;
+  onCommentSubmitted?: (comment: CommentItem) => void;
 }
 
-export default function CommentSection({
-  articleId,
+export function CommentInputForm({
   userCountryFlag = '🇳🇬',
   onRequireAuth,
   isLoggedIn = false,
-}: CommentSectionProps) {
-  const [comments, setComments] = useState<CommentItem[]>([]);
+  onCommentSubmitted,
+}: CommentInputFormProps) {
   const [newComment, setNewComment] = useState('');
-  const [replyingToId, setReplyingToId] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Link detector regex
   const hasLink = (text: string) => {
     const urlPattern = /(https?:\/\/|www\.|[a-z0-9-]+\.(com|org|net|gov|edu|app|io|me|co|uk|ng))/i;
     return urlPattern.test(text);
@@ -68,86 +63,31 @@ export default function CommentSection({
         reactions: { agree: 0, disagree: 0, angry: 0, insightful: 0 },
       };
 
-      setComments([added, ...comments]);
+      if (onCommentSubmitted) {
+        onCommentSubmitted(added);
+      }
       setNewComment('');
-    } catch (e: any) {
+    } catch {
       setErrorMsg('Error posting comment. Please try again.');
     }
     setIsSubmitting(false);
   };
 
-  const handleReplySubmit = (e: React.FormEvent, parentId: string) => {
-    e.preventDefault();
-    setErrorMsg('');
-
-    if (!isLoggedIn && onRequireAuth) {
-      onRequireAuth();
-      return;
-    }
-
-    if (!replyText.trim()) return;
-
-    if (hasLink(replyText)) {
-      setErrorMsg('No links allowed in comments to maintain civilized public discourse.');
-      return;
-    }
-
-    const added: CommentItem = {
-      id: `c-${Date.now()}`,
-      parentId,
-      user_name: 'Verified Member',
-      country_flag: userCountryFlag,
-      content: replyText.trim(),
-      created_at: 'Just now',
-      reactions: { agree: 0, disagree: 0, angry: 0, insightful: 0 },
-    };
-
-    setComments([...comments, added]);
-    setReplyText('');
-    setReplyingToId(null);
-  };
-
-  const handleCommentReaction = (commentId: string, type: 'agree' | 'disagree' | 'angry' | 'insightful') => {
-    if (!isLoggedIn && onRequireAuth) {
-      onRequireAuth();
-      return;
-    }
-
-    setComments(
-      comments.map((c) => {
-        if (c.id === commentId) {
-          return {
-            ...c,
-            reactions: {
-              ...c.reactions,
-              [type]: c.reactions[type] + 1,
-            },
-          };
-        }
-        return c;
-      })
-    );
-  };
-
-  const parentComments = comments.filter((c) => !c.parentId);
-  const getReplies = (parentId: string) => comments.filter((c) => c.parentId === parentId);
-
   return (
-    <div className="my-8 p-6 bg-white dark:bg-gray-800/80 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md">
-      <div className="flex items-center justify-between mb-6">
+    <div className="my-6 p-5 sm:p-6 bg-white dark:bg-gray-800/80 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <h3 className="text-base font-bold text-gray-900 dark:text-white">
-            Global Member Discussion ({comments.length})
+          <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
+            Join the Member Discussion
           </h3>
         </div>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-full">
-          Disqus Style • Members Only
+        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800">
+          Verified Members
         </span>
       </div>
 
-      {/* Moderated Comment Input */}
-      <form onSubmit={handleMainSubmit} className="mb-8">
+      <form onSubmit={handleMainSubmit}>
         {errorMsg && (
           <div className="mb-3 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-semibold rounded-xl flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -182,8 +122,93 @@ export default function CommentSection({
           <span>No external links permitted. Your country flag ({userCountryFlag}) is attached automatically.</span>
         </p>
       </form>
+    </div>
+  );
+}
 
-      {/* Comment List */}
+interface CommentListProps {
+  comments: CommentItem[];
+  userCountryFlag?: string;
+  onRequireAuth?: () => void;
+  isLoggedIn?: boolean;
+  onAddReply?: (reply: CommentItem) => void;
+  onReact?: (commentId: string, type: 'agree' | 'disagree' | 'angry' | 'insightful') => void;
+}
+
+export function CommentList({
+  comments,
+  userCountryFlag = '🇳🇬',
+  onRequireAuth,
+  isLoggedIn = false,
+  onAddReply,
+  onReact,
+}: CommentListProps) {
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const hasLink = (text: string) => {
+    const urlPattern = /(https?:\/\/|www\.|[a-z0-9-]+\.(com|org|net|gov|edu|app|io|me|co|uk|ng))/i;
+    return urlPattern.test(text);
+  };
+
+  const handleReplySubmit = (e: React.FormEvent, parentId: string) => {
+    e.preventDefault();
+    setErrorMsg('');
+
+    if (!isLoggedIn && onRequireAuth) {
+      onRequireAuth();
+      return;
+    }
+
+    if (!replyText.trim()) return;
+
+    if (hasLink(replyText)) {
+      setErrorMsg('No links allowed in comments to maintain civilized public discourse.');
+      return;
+    }
+
+    const added: CommentItem = {
+      id: `c-${Date.now()}`,
+      parentId,
+      user_name: 'Verified Member',
+      country_flag: userCountryFlag,
+      content: replyText.trim(),
+      created_at: 'Just now',
+      reactions: { agree: 0, disagree: 0, angry: 0, insightful: 0 },
+    };
+
+    if (onAddReply) {
+      onAddReply(added);
+    }
+    setReplyText('');
+    setReplyingToId(null);
+  };
+
+  const parentComments = comments.filter((c) => !c.parentId);
+  const getReplies = (parentId: string) => comments.filter((c) => c.parentId === parentId);
+
+  return (
+    <div className="my-8 p-6 bg-white dark:bg-gray-800/80 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">
+            Global Member Discussion ({comments.length})
+          </h3>
+        </div>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-full">
+          Verified Members Only
+        </span>
+      </div>
+
+      {errorMsg && (
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
       {comments.length === 0 ? (
         <div className="py-8 text-center bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
           <MessageSquare className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
@@ -191,12 +216,12 @@ export default function CommentSection({
             No member comments yet.
           </p>
           <p className="text-[11px] text-gray-400 mt-0.5">
-            Be the first verified member to share your policy insight.
+            Be the first verified member to share your policy insight using the discussion box above.
           </p>
         </div>
       ) : (
         <div className="space-y-6">
-          {parentComments.map((c, idx) => {
+          {parentComments.map((c) => {
             const replies = getReplies(c.id);
             return (
               <div key={c.id} className="space-y-3">
@@ -216,14 +241,14 @@ export default function CommentSection({
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => handleCommentReaction(c.id, 'agree')}
+                        onClick={() => onReact && onReact(c.id, 'agree')}
                         className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-gray-700 dark:text-gray-300 font-semibold transition"
                       >
                         👍 Agree {c.reactions.agree > 0 && `(${c.reactions.agree})`}
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleCommentReaction(c.id, 'disagree')}
+                        onClick={() => onReact && onReact(c.id, 'disagree')}
                         className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-800 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-gray-700 dark:text-gray-300 font-semibold transition"
                       >
                         👎 Disagree {c.reactions.disagree > 0 && `(${c.reactions.disagree})`}
@@ -290,6 +315,61 @@ export default function CommentSection({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// Default legacy export for backward compatibility
+export default function CommentSection(props: {
+  articleId: string;
+  userCountryFlag?: string;
+  userCountryCode?: string;
+  onRequireAuth?: () => void;
+  isLoggedIn?: boolean;
+}) {
+  const [comments, setComments] = useState<CommentItem[]>([]);
+
+  const handleAddComment = (newC: CommentItem) => {
+    setComments([newC, ...comments]);
+  };
+
+  const handleAddReply = (reply: CommentItem) => {
+    setComments([...comments, reply]);
+  };
+
+  const handleReact = (commentId: string, type: 'agree' | 'disagree' | 'angry' | 'insightful') => {
+    setComments(
+      comments.map((c) => {
+        if (c.id === commentId) {
+          return {
+            ...c,
+            reactions: {
+              ...c.reactions,
+              [type]: c.reactions[type] + 1,
+            },
+          };
+        }
+        return c;
+      })
+    );
+  };
+
+  return (
+    <div>
+      <CommentInputForm
+        userCountryFlag={props.userCountryFlag}
+        onRequireAuth={props.onRequireAuth}
+        isLoggedIn={props.isLoggedIn}
+        onCommentSubmitted={handleAddComment}
+      />
+      <CommentList
+        comments={comments}
+        userCountryFlag={props.userCountryFlag}
+        onRequireAuth={props.onRequireAuth}
+        isLoggedIn={props.isLoggedIn}
+        onAddReply={handleAddReply}
+        onReact={handleReact}
+      />
     </div>
   );
 }

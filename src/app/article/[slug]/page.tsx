@@ -9,7 +9,7 @@ import AIAnalysisSection from '@/components/article/AIAnalysisSection';
 import AffiliateSection from '@/components/article/AffiliateSection';
 import PollSection from '@/components/article/PollSection';
 import RelatedArticlesSection from '@/components/article/RelatedArticlesSection';
-import CommentSection from '@/components/article/CommentSection';
+import { CommentInputForm, CommentList, CommentItem } from '@/components/article/CommentSection';
 import OriginalSourceLink from '@/components/article/OriginalSourceLink';
 import EngagementPromptModal from '@/components/retention/EngagementPromptModal';
 import { SUPPORTED_COUNTRIES, getCountryByCode } from '@/config/countries';
@@ -36,6 +36,32 @@ export default function ArticleDetailPage() {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [realViews, setRealViews] = useState(0);
+  const [comments, setComments] = useState<CommentItem[]>([]);
+
+  const handleAddComment = (newC: CommentItem) => {
+    setComments((prev) => [newC, ...prev]);
+  };
+
+  const handleAddReply = (reply: CommentItem) => {
+    setComments((prev) => [...prev, reply]);
+  };
+
+  const handleReact = (commentId: string, type: 'agree' | 'disagree' | 'angry' | 'insightful') => {
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c.id === commentId) {
+          return {
+            ...c,
+            reactions: {
+              ...c.reactions,
+              [type]: c.reactions[type] + 1,
+            },
+          };
+        }
+        return c;
+      })
+    );
+  };
 
   useEffect(() => {
     async function loadArticle() {
@@ -140,11 +166,13 @@ export default function ArticleDetailPage() {
         />
 
         {/* Executive Article Summary Block before detailed body */}
-        <div className="my-6 p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border-l-4 border-blue-600 text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
-          <span className="font-bold text-blue-700 dark:text-blue-400 block uppercase tracking-wider text-[10px] mb-1">
+        <div className="my-6 pt-2 text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
+          <span className="font-bold text-blue-600 dark:text-blue-400 block uppercase tracking-wider text-[11px] mb-1">
             EXECUTIVE REPORT SUMMARY
           </span>
-          <p>{article.snippet || article.content.slice(0, 220) + '...'}</p>
+          <p className="text-gray-800 dark:text-gray-200 font-semibold leading-relaxed">
+            {article.snippet || article.content.slice(0, 220) + '...'}
+          </p>
         </div>
 
         {/* Article Body Content */}
@@ -167,27 +195,38 @@ export default function ArticleDetailPage() {
         {/* 5. Sponsored/Affiliate Section */}
         <AffiliateSection label={article.affiliate_link_label} url={article.affiliate_link_url} />
 
-        {/* 6. Poll Section (Members Only - empty initial counts) */}
+        {/* 6. Poll Section (Members Only) */}
         <PollSection
           poll={article.poll}
           onRequireAuth={() => setShowAuthModal(true)}
           isLoggedIn={isLoggedIn}
         />
 
-        {/* 7. "Related Articles" Section */}
-        <RelatedArticlesSection articles={relatedArticles} />
-
-        {/* Social Media Sharing Buttons (Immediately Before Comment Section) */}
-        <SocialShareButtons title={article.title} slug={article.slug} />
-
-        {/* 8. Comment Section (Disqus style, members only) */}
-        <CommentSection
-          articleId={article.id}
+        {/* 7. Comment Input Window (Form placed immediately after the poll) */}
+        <CommentInputForm
+          userCountryFlag="🇳🇬"
           onRequireAuth={() => setShowAuthModal(true)}
           isLoggedIn={isLoggedIn}
+          onCommentSubmitted={handleAddComment}
         />
 
-        {/* 9. Small, Quiet Credited Link to Original Source at Very Bottom */}
+        {/* 8. "Related Articles" Section */}
+        <RelatedArticlesSection articles={relatedArticles} />
+
+        {/* Social Media Sharing Buttons */}
+        <SocialShareButtons title={article.title} slug={article.slug} />
+
+        {/* 9. Global Member Discussion List (Placed after related posts) */}
+        <CommentList
+          comments={comments}
+          userCountryFlag="🇳🇬"
+          onRequireAuth={() => setShowAuthModal(true)}
+          isLoggedIn={isLoggedIn}
+          onAddReply={handleAddReply}
+          onReact={handleReact}
+        />
+
+        {/* 10. Small, Quiet Credited Link to Original Source at Very Bottom */}
         <OriginalSourceLink sourceName={article.source_name} sourceUrl={article.source_url} />
       </main>
 

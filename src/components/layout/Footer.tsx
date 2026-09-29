@@ -9,7 +9,12 @@ export default function Footer() {
       <div className="max-w-6xl mx-auto flex flex-col items-center justify-center text-center space-y-6">
         {/* Centered App Logo */}
         <Link href="/" className="inline-block hover:opacity-90 transition">
-          <SiteLogo variant="full" className="h-10 sm:h-12 w-auto mx-auto" />
+          {/* eslint-disable-next-html-element-suppression */}
+          <img
+            src="/footer-logo.png"
+            alt="Voxpolis Logo"
+            className="h-14 sm:h-16 w-auto mx-auto object-contain"
+          />
         </Link>
 
         {/* Footer Navigation Links */}

@@ -55,6 +55,24 @@ export default function FeedPage() {
     localStorage.setItem('voxpolis_preferred_language', lang);
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ARTICLES_PER_PAGE = 12;
+
+  const activeArticles = articles.filter((a) => !a.is_archived);
+  const totalPages = Math.ceil(activeArticles.length / ARTICLES_PER_PAGE) || 1;
+  const startIndex = (currentPage - 1) * ARTICLES_PER_PAGE;
+  const currentArticles = activeArticles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
+
+  const firstHalf = currentArticles.slice(0, 6);
+  const secondHalf = currentArticles.slice(6, 12);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 200, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
       <Header
@@ -64,7 +82,7 @@ export default function FeedPage() {
         onSelectLanguage={handleLanguageChange}
       />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8">
         {/* Country & Holiday Greeting Banner */}
         <HolidayBanner countryCode={selectedCountry.code} />
 
@@ -81,27 +99,64 @@ export default function FeedPage() {
               Language: {selectedLanguage.toUpperCase()}
             </span>
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-800 px-2.5 py-1 rounded-full">
-              {articles.length} Articles
+              {activeArticles.length} Active Reports
             </span>
           </div>
         </div>
 
-        {/* News Feed Items with Ad Insertion */}
+        {/* News Feed Items in 2-Column Grid with 12 Articles Per Page */}
         {loading ? (
-          <div className="space-y-4 py-8 text-center">
+          <div className="space-y-4 py-12 text-center">
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-xs text-gray-500">Fetching localized political coverage ({selectedLanguage.toUpperCase()})...</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {articles.map((art, idx) => (
-              <div key={art.id}>
-                <FeedCard article={art} />
+          <div className="space-y-8">
+            {/* First 6 Articles Grid (2-Column 2x2 Layout) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {firstHalf.map((art) => (
+                <FeedCard key={art.id} article={art} />
+              ))}
+            </div>
 
-                {/* AD BANNER BETWEEN FEED CARDS */}
-                {(idx + 1) % 2 === 0 && <FeedAdCard />}
+            {/* Advert Space After 6 Articles */}
+            {currentArticles.length > 0 && (
+              <div className="w-full">
+                <FeedAdCard countryCode={selectedCountry.code} countryName={selectedCountry.name} />
               </div>
-            ))}
+            )}
+
+            {/* Remaining Articles Grid (2-Column 2x2 Layout) */}
+            {secondHalf.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {secondHalf.map((art) => (
+                  <FeedCard key={art.id} article={art} />
+                ))}
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="pt-6 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 disabled:opacity-40 text-xs font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                >
+                  ← Previous Page
+                </button>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 bg-blue-600 text-white disabled:opacity-40 text-xs font-bold rounded-xl hover:bg-blue-700 shadow transition"
+                >
+                  Next Page →
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>

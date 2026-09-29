@@ -73,6 +73,9 @@ function cleanRssText(raw: string): string {
     .replace(/<[^>]+>/g, ' ')
     .replace(/http[s]?:\/\/[^\s]+/g, '')
     .replace(/href=["'][^"']*["']/g, '')
+    .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
+    .replace(/The post .* appeared first on .*/gi, '')
+    .replace(/appeared first on .*/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -258,7 +261,7 @@ function parseRssXmlToArticles(
       created_at: pubDate,
       poll: {
         id: `poll-${articleId}`,
-        question: `Do you support the policy developments outlined in this update regarding ${titleText.slice(0, 70)}?`,
+        question: `What is your perspective on the decision regarding "${titleText.slice(0, 75)}"?`,
         agree_count: 0,
         disagree_count: 0,
       },
