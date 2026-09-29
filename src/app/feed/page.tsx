@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
 import HolidayBanner from '@/components/feed/HolidayBanner';
 import FeedCard from '@/components/feed/FeedCard';
 import FeedAdCard from '@/components/feed/FeedAdCard';
@@ -15,7 +16,6 @@ export default function FeedPage() {
   const [articles, setArticles] = useState<ArticleData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load saved country & language from onboarding or localStorage
   useEffect(() => {
     const savedCountry = localStorage.getItem('voxpolis_primary_country');
     const savedLang = localStorage.getItem('voxpolis_preferred_language');
@@ -31,7 +31,6 @@ export default function FeedPage() {
     }
   }, []);
 
-  // Fetch news articles when country or language changes
   useEffect(() => {
     async function loadNews() {
       setLoading(true);
@@ -58,18 +57,18 @@ export default function FeedPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ARTICLES_PER_PAGE = 12;
 
-  const activeArticles = articles.filter((a) => !a.is_archived);
-  const totalPages = Math.ceil(activeArticles.length / ARTICLES_PER_PAGE) || 1;
-  const startIndex = (currentPage - 1) * ARTICLES_PER_PAGE;
-  const currentArticles = activeArticles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
+  const totalPages = Math.ceil(articles.length / ARTICLES_PER_PAGE);
 
-  const firstHalf = currentArticles.slice(0, 6);
-  const secondHalf = currentArticles.slice(6, 12);
+  const startIndex = (currentPage - 1) * ARTICLES_PER_PAGE;
+  const currentArticles = articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
+
+  const firstHalf = currentArticles.slice(0, 4);
+  const secondHalf = currentArticles.slice(4);
 
   const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 200, behavior: 'smooth' });
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -82,51 +81,57 @@ export default function FeedPage() {
         onSelectLanguage={handleLanguageChange}
       />
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8">
-        {/* Country & Holiday Greeting Banner */}
-        <HolidayBanner countryCode={selectedCountry.code} />
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <HolidayBanner countryCode={selectedCountry.code} countryName={selectedCountry.name} />
 
-        {/* Feed Header */}
-        <div className="flex items-center justify-between mb-6 pb-3 border-b border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2">
-            <Newspaper className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h1 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white">
-              {selectedCountry.flag} {selectedCountry.name} | Politics
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800">
-              Language: {selectedLanguage.toUpperCase()}
-            </span>
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-800 px-2.5 py-1 rounded-full">
-              {activeArticles.length} Active Reports
-            </span>
+        {/* Section Header Bar */}
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4 flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl sm:text-3xl">{selectedCountry.flag}</span>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                <span>{selectedCountry.name} Political Feed</span>
+                <span className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full font-bold">
+                  {selectedLanguage.toUpperCase()}
+                </span>
+              </h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Verified regional political updates, policy briefs, and civic sentiment polls.
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* News Feed Items in 2-Column Grid with 12 Articles Per Page */}
+        {/* Feed Cards List */}
         {loading ? (
-          <div className="space-y-4 py-12 text-center">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-gray-500">Fetching localized political coverage ({selectedLanguage.toUpperCase()})...</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={i}
+                className="h-72 rounded-2xl bg-gray-200 dark:bg-gray-800 animate-pulse border border-gray-300 dark:border-gray-700"
+              />
+            ))}
+          </div>
+        ) : articles.length === 0 ? (
+          <div className="py-16 text-center space-y-3 bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800">
+            <Newspaper className="w-10 h-10 text-gray-400 mx-auto" />
+            <h3 className="text-base font-bold text-gray-800 dark:text-gray-200">
+              No Political Updates Available
+            </h3>
+            <p className="text-xs text-gray-500 max-w-sm mx-auto">
+              There are currently no fresh political reports matching {selectedCountry.name} in {selectedLanguage.toUpperCase()}.
+            </p>
           </div>
         ) : (
-          <div className="space-y-8">
-            {/* First 6 Articles Grid (2-Column 2x2 Layout) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {firstHalf.map((art) => (
                 <FeedCard key={art.id} article={art} />
               ))}
             </div>
 
-            {/* Advert Space After 6 Articles */}
-            {currentArticles.length > 0 && (
-              <div className="w-full">
-                <FeedAdCard countryCode={selectedCountry.code} countryName={selectedCountry.name} />
-              </div>
-            )}
+            <FeedAdCard countryCode={selectedCountry.code} countryName={selectedCountry.name} />
 
-            {/* Remaining Articles Grid (2-Column 2x2 Layout) */}
             {secondHalf.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {secondHalf.map((art) => (
@@ -135,7 +140,6 @@ export default function FeedPage() {
               </div>
             )}
 
-            {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="pt-6 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
                 <button
@@ -160,6 +164,8 @@ export default function FeedPage() {
           </div>
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }

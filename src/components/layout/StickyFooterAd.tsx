@@ -1,13 +1,31 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { X, ChevronUp, Sparkles } from 'lucide-react';
 
+const NON_NEWS_PATHS = [
+  '/login',
+  '/signup',
+  '/about',
+  '/contact',
+  '/corrections',
+  '/privacy',
+  '/terms',
+  '/onboarding',
+  '/admin',
+  '/verify-email',
+];
+
 export default function StickyFooterAd() {
+  const pathname = usePathname() || '';
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
-  if (isDismissed) return null;
+  // Strictly block ads on all non-news pages (login, signup, trust/legal pages, etc.)
+  if (isDismissed || NON_NEWS_PATHS.some((p) => pathname.startsWith(p))) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-30 flex justify-center p-2 pointer-events-none">
@@ -19,12 +37,12 @@ export default function StickyFooterAd() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="hover:text-white transition"
+              className="hover:text-white transition cursor-pointer"
               title={isCollapsed ? 'Expand Ad' : 'Collapse Ad'}
             >
               <ChevronUp className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
             </button>
-            <button onClick={() => setIsDismissed(true)} className="hover:text-white transition" title="Close Ad">
+            <button onClick={() => setIsDismissed(true)} className="hover:text-white transition cursor-pointer" title="Close Ad">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -32,13 +50,12 @@ export default function StickyFooterAd() {
 
         {!isCollapsed && (
           <div className="p-3 text-center">
-            {/* Ad Unit Container for AdSense / Monetag */}
             <div className="bg-gradient-to-r from-gray-800 via-gray-800 to-gray-800 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 border border-gray-700/50">
               <div className="text-left">
                 <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-500/30">
                   FEATURED SPONSOR
                 </span>
-                <p className="text-xs font-bold text-white mt-1">Global Political Intelligence Digest 2026</p>
+                <p className="text-xs font-bold text-white mt-1">Global Political Intelligence Digest</p>
                 <p className="text-[11px] text-gray-400">Stay informed on policy shifts and international trade updates.</p>
               </div>
               <a
