@@ -99,15 +99,16 @@ export async function GET(request: NextRequest) {
   const rssArticles = await fetchRssArticlesForCountry(countryCode, language);
 
   // 4. Combine NewsData + RSS Feeds (NewsData first, then RSS)
-  const { isPoliticalNews } = await import('@/lib/news');
+  const { isPoliticalNews, isRelevantToCountry } = await import('@/lib/news');
   const combined = [...newsDataArticles, ...rssArticles];
 
-  // Deduplicate by title similarity & enforce political filtering
+  // Deduplicate by title similarity & enforce political filtering and country relevance
   const seenTitles = new Set<string>();
   const uniqueArticles: ArticleData[] = [];
 
   for (const art of combined) {
     if (!isPoliticalNews(art.title, art.snippet, art.tags)) continue;
+    if (!isRelevantToCountry(art.title, art.snippet, countryCode)) continue;
 
     const key = art.title.toLowerCase().slice(0, 35);
     if (!seenTitles.has(key)) {

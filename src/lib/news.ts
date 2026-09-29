@@ -72,6 +72,60 @@ export function isPoliticalNews(title: string, snippet: string = '', tags: strin
   return POLITICAL_KEYWORDS.some((kw) => text.includes(kw));
 }
 
+// Strict Country Relevance Filter: Ensures news belonging exclusively to another nation is not leaked
+export function isRelevantToCountry(title: string, snippet: string = '', countryCode: string): boolean {
+  const country = getCountryByCode(countryCode);
+  const text = `${title} ${snippet}`.toLowerCase();
+
+  const cName = country.name.toLowerCase();
+  const cCapital = country.capital.toLowerCase();
+
+  // Known demonyms and entity keywords per country code
+  const DEMONYM_MAP: Record<string, string[]> = {
+    NG: ['nigeria', 'nigerian', 'abuja', 'tinubu', 'naira', 'nass', 'inec', 'fct'],
+    US: ['united states', 'us', 'usa', 'american', 'biden', 'trump', 'congress', 'white house', 'washington', 'capitol', 'senate'],
+    GB: ['united kingdom', 'uk', 'britain', 'british', 'london', 'downing street', 'parliament', 'starmer', 'sunak'],
+    GH: ['ghana', 'ghanaian', 'accra', 'cedi'],
+    ZA: ['south africa', 'south african', 'pretoria', 'johannesburg', 'ramaphosa', 'rand'],
+    KE: ['kenya', 'kenyan', 'nairobi', 'ruto', 'shilling'],
+    CA: ['canada', 'canadian', 'ottawa', 'trudeau'],
+    AU: ['australia', 'australian', 'canberra', 'albanese'],
+    IN: ['india', 'indian', 'delhi', 'new delhi', 'modi', 'rupee'],
+    CN: ['china', 'chinese', 'beijing', 'xi jinping'],
+    JP: ['japan', 'japanese', 'tokyo', 'kishida'],
+    DE: ['germany', 'german', 'berlin', 'scholz'],
+    FR: ['france', 'french', 'paris', 'macron'],
+  };
+
+  const keywords = DEMONYM_MAP[country.code] || [cName, cCapital];
+
+  // If text explicitly mentions target country name, capital, or demonym, it is relevant
+  if (keywords.some((kw) => text.includes(kw))) {
+    return true;
+  }
+
+  // Check if text explicitly names ANOTHER country exclusively without mentioning target country
+  const OTHER_COUNTRIES: Record<string, string[]> = {
+    US: ['united states', 'white house', 'joe biden', 'donald trump', 'washington d.c.'],
+    GB: ['united kingdom', 'downing street', 'keir starmer', 'rishi sunak'],
+    NG: ['nigeria', 'president tinubu', 'fct abuja'],
+    FR: ['france', 'emmanuel macron', 'elysee palace'],
+    DE: ['germany', 'olaf scholz', 'bundestag'],
+    CN: ['china', 'xi jinping', 'beijing politburo'],
+    RU: ['russia', 'vladimir putin', 'kremlin'],
+  };
+
+  for (const [otherCode, otherKeywords] of Object.entries(OTHER_COUNTRIES)) {
+    if (otherCode !== country.code) {
+      if (otherKeywords.some((kw) => text.includes(kw))) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 // Multi-language template content for localized news reports
 const LOCALIZED_NEWS_TEMPLATES: Record<string, (countryName: string, capital: string) => { title: string; snippet: string; content: string; analysis: string; pollQuestion: string }> = {
   fr: (country, capital) => ({
@@ -255,6 +309,7 @@ export async function fetchArticlesForCountry(
       const unique: ArticleData[] = [];
       for (const a of combined) {
         if (!isPoliticalNews(a.title, a.snippet, a.tags)) continue;
+        if (!isRelevantToCountry(a.title, a.snippet, code)) continue;
 
         const k = a.title.toLowerCase().slice(0, 35);
         if (!seen.has(k)) {
