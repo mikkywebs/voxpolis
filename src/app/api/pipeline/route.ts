@@ -89,7 +89,42 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get('action');
+  const urlParam = searchParams.get('url');
+
+  if (urlParam && urlParam.startsWith('http')) {
+    const article = await processSourceUrlThroughPipeline(urlParam, 'Direct URL Ingestion');
+    return NextResponse.json({ success: article.status === 'published', article });
+  }
+
+  if (action === 'poll_feeds') {
+    const countryCode = (searchParams.get('country') || 'NG').toUpperCase();
+    const legacyArticles = await fetchArticlesForCountry(countryCode);
+    const processed: any[] = [];
+    for (const art of legacyArticles) {
+      if (art.source_url && art.source_url.startsWith('http')) {
+        const res = await processSourceUrlThroughPipeline(
+          art.source_url,
+          art.source_name,
+          art.title,
+          art.snippet,
+          art.created_at
+        );
+        processed.push({ url: art.source_url, status: res.status, slug: res.slug });
+      }
+    }
+    return NextResponse.json({ success: true, processed_count: processed.length, processed });
+  }
+
+  if (action === 'backfill') {
+    const countryCode = searchParams.get('country') || 'NG';
+    const legacyArticles = await fetchArticlesForCountry(countryCode);
+    const backfillResult = await runBackfillJob(legacyArticles);
+    return NextResponse.json({ success: true, result: backfillResult });
+  }
+
   const articles = getAllPublishedPipelineArticles();
   return NextResponse.json({
     total_published: articles.length,

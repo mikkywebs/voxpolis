@@ -1,3 +1,12 @@
 {
-  "framework": "nextjs"
+  "crons": [
+    {
+      "path": "/api/pipeline?action=poll_feeds",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/pipeline?action=backfill",
+      "schedule": "0 2 * * *"
+    }
+  ]
 }
