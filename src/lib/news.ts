@@ -356,3 +356,31 @@ export function formatExactTimestamp(dateStr?: string): string {
     return dateStr || '';
   }
 }
+
+const DIVERSE_POLITICAL_FALLBACKS = [
+  '/breaking-news-banner.png',
+  'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1575320181282-9afab399332c?auto=format&fit=crop&w=800&q=80',
+];
+
+export function getArticleImageUrl(article: Partial<ArticleData>): string {
+  if (article.image_mode === 'breaking_logo' || article.is_breaking) {
+    return '/breaking-news-banner.png';
+  }
+  if (article.original_image_url && article.original_image_url.trim() !== '' && !article.original_image_url.includes('google.com/news')) {
+    return article.original_image_url;
+  }
+  if (article.ai_image_url && article.ai_image_url.trim() !== '') {
+    return article.ai_image_url;
+  }
+  const titleStr = article.title || 'news';
+  let hash = 0;
+  for (let i = 0; i < titleStr.length; i++) {
+    hash = (hash << 5) - hash + titleStr.charCodeAt(i);
+    hash |= 0;
+  }
+  const idx = Math.abs(hash) % DIVERSE_POLITICAL_FALLBACKS.length;
+  return DIVERSE_POLITICAL_FALLBACKS[idx];
+}

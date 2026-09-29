@@ -96,14 +96,18 @@ export default function Header({
   return (
     <header className="sticky top-0 z-40 w-full border-b border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Left: Branding Logo & Greeting */}
+        {/* Left: Branding Logo, About Link & Greeting */}
         <div className="flex items-center gap-4">
           <Link href="/feed" className="flex items-center gap-2 group">
             <SiteLogo variant="full" className="h-8 sm:h-9 w-auto" />
           </Link>
-          <div className="hidden md:block text-xs font-medium text-gray-500 dark:text-gray-400 border-l border-gray-200 dark:border-gray-700 pl-4 py-1">
-            <span>{greeting}</span>
-          </div>
+          <nav className="hidden sm:flex items-center gap-3 border-l border-gray-200 dark:border-gray-700 pl-4 py-1 text-xs font-semibold">
+            <Link href="/about" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">
+              About Us
+            </Link>
+            <span className="hidden md:inline text-gray-300 dark:text-gray-700">•</span>
+            <span className="hidden md:inline font-medium text-gray-500 dark:text-gray-400">{greeting}</span>
+          </nav>
         </div>
 
         {/* Right: Weather Chip, Regional Country Switcher, Recognized Language Toggle, Theme & User */}

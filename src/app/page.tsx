@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import SiteLogo from '@/components/branding/SiteLogo';
 import FeedCard from '@/components/feed/FeedCard';
 import Footer from '@/components/layout/Footer';
 import { createClient } from '@/lib/supabase/client';
 import { ALL_COUNTRIES, CountryConfig, getCountryByCode } from '@/config/countries';
-import { fetchArticlesForCountry, ArticleData, formatExactTimestamp } from '@/lib/news';
+import { fetchArticlesForCountry, ArticleData, formatExactTimestamp, getArticleImageUrl } from '@/lib/news';
 import {
   ArrowRight,
   Globe2,
@@ -23,12 +22,12 @@ import {
   ChevronRight,
   ShieldCheck,
   Eye,
+  UserCheck,
 } from 'lucide-react';
 
 export default function LandingPage() {
-  const router = useRouter();
   const supabase = createClient();
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
   // IP-detected location & preview feed articles
   const [detectedCountry, setDetectedCountry] = useState<CountryConfig>(ALL_COUNTRIES[0]);
@@ -36,20 +35,18 @@ export default function LandingPage() {
   const [loadingArticles, setLoadingArticles] = useState(true);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
+  // Check auth without forcing redirect so logged in users can view homepage
   useEffect(() => {
     async function checkUser() {
       const { data } = await supabase.auth.getSession();
-      if (data?.session) {
-        // Returning logged in user goes straight to personalized feed
-        router.replace('/feed');
-      } else {
-        setCheckingAuth(false);
+      if (data?.session?.user) {
+        setUser(data.session.user);
       }
     }
     checkUser();
-  }, [router, supabase]);
+  }, [supabase]);
 
-  // Automatic IP-based Geolocation Detection & Live Feed Loading
+  // Robust Multi-Provider IP Geolocation Detection & News Loading
   useEffect(() => {
     async function detectLocationAndLoadNews() {
       setLoadingArticles(true);
@@ -60,21 +57,38 @@ export default function LandingPage() {
       if (savedCountry) {
         countryCode = savedCountry;
       } else {
+        // Provider 1: ipapi.co
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          const timeoutId = setTimeout(() => controller.abort(), 2500);
 
           const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
           clearTimeout(timeoutId);
 
           if (res.ok) {
             const data = await res.json();
-            if (data.country_code) {
+            if (data.country_code && typeof data.country_code === 'string' && data.country_code.length === 2) {
               countryCode = data.country_code;
             }
           }
         } catch {
-          countryCode = 'NG';
+          // Provider 2: ip-api.com fallback
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+            const res = await fetch('http://ip-api.com/json/?fields=countryCode', { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+              const data = await res.json();
+              if (data.countryCode && typeof data.countryCode === 'string' && data.countryCode.length === 2) {
+                countryCode = data.countryCode;
+              }
+            }
+          } catch {
+            countryCode = 'NG';
+          }
         }
       }
 
@@ -91,10 +105,8 @@ export default function LandingPage() {
       }
     }
 
-    if (!checkingAuth) {
-      detectLocationAndLoadNews();
-    }
-  }, [checkingAuth]);
+    detectLocationAndLoadNews();
+  }, []);
 
   // Auto-play featured carousel slider every 6 seconds
   useEffect(() => {
@@ -119,14 +131,6 @@ export default function LandingPage() {
     }
   };
 
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <SiteLogo variant="light" className="h-10 w-auto animate-pulse" />
-      </div>
-    );
-  }
-
   // Top 3 articles for Featured Slider Hero
   const featuredArticles = allArticles.slice(0, 3);
   // Grid section takes remaining articles (max 6) so featured items are NOT duplicated
@@ -144,12 +148,24 @@ export default function LandingPage() {
           <Link href="/about" className="text-gray-300 hover:text-white transition hidden sm:inline">
             About Us
           </Link>
-          <Link href="/login" className="px-3 py-1.5 text-gray-300 hover:text-white transition">
-            Log In
-          </Link>
-          <Link href="/signup" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow transition">
-            Sign Up
-          </Link>
+          {user ? (
+            <Link
+              href="/feed"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow transition flex items-center gap-1.5"
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Go to My Feed</span>
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className="px-3 py-1.5 text-gray-300 hover:text-white transition">
+                Log In
+              </Link>
+              <Link href="/signup" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow transition">
+                Sign Up
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -172,25 +188,40 @@ export default function LandingPage() {
           Voxpolis delivers real-time, independent political coverage and executive fact summaries from 230+ nations. Access direct regional political developments and active civic polls with zero paywalls.
         </p>
 
-        {/* CTAs */}
-        <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">
-          <Link
-            href="/signup"
-            className="w-full sm:w-auto flex-1 py-3.5 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2"
-          >
-            <span>Sign Up Free</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+        {/* Logged in User Banner */}
+        {user ? (
+          <div className="mt-6 p-4 rounded-2xl bg-blue-950/60 border border-blue-800/60 flex items-center justify-between gap-4 max-w-md w-full text-xs">
+            <span className="text-blue-200 font-semibold truncate">
+              Signed in as <strong>{user.email}</strong>
+            </span>
+            <Link
+              href="/feed"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow transition shrink-0"
+            >
+              Open My Feed →
+            </Link>
+          </div>
+        ) : (
+          /* Guest CTAs */
+          <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">
+            <Link
+              href="/signup"
+              className="w-full sm:w-auto flex-1 py-3.5 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+            >
+              <span>Sign Up Free</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
 
-          <button
-            onClick={handleGoogleLogin}
-            type="button"
-            className="w-full sm:w-auto flex-1 py-3.5 px-6 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2"
-          >
-            <Chrome className="w-4 h-4 text-blue-400" />
-            <span>Continue with Google</span>
-          </button>
-        </div>
+            <button
+              onClick={handleGoogleLogin}
+              type="button"
+              className="w-full sm:w-auto flex-1 py-3.5 px-6 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2"
+            >
+              <Chrome className="w-4 h-4 text-blue-400" />
+              <span>Continue with Google</span>
+            </button>
+          </div>
+        )}
 
         <div className="mt-4">
           <Link href="/feed" className="text-xs font-bold text-gray-400 hover:text-white underline transition">
@@ -198,19 +229,22 @@ export default function LandingPage() {
           </Link>
         </div>
 
-        {/* FEATURED NEWS CAROUSEL SLIDER (Top 3 Stories) */}
-        {!loadingArticles && featuredArticles.length > 0 && activeSlide && (
-          <section className="mt-12 w-full max-w-5xl text-left">
+        {/* FEATURED NEWS CAROUSEL SLIDER (Top 3 Stories) with CLS Skeleton Placeholder */}
+        <section className="mt-12 w-full max-w-5xl text-left">
+          {loadingArticles ? (
+            /* Skeleton Placeholder matching Carousel dimensions (CLS Prevention) */
+            <div className="h-80 sm:h-[420px] w-full rounded-3xl bg-gray-900/80 border border-gray-800 animate-pulse p-6 sm:p-10 flex flex-col justify-end space-y-4">
+              <div className="h-6 bg-gray-800 rounded w-1/4" />
+              <div className="h-10 bg-gray-800 rounded w-4/5" />
+              <div className="h-12 bg-gray-800/60 rounded w-full" />
+            </div>
+          ) : featuredArticles.length > 0 && activeSlide ? (
             <div className="relative rounded-3xl overflow-hidden border border-gray-800 bg-gray-900 shadow-2xl group">
               {/* Featured Background Image */}
               <div className="relative h-80 sm:h-[420px] w-full overflow-hidden bg-slate-950">
                 {/* eslint-disable-next-html-element-suppression */}
                 <img
-                  src={
-                    activeSlide.image_mode === 'breaking_logo'
-                      ? '/breaking-news-banner.png'
-                      : activeSlide.original_image_url || activeSlide.ai_image_url || '/breaking-news-banner.png'
-                  }
+                  src={getArticleImageUrl(activeSlide)}
                   alt={activeSlide.title}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = '/breaking-news-banner.png';
@@ -296,8 +330,8 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </section>
-        )}
+          ) : null}
+        </section>
 
         {/* 1. Trust and Credibility Stat Strip */}
         <section className="mt-16 w-full max-w-4xl">

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArticleData, formatExactTimestamp } from '@/lib/news';
+import { ArticleData, formatExactTimestamp, getArticleImageUrl } from '@/lib/news';
 import { ExternalLink, AlertCircle, Eye } from 'lucide-react';
 
 interface FeedCardProps {
@@ -14,10 +14,7 @@ export default function FeedCard({ article }: FeedCardProps) {
       ? `${(article.views_count / 1000).toFixed(1)}k`
       : article.views_count.toString();
 
-  const imageUrl =
-    article.image_mode === 'breaking_logo'
-      ? '/breaking-news-banner.png'
-      : article.original_image_url || article.ai_image_url || '/breaking-news-banner.png';
+  const imageUrl = getArticleImageUrl(article);
 
   const formattedTime = formatExactTimestamp(article.created_at);
 
