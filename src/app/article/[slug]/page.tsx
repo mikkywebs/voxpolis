@@ -11,7 +11,7 @@ import PollSection from '@/components/article/PollSection';
 import RelatedArticlesSection from '@/components/article/RelatedArticlesSection';
 import { CommentInputForm, CommentList, CommentItem } from '@/components/article/CommentSection';
 import OriginalSourceLink from '@/components/article/OriginalSourceLink';
-import { SUPPORTED_COUNTRIES } from '@/config/countries';
+import { SUPPORTED_COUNTRIES, getCountryByCode } from '@/config/countries';
 import { fetchArticlesForCountry, ArticleData } from '@/lib/news';
 import { getPipelineArticleBySlug } from '@/lib/pipeline';
 import { get301Redirect } from '@/lib/pipeline/redirects';
@@ -57,9 +57,15 @@ export default function ArticleDetailPage() {
       }
 
       const list = await fetchArticlesForCountry(selectedCountry.code);
-      const found = list.find((a) => a.slug === slug) || list[0];
-      setArticle(found);
-      setRelatedArticles(list.filter((a) => a.slug !== found?.slug));
+      const found = list.find((a) => a.slug === slug);
+      if (found) {
+        setArticle(found);
+        const artCountry = getCountryByCode(found.country_code);
+        setSelectedCountry(artCountry);
+      } else {
+        setArticle(list[0] || null);
+      }
+      setRelatedArticles(list.filter((a) => a.slug !== (found?.slug || list[0]?.slug)));
 
       // Track view count
       if (found) {

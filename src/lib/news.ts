@@ -321,7 +321,9 @@ export async function fetchArticlesForCountry(
         }
       }
       
-      return unique;
+      if (unique.length > 0) {
+        return unique;
+      }
     }
   } catch (err) {
     console.warn('Server-side RSS/NewsData fetch error, using fallback seed.', err);

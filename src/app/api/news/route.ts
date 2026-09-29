@@ -117,10 +117,15 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 5. Store in Server Cache
-  if (uniqueArticles.length > 0) {
-    cacheMap.set(cacheKey, { timestamp: now, data: uniqueArticles });
+  // 5. Fallback to country localized template if zero articles found
+  if (uniqueArticles.length === 0) {
+    const { fetchArticlesForCountry } = await import('@/lib/news');
+    const fallbackArticles = await fetchArticlesForCountry(countryCode, language);
+    return NextResponse.json({ articles: fallbackArticles, cached: false });
   }
+
+  // Store in Server Cache
+  cacheMap.set(cacheKey, { timestamp: now, data: uniqueArticles });
 
   return NextResponse.json({ articles: uniqueArticles, cached: false });
 }

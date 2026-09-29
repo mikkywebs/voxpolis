@@ -18,18 +18,23 @@ export default function CountryFeedPage() {
   const supabase = createClient();
   const countrySlug = (params?.countrySlug as string || 'nigeria').toLowerCase();
 
-  const [selectedCountry, setSelectedCountry] = useState<CountryConfig>(ALL_COUNTRIES[0]);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
+  const initialCountry = ALL_COUNTRIES.find((c) => {
+    const nameSlug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    return nameSlug === countrySlug || c.code.toLowerCase() === countrySlug;
+  }) || getCountryByCode('US');
+
+  const [selectedCountry, setSelectedCountry] = useState<CountryConfig>(initialCountry);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(initialCountry.languages[0]?.code || 'en');
   const [articles, setArticles] = useState<ArticleData[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
 
-  // Match country slug (e.g. "nigeria" -> NG, "united-states" -> US)
+  // Sync state if countrySlug URL param changes dynamically
   useEffect(() => {
     const matched = ALL_COUNTRIES.find((c) => {
       const nameSlug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       return nameSlug === countrySlug || c.code.toLowerCase() === countrySlug;
-    }) || ALL_COUNTRIES[0];
+    }) || getCountryByCode('US');
 
     setSelectedCountry(matched);
     const defaultLang = matched.languages[0]?.code || 'en';
