@@ -304,21 +304,6 @@ export default function LandingPage() {
           )}
         </section>
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-900 py-8 text-center text-xs text-gray-500 mt-12">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 Voxpolis Platform (voxpolis.app). All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <Link href="/privacy" className="hover:text-gray-300">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="hover:text-gray-300">
-              Terms of Service
-            </Link>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

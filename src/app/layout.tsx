@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import Footer from '@/components/layout/Footer';
 import CookieConsentBanner from '@/components/layout/CookieConsentBanner';
 import StickyFooterAd from '@/components/layout/StickyFooterAd';
 
@@ -26,6 +27,7 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth">
       <body className="min-h-screen antialiased flex flex-col justify-between">
         {children}
+        <Footer />
         <CookieConsentBanner />
         <StickyFooterAd />
       </body>
