@@ -5,13 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import SiteLogo from '@/components/branding/SiteLogo';
 import FeedCard from '@/components/feed/FeedCard';
+import Footer from '@/components/layout/Footer';
 import { createClient } from '@/lib/supabase/client';
 import { ALL_COUNTRIES, CountryConfig, getCountryByCode } from '@/config/countries';
-import { fetchArticlesForCountry, ArticleData } from '@/lib/news';
+import { fetchArticlesForCountry, ArticleData, formatExactTimestamp } from '@/lib/news';
 import {
   ArrowRight,
-  Sparkles,
-  ShieldCheck,
   Globe2,
   Chrome,
   Flame,
@@ -20,6 +19,10 @@ import {
   Vote,
   MapPin,
   Newspaper,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
+  Eye,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -29,8 +32,9 @@ export default function LandingPage() {
 
   // IP-detected location & preview feed articles
   const [detectedCountry, setDetectedCountry] = useState<CountryConfig>(ALL_COUNTRIES[0]);
-  const [previewArticles, setPreviewArticles] = useState<ArticleData[]>([]);
+  const [allArticles, setAllArticles] = useState<ArticleData[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(true);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
   useEffect(() => {
     async function checkUser() {
@@ -51,16 +55,14 @@ export default function LandingPage() {
       setLoadingArticles(true);
       let countryCode = 'NG';
 
-      // 1. Check if user already has a saved primary country in localStorage
       const savedCountry = typeof window !== 'undefined' ? localStorage.getItem('voxpolis_primary_country') : null;
 
       if (savedCountry) {
         countryCode = savedCountry;
       } else {
-        // 2. IP Detection via lightweight fast geolocation lookup
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
 
           const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
           clearTimeout(timeoutId);
@@ -81,8 +83,7 @@ export default function LandingPage() {
 
       try {
         const articles = await fetchArticlesForCountry(country.code);
-        // Display 6 responsive preview cards so section feels rich and active
-        setPreviewArticles(articles.slice(0, 6));
+        setAllArticles(articles);
       } catch (e) {
         console.warn('Failed to load preview articles:', e);
       } finally {
@@ -94,6 +95,16 @@ export default function LandingPage() {
       detectLocationAndLoadNews();
     }
   }, [checkingAuth]);
+
+  // Auto-play featured carousel slider every 6 seconds
+  useEffect(() => {
+    if (allArticles.length === 0) return;
+    const featuredCount = Math.min(3, allArticles.length);
+    const interval = setInterval(() => {
+      setCurrentSlideIndex((prev) => (prev + 1) % featuredCount);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [allArticles]);
 
   const handleGoogleLogin = async () => {
     try {
@@ -116,13 +127,24 @@ export default function LandingPage() {
     );
   }
 
+  // Top 3 articles for Featured Slider Hero
+  const featuredArticles = allArticles.slice(0, 3);
+  // Grid section takes remaining articles (max 6) so featured items are NOT duplicated
+  const gridArticles = allArticles.slice(3, 9);
+
+  const activeSlide = featuredArticles[currentSlideIndex] || featuredArticles[0];
+  const countrySlug = detectedCountry.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-white selection:bg-blue-600 selection:text-white flex flex-col">
       {/* Header Bar */}
-      <header className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+      <header className="max-w-7xl mx-auto px-6 h-20 w-full flex items-center justify-between">
         <SiteLogo variant="light" className="h-9 w-auto" />
-        <div className="flex items-center gap-3 text-xs font-semibold">
-          <Link href="/login" className="px-4 py-2 text-gray-300 hover:text-white transition">
+        <div className="flex items-center gap-4 text-xs font-semibold">
+          <Link href="/about" className="text-gray-300 hover:text-white transition hidden sm:inline">
+            About Us
+          </Link>
+          <Link href="/login" className="px-3 py-1.5 text-gray-300 hover:text-white transition">
             Log In
           </Link>
           <Link href="/signup" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow transition">
@@ -132,10 +154,11 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <main className="max-w-7xl mx-auto px-6 py-10 sm:py-16 flex flex-col items-center text-center">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 flex flex-col items-center text-center">
+        {/* Human-centric Badge */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-900/40 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-wider mb-6 shadow-sm">
-          <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-          <span>Personalized Political Intelligence</span>
+          <Globe2 className="w-3.5 h-3.5 text-blue-400" />
+          <span>Global Independent News & Civic Voice</span>
         </div>
 
         <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-tight max-w-4xl">
@@ -175,8 +198,109 @@ export default function LandingPage() {
           </Link>
         </div>
 
+        {/* FEATURED NEWS CAROUSEL SLIDER (Top 3 Stories) */}
+        {!loadingArticles && featuredArticles.length > 0 && activeSlide && (
+          <section className="mt-12 w-full max-w-5xl text-left">
+            <div className="relative rounded-3xl overflow-hidden border border-gray-800 bg-gray-900 shadow-2xl group">
+              {/* Featured Background Image */}
+              <div className="relative h-80 sm:h-[420px] w-full overflow-hidden bg-slate-950">
+                {/* eslint-disable-next-html-element-suppression */}
+                <img
+                  src={
+                    activeSlide.image_mode === 'breaking_logo'
+                      ? '/breaking-news-banner.png'
+                      : activeSlide.original_image_url || activeSlide.ai_image_url || '/breaking-news-banner.png'
+                  }
+                  alt={activeSlide.title}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/breaking-news-banner.png';
+                  }}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                {/* Dark Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-transparent" />
+              </div>
+
+              {/* Slider Content Overlay */}
+              <div className="absolute bottom-0 inset-x-0 p-6 sm:p-10 flex flex-col justify-end space-y-3 z-10">
+                <div className="flex items-center justify-between gap-3 text-xs flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 bg-red-600 text-white font-extrabold text-[11px] rounded-full uppercase tracking-wider shadow">
+                      FEATURED REPORT
+                    </span>
+                    <span className="font-bold text-blue-300 uppercase tracking-wide">
+                      {activeSlide.source_name}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-gray-300 text-[11px] font-medium">
+                    <span className="flex items-center gap-1 bg-slate-900/80 backdrop-blur px-2.5 py-1 rounded-full border border-gray-700">
+                      <Eye className="w-3.5 h-3.5 text-blue-400" />
+                      <span>{(activeSlide.views_count || 1240).toLocaleString()} views</span>
+                    </span>
+                    <span className="bg-slate-900/80 backdrop-blur px-2.5 py-1 rounded-full border border-gray-700">
+                      {formatExactTimestamp(activeSlide.created_at)}
+                    </span>
+                  </div>
+                </div>
+
+                <Link href={`/article/${activeSlide.slug}`} className="block group-hover:text-blue-300 transition">
+                  <h2 className="text-xl sm:text-3xl font-black text-white leading-snug drop-shadow-md">
+                    {activeSlide.title}
+                  </h2>
+                </Link>
+
+                <p className="text-xs sm:text-sm text-gray-300 line-clamp-2 max-w-3xl leading-relaxed">
+                  {activeSlide.snippet}
+                </p>
+
+                {/* Slider Controls & Progress Bar */}
+                <div className="pt-2 flex items-center justify-between">
+                  {/* Slide Indicators */}
+                  <div className="flex items-center gap-2">
+                    {featuredArticles.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentSlideIndex(idx)}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${
+                          currentSlideIndex === idx ? 'w-8 bg-blue-500' : 'w-2 bg-gray-600 hover:bg-gray-400'
+                        }`}
+                        title={`Go to slide ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Previous / Next Arrows */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        setCurrentSlideIndex(
+                          (prev) => (prev - 1 + featuredArticles.length) % featuredArticles.length
+                        )
+                      }
+                      className="p-2 rounded-full bg-slate-900/80 hover:bg-slate-800 text-white border border-gray-700 transition"
+                      title="Previous Slide"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCurrentSlideIndex((prev) => (prev + 1) % featuredArticles.length)
+                      }
+                      className="p-2 rounded-full bg-slate-900/80 hover:bg-slate-800 text-white border border-gray-700 transition"
+                      title="Next Slide"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* 1. Trust and Credibility Stat Strip */}
-        <section className="mt-12 w-full max-w-4xl">
+        <section className="mt-16 w-full max-w-4xl">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-gray-900/60 border border-gray-800/80 backdrop-blur-md shadow-xl">
             <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-800/40 border border-gray-700/40 text-left">
               <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-400">
@@ -213,8 +337,59 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* 2. How It Works Section (Editorial & Non-AI) */}
-        <section className="mt-16 w-full max-w-5xl text-left space-y-6">
+        {/* 2. Dynamic Country Feed Section (Non-duplicated Cards Grid) */}
+        <section className="mt-16 w-full max-w-6xl text-left space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-800/80">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-amber-400 animate-pulse" />
+              <h2 className="text-lg sm:text-2xl font-black text-white">
+                {detectedCountry.flag} {detectedCountry.name} | Politics
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-950/60 border border-blue-800/50 text-blue-300 text-[11px] font-bold">
+                <MapPin className="w-3 h-3 text-blue-400" />
+                <span>Auto-Detected Location ({detectedCountry.code})</span>
+              </span>
+            </div>
+          </div>
+
+          {loadingArticles ? (
+            /* Skeleton Loading State */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="p-6 rounded-2xl bg-gray-900/60 border border-gray-800 animate-pulse space-y-3">
+                  <div className="h-4 bg-gray-800 rounded w-1/3" />
+                  <div className="h-6 bg-gray-800 rounded w-5/6" />
+                  <div className="h-12 bg-gray-800/50 rounded w-full" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Non-duplicated 6-Card Grid */
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {(gridArticles.length > 0 ? gridArticles : allArticles.slice(0, 6)).map((art) => (
+                  <FeedCard key={art.id} article={art} />
+                ))}
+              </div>
+
+              {/* View Full Country Feed Button */}
+              <div className="text-center pt-4">
+                <Link
+                  href={`/${countrySlug}`}
+                  className="inline-flex items-center gap-2 px-8 py-3.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold rounded-2xl shadow-xl transition transform hover:scale-105"
+                >
+                  <span>View Full {detectedCountry.flag} {detectedCountry.name} Feed</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* 3. How It Works Section */}
+        <section className="mt-20 w-full max-w-5xl text-left space-y-6">
           <div className="text-center space-y-2">
             <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">Simple & Transparent</span>
             <h2 className="text-2xl sm:text-3xl font-black text-white">How Voxpolis Works</h2>
@@ -264,46 +439,9 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
-
-        {/* 3. IP-Based Dynamic Preview Feed (6 Cards Grid) */}
-        <section className="mt-16 w-full max-w-6xl text-left space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-800/80">
-            <div className="flex items-center gap-2">
-              <Flame className="w-5 h-5 text-amber-400 animate-pulse" />
-              <h2 className="text-lg sm:text-xl font-black text-white">
-                Live Preview for {detectedCountry.flag} {detectedCountry.name}
-              </h2>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-950/60 border border-blue-800/50 text-blue-300 text-[11px] font-bold">
-                <MapPin className="w-3 h-3 text-blue-400" />
-                <span>Auto-Detected Location ({detectedCountry.code})</span>
-              </span>
-              <span className="text-[10px] text-gray-500 font-semibold hidden sm:inline">Updated Real-Time</span>
-            </div>
-          </div>
-
-          {loadingArticles ? (
-            /* Skeleton Loading State for 6 Cards */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="p-6 rounded-2xl bg-gray-900/60 border border-gray-800 animate-pulse space-y-3">
-                  <div className="h-4 bg-gray-800 rounded w-1/3" />
-                  <div className="h-6 bg-gray-800 rounded w-5/6" />
-                  <div className="h-12 bg-gray-800/50 rounded w-full" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            /* Responsive 6-Card Feed Grid */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {previewArticles.map((art) => (
-                <FeedCard key={art.id} article={art} />
-              ))}
-            </div>
-          )}
-        </section>
       </main>
+
+      <Footer />
     </div>
   );
 }

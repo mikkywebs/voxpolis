@@ -153,6 +153,7 @@ export default function ArticleDetailPage() {
           sourceUrl={article.source_url}
           isBreaking={article.is_breaking}
           viewsCount={realViews}
+          createdAt={article.created_at}
         />
 
         {/* Social Media Sharing Buttons (Immediately After Title) */}

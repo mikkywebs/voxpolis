@@ -343,3 +343,16 @@ Addressing press representatives in ${country.capital}, government officials con
     },
   ];
 }
+
+export function formatExactTimestamp(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateFormatted = d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    return `${timeStr} • ${dateFormatted}`;
+  } catch {
+    return dateStr || '';
+  }
+}

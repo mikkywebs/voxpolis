@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { ArticleData } from '@/lib/news';
-import { ExternalLink, AlertCircle, Sparkles, Eye } from 'lucide-react';
+import { ArticleData, formatExactTimestamp } from '@/lib/news';
+import { ExternalLink, AlertCircle, Eye } from 'lucide-react';
 
 interface FeedCardProps {
   article: ArticleData;
@@ -18,6 +18,8 @@ export default function FeedCard({ article }: FeedCardProps) {
     article.image_mode === 'breaking_logo'
       ? '/breaking-news-banner.png'
       : article.original_image_url || article.ai_image_url || '/breaking-news-banner.png';
+
+  const formattedTime = formatExactTimestamp(article.created_at);
 
   return (
     <article className="group bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/70 rounded-2xl overflow-hidden p-5 sm:p-6 shadow-sm hover:shadow-lg transition duration-200 flex flex-col justify-between">
@@ -45,7 +47,7 @@ export default function FeedCard({ article }: FeedCardProps) {
               <Eye className="w-3 h-3 text-blue-500" />
               <span>{viewsFormatted} views</span>
             </span>
-            <span>{new Date(article.created_at).toLocaleDateString()}</span>
+            <span className="font-medium text-gray-400">{formattedTime}</span>
           </div>
         </div>
 

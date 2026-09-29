@@ -2,6 +2,7 @@
 
 import SiteLogo from '@/components/branding/SiteLogo';
 import { ExternalLink, Sparkles, AlertCircle, Eye, Clock } from 'lucide-react';
+import { formatExactTimestamp } from '@/lib/news';
 
 interface ArticleImageHeaderProps {
   title: string;
@@ -14,6 +15,7 @@ interface ArticleImageHeaderProps {
   isBreaking?: boolean;
   viewsCount?: number;
   totalReadingTimeSeconds?: number;
+  createdAt?: string;
 }
 
 export default function ArticleImageHeader({
@@ -27,8 +29,10 @@ export default function ArticleImageHeader({
   isBreaking,
   viewsCount = 0,
   totalReadingTimeSeconds = 180,
+  createdAt,
 }: ArticleImageHeaderProps) {
   const readingTimeMin = Math.ceil(totalReadingTimeSeconds / 60);
+  const formattedTimestamp = formatExactTimestamp(createdAt);
 
   return (
     <div className="mb-6 space-y-4">
@@ -58,6 +62,13 @@ export default function ArticleImageHeader({
           </span>
         </div>
       </div>
+
+      {/* Exact Moment Timestamp Just Before Title */}
+      {formattedTimestamp && (
+        <div className="text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wide uppercase">
+          Published: {formattedTimestamp}
+        </div>
+      )}
 
       <h1 className="text-2xl sm:text-4xl font-extrabold text-gray-900 dark:text-white leading-tight tracking-tight">
         {title}
