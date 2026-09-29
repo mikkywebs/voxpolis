@@ -1,15 +1,13 @@
 'use client';
 
-import SiteLogo from '@/components/branding/SiteLogo';
-import { ExternalLink, Sparkles, AlertCircle, Eye, Clock } from 'lucide-react';
+import { ExternalLink, AlertCircle, Clock, Eye } from 'lucide-react';
 import { formatExactTimestamp } from '@/lib/news';
 
 interface ArticleImageHeaderProps {
   title: string;
   snippet: string;
-  imageMode: 'original' | 'ai_generated' | 'breaking_logo';
+  imageMode: 'original' | 'breaking_logo';
   originalImageUrl?: string;
-  aiImageUrl?: string;
   sourceName: string;
   sourceUrl: string;
   isBreaking?: boolean;
@@ -23,7 +21,6 @@ export default function ArticleImageHeader({
   snippet,
   imageMode,
   originalImageUrl,
-  aiImageUrl,
   sourceName,
   sourceUrl,
   isBreaking,
@@ -31,8 +28,12 @@ export default function ArticleImageHeader({
   totalReadingTimeSeconds = 180,
   createdAt,
 }: ArticleImageHeaderProps) {
-  const readingTimeMin = Math.ceil(totalReadingTimeSeconds / 60);
+  const readingTimeMin = Math.max(1, Math.ceil(totalReadingTimeSeconds / 60));
   const formattedTimestamp = formatExactTimestamp(createdAt);
+
+  const displayImage = (originalImageUrl && originalImageUrl.startsWith('http'))
+    ? originalImageUrl
+    : '/breaking-news-banner.png';
 
   return (
     <div className="mb-6 space-y-4">
@@ -45,7 +46,6 @@ export default function ArticleImageHeader({
           </div>
         )}
 
-        {/* Viewer Counter & Reading Time: Only show readers count badge when views >= 100 */}
         <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800/80 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">
           {viewsCount >= 100 && (
             <>
@@ -63,7 +63,6 @@ export default function ArticleImageHeader({
         </div>
       </div>
 
-      {/* Exact Moment Timestamp Just Before Title */}
       {formattedTimestamp && (
         <div className="text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wide uppercase">
           Published: {formattedTimestamp}
@@ -78,52 +77,24 @@ export default function ArticleImageHeader({
         {snippet}
       </p>
 
-      {/* Image Mode Treatments */}
+      {/* Featured Image Treatment: Source Image or Site Default Asset */}
       <div className="mt-4 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 shadow-md">
-        {imageMode === 'original' && originalImageUrl && (
-          <div className="relative group">
-            {/* eslint-disable-next-html-element-suppression */}
-            <img src={originalImageUrl} alt={title} className="w-full h-64 sm:h-96 object-cover" />
-            <div className="p-2.5 bg-gray-900/90 text-white text-xs flex items-center justify-between gap-2">
-              <span className="truncate">Image Source: {sourceName}</span>
-              <a
-                href={sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-blue-400 hover:text-blue-300 shrink-0 font-semibold"
-              >
-                <span>View Original</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
+        <div className="relative group">
+          {/* eslint-disable-next-html-element-suppression */}
+          <img src={displayImage} alt={title} className="w-full h-64 sm:h-96 object-cover" />
+          <div className="p-2.5 bg-gray-900/90 text-white text-xs flex items-center justify-between gap-2">
+            <span className="truncate">Image Credit: {sourceName}</span>
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-blue-400 hover:text-blue-300 shrink-0 font-semibold"
+            >
+              <span>View Original</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
           </div>
-        )}
-
-        {imageMode === 'ai_generated' && (
-          <div className="relative">
-            {/* eslint-disable-next-html-element-suppression */}
-            <img
-              src={aiImageUrl || 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80'}
-              alt="Featured Report Illustration"
-              className="w-full h-64 sm:h-96 object-cover filter contrast-105 saturate-110"
-            />
-            <div className="p-2.5 bg-slate-950/90 text-slate-200 text-xs flex items-center gap-1.5 font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-              <span>Featured Report Illustration (Non-identifiable representation)</span>
-            </div>
-          </div>
-        )}
-
-        {imageMode === 'breaking_logo' && (
-          <div className="relative overflow-hidden group bg-slate-950">
-            {/* eslint-disable-next-html-element-suppression */}
-            <img
-              src="/breaking-news-banner.png"
-              alt="Voxpolis Breaking News"
-              className="w-full h-auto max-h-[450px] object-cover"
-            />
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

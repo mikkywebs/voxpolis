@@ -26,11 +26,12 @@ export async function processSourceUrlThroughPipeline(
   rssHeadline: string = '',
   rssDescription: string = '',
   rssDate?: string,
+  countryIso: string = 'NG',
   forceReprocess: boolean = false
 ): Promise<PipelineArticleRecord> {
   const normUrl = sourceUrl.trim();
 
-  // 1. DISCOVER: Check if source_url already processed
+  // 1. DISCOVER: Check if source_url already processed (One source URL = one Voxpolis article worldwide)
   if (!forceReprocess && articlesBySourceUrl.has(normUrl)) {
     const existing = articlesBySourceUrl.get(normUrl)!;
     if (existing.status === 'published') {
@@ -59,7 +60,7 @@ export async function processSourceUrlThroughPipeline(
       items: [],
       actors: [],
       tags: [],
-      country_code: 'NG',
+      country_code: countryIso,
       language: 'en',
       category: 'politics',
       word_count: 0,
@@ -74,7 +75,8 @@ export async function processSourceUrlThroughPipeline(
   }
 
   // 3. CLASSIFY & REWRITE: Anthropic Claude Engine
-  const rewritePayload = await rewriteWithAnthropic(scraped);
+  const rewritePayload = await rewriteWithAnthropic(scraped, countryIso);
+  const targetCountry = rewritePayload.country_iso || countryIso || 'NG';
 
   if (rewritePayload.completeness === 'incomplete') {
     const incompleteRecord: PipelineArticleRecord = {
@@ -94,7 +96,7 @@ export async function processSourceUrlThroughPipeline(
       items: rewritePayload.items || [],
       actors: rewritePayload.actors || [],
       tags: rewritePayload.tags || [],
-      country_code: 'NG',
+      country_code: targetCountry,
       language: 'en',
       category: 'politics',
       word_count: 0,
@@ -129,7 +131,7 @@ export async function processSourceUrlThroughPipeline(
       items: rewritePayload.items,
       actors: rewritePayload.actors,
       tags: rewritePayload.tags,
-      country_code: 'NG',
+      country_code: targetCountry,
       language: 'en',
       category: 'politics',
       word_count: 0,
@@ -153,6 +155,11 @@ export async function processSourceUrlThroughPipeline(
   const wordCount = rewritePayload.body_markdown.trim().split(/\s+/).filter(Boolean).length;
   const readMinutes = Math.max(1, Math.ceil(wordCount / 220));
 
+  // Featured Image: source og:image or first content image if valid, else site default breaking news asset
+  const featuredImage = (scraped.image_url && scraped.image_url.startsWith('http'))
+    ? scraped.image_url
+    : '/breaking-news-banner.png';
+
   const publishedRecord: PipelineArticleRecord = {
     id: `vox-art-${slug}`,
     slug,
@@ -166,14 +173,16 @@ export async function processSourceUrlThroughPipeline(
     executive_summary: rewritePayload.executive_summary,
     fact_analysis: rewritePayload.fact_analysis,
     why_it_matters: rewritePayload.why_it_matters,
-    legislative_scope: rewritePayload.legislative_scope,
+    legislative_scope: rewritePayload.legislative_scope || null,
     items: rewritePayload.items,
     actors: rewritePayload.actors,
     tags: rewritePayload.tags,
-    country_code: 'NG',
+    country_code: targetCountry,
     language: 'en',
     category: 'politics',
-    original_image_url: scraped.image_url || '/breaking-news-banner.png',
+    original_image_url: featuredImage,
+    image_credit: sourceName,
+    image_source_url: normUrl,
     word_count: wordCount,
     read_minutes: readMinutes,
     created_at: scraped.source_published_at || new Date().toISOString(),

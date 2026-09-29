@@ -20,13 +20,13 @@ export function validateQualityGates(
     errors.push(`Anthropic flagged brief as incomplete: ${payload.incomplete_reason || 'Source missing details'}`);
   }
 
-  // Gate 1: Word Count for Single Story
+  // Gate 1: Word Count for Single Story (minimum 220 words)
   const bodyWords = payload.body_markdown.trim().split(/\s+/).filter(Boolean).length;
   if (payload.content_type === 'single_story' && bodyWords < 220) {
     errors.push(`Single story body_markdown has only ${bodyWords} words (minimum required: 220)`);
   }
 
-  // Gate 2: Listicle Items Count
+  // Gate 2: Listicle Items Count (>= 8 if title claims "10 things", or >= 3 for general listicle)
   if (payload.content_type === 'listicle') {
     const titleClaims10 = (payload.headline + ' ' + scraped.source_headline).match(/\b(10|ten)\b/i);
     if (titleClaims10 && payload.items.length < 8) {
@@ -36,7 +36,7 @@ export function validateQualityGates(
     }
   }
 
-  // Gate 3: No [...] or … in any public field
+  // Gate 3: No [...] or … or "read more" in public fields
   const publicFields = [
     payload.headline,
     payload.dek,
@@ -47,7 +47,7 @@ export function validateQualityGates(
   ];
 
   for (const field of publicFields) {
-    if (field.includes('[...]') || field.includes('…') || field.match(/\b(read more|click here to read)\b/i)) {
+    if (field.includes('[...]') || field.includes('…') || field.match(/\b(read more|click here to read|continue reading)\b/i)) {
       errors.push(`Public field contains teaser marker ([...], …, read more): "${field.slice(0, 50)}..."`);
       break;
     }
@@ -58,19 +58,24 @@ export function validateQualityGates(
   const normDek = payload.dek.trim().toLowerCase();
   const firstParagraph = payload.body_markdown.split('\n\n')[0]?.trim().toLowerCase() || '';
 
-  if (normSummary === normDek) {
+  if (normSummary && normDek && normSummary === normDek) {
     errors.push('executive_summary is identical to dek');
   }
-  if (normSummary === firstParagraph) {
+  if (normSummary && firstParagraph && normSummary === firstParagraph) {
     errors.push('executive_summary is identical to the first paragraph of body_markdown');
   }
 
-  // Gate 5: source_url set
+  // Gate 5: source_url present
   if (!scraped.source_url || !scraped.source_url.startsWith('http')) {
     errors.push('source_url is missing or invalid');
   }
 
-  // Gate 6: No 20+ word verbatim span from source
+  // Gate 6: country_iso set
+  if (!payload.country_iso && !scraped.source_name) {
+    errors.push('country_iso / country code is missing');
+  }
+
+  // Gate 7: No 20+ word verbatim span copy from source
   const sourceSpans = extractSentenceSpans(scraped.extracted_full_text, 20);
   const bodyTextLower = payload.body_markdown.toLowerCase().replace(/[^a-z0-9\s]/g, '');
 

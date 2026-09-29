@@ -1,18 +1,18 @@
 import { AnthropicRewritePayload, ScrapedSourcePage } from './types';
 
-const SYSTEM_PROMPT = `You are the automatic Voxpolis rewrite engine. Turn one full source article into an original, clear brief for Nigerian and African readers.
+const SYSTEM_PROMPT = `You are the automatic Voxpolis rewrite engine for a global political news app. Produce an original brief for readers in the story’s country, in clear English.
 Rules:
-- Use only extracted_full_text. If it is truncated or a teaser, return completeness=incomplete. Do not invent facts or missing list items.
+- Use only extracted_full_text. If truncated, completeness=incomplete. Do not invent list items or figures.
 - Do not copy any source sentence of 20+ words.
 - Do not paste the headline into the body.
-- Separate confirmed fact from allegation. Attribute speakers.
-- Keep names, dates, figures, places exact. If a number is cut off, mark unverified; do not guess.
-- No campaign tone, no sermon, no generic politics filler.
-- legislative_scope must be null unless the story is a bill, vote, gazette, or binding court/regulatory order.
-- Listicle: emit one object per item actually present in the source. If the source promised 10 and the text only contains 1, completeness=incomplete.
-- Output JSON only.
+- Separate confirmed fact from allegation; attribute speakers.
+- Keep names, dates, figures, places exact.
+- No campaign tone. No generic politics filler.
+- legislative_scope = null unless bill, vote, gazette, or binding court/regulator order.
+- Listicle: one object per item actually in the source. If source promised 10 and text has 1, incomplete.
+- JSON only.
 
-JSON shape:
+JSON:
 {
   "content_type": "single_story|listicle",
   "headline": "",
@@ -25,13 +25,15 @@ JSON shape:
   "items": [{"position":1,"title":"","summary":"","source":""}],
   "actors": [],
   "tags": [],
+  "country_iso": "",
   "suggested_slug_keywords": "",
   "completeness": "complete|incomplete",
   "incomplete_reason": null
 }`;
 
 export async function rewriteWithAnthropic(
-  scraped: ScrapedSourcePage
+  scraped: ScrapedSourcePage,
+  targetCountryCode: string = 'NG'
 ): Promise<AnthropicRewritePayload> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || apiKey.trim() === '') {
@@ -43,6 +45,7 @@ export async function rewriteWithAnthropic(
     source_url: scraped.source_url,
     source_published_at: scraped.source_published_at,
     source_headline: scraped.source_headline,
+    target_country_iso: targetCountryCode,
     extracted_full_text: scraped.extracted_full_text,
   };
 
@@ -75,7 +78,6 @@ export async function rewriteWithAnthropic(
   const data = await response.json();
   const textContent = data.content?.[0]?.text || '';
 
-  // Extract JSON from response text (handling code fences if any)
   let jsonString = textContent.trim();
   if (jsonString.includes('```json')) {
     jsonString = jsonString.split('```json')[1].split('```')[0].trim();
@@ -92,6 +94,7 @@ export async function rewriteWithAnthropic(
     if (!Array.isArray(parsed.items)) parsed.items = [];
     if (!Array.isArray(parsed.actors)) parsed.actors = [];
     if (!Array.isArray(parsed.tags)) parsed.tags = [];
+    if (!parsed.country_iso) parsed.country_iso = targetCountryCode;
 
     return parsed;
   } catch (err: any) {

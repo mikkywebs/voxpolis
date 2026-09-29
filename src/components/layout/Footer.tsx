@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import SiteLogo from '@/components/branding/SiteLogo';
 
 export default function Footer() {
   return (
@@ -17,16 +16,19 @@ export default function Footer() {
           />
         </Link>
 
-        {/* Footer Navigation Links */}
-        <nav className="flex items-center justify-center flex-wrap gap-6 text-xs font-semibold text-gray-300">
+        {/* Footer Navigation Links for All 5 Indexable Trust Pages */}
+        <nav className="flex items-center justify-center flex-wrap gap-5 text-xs font-semibold text-gray-300">
           <Link href="/" className="hover:text-blue-400 transition">
             Home
           </Link>
           <Link href="/about" className="hover:text-blue-400 transition">
             About Us
           </Link>
-          <Link href="/archive" className="hover:text-blue-400 transition">
-            Historical Archive
+          <Link href="/contact" className="hover:text-blue-400 transition">
+            Contact Us
+          </Link>
+          <Link href="/corrections" className="hover:text-blue-400 transition">
+            Corrections Policy
           </Link>
           <Link href="/privacy" className="hover:text-blue-400 transition">
             Privacy Policy
@@ -34,12 +36,15 @@ export default function Footer() {
           <Link href="/terms" className="hover:text-blue-400 transition">
             Terms of Service
           </Link>
+          <Link href="/archive" className="hover:text-blue-400 transition">
+            Historical Archive
+          </Link>
         </nav>
 
         {/* Copyright & Platform Description */}
         <div className="space-y-1 text-[11px] text-gray-500 max-w-md">
-          <p>© {new Date().getFullYear()} Voxpolis. Independent Global Political Intelligence Platform.</p>
-          <p>Multi-nation governance updates, executive fact summaries, and citizen sentiment analysis.</p>
+          <p>© {new Date().getFullYear()} Voxpolis. Multi-country Political News Briefs.</p>
+          <p>Automated news briefs from primary source feeds. Operated from Abuja, Nigeria.</p>
         </div>
       </div>
     </footer>

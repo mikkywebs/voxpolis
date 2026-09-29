@@ -27,6 +27,7 @@ export interface AnthropicRewritePayload {
   items: ListicleItem[];
   actors: string[];
   tags: string[];
+  country_iso?: string;
   suggested_slug_keywords: string;
   completeness: CompletenessStatus;
   incomplete_reason?: string | null;
@@ -71,10 +72,12 @@ export interface PipelineArticleRecord {
   language: string;
   category: string;
   original_image_url?: string;
+  image_credit?: string;
+  image_source_url?: string;
   word_count: number;
   read_minutes: number;
   created_at: string;
-  status: 'published' | 'incomplete' | 'rejected';
+  status: 'published' | 'incomplete' | 'rejected' | 'unpublished';
   incomplete_reason?: string;
 }
 
