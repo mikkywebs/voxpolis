@@ -228,7 +228,7 @@ export default function CountryFeedPage() {
               <div className="p-4 rounded-xl bg-gray-100/80 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 flex items-center justify-between gap-3 text-xs">
                 <div className="text-gray-600 dark:text-gray-400">
                   <span className="font-bold text-gray-900 dark:text-white">Historical Archive: </span>
-                  Browse earlier reports older than 30 days for {selectedCountry.name}.
+                  Browse earlier historical reports for {selectedCountry.name}.
                 </div>
                 <Link
                   href={`/${countrySlug}/archive`}

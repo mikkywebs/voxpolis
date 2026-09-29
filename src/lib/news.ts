@@ -36,9 +36,11 @@ export interface ArticleData {
 }
 
 export function isArticleArchived(createdAt: string): boolean {
-  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  // Main live feeds display fresh daily news published within 48 hours (2 days).
+  // Articles older than 48 hours are automatically archived.
+  const fortyEightHoursMs = 48 * 60 * 60 * 1000;
   const age = Date.now() - new Date(createdAt).getTime();
-  return age > thirtyDaysMs;
+  return age > fortyEightHoursMs;
 }
 
 // Multi-language template content for localized news reports

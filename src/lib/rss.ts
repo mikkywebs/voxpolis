@@ -53,16 +53,33 @@ const REAL_POLITICAL_PHOTOS = [
 function decodeHtmlEntities(str: string): string {
   if (!str) return '';
   return str
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&#39;/g, "'")
     .replace(/&#8216;|&#8217;|&#8218;|&#8219;|&#145;|&#146;/g, "'")
     .replace(/&#8211;|&#8212;/g, '–')
     .replace(/&#8220;|&#8221;|&#8222;/g, '"')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;|&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
     .replace(/&#\d+;/g, '');
+}
+
+function cleanRssText(raw: string): string {
+  if (!raw) return '';
+  // Double decode to handle encoded HTML tags like &lt;a href="..."&gt;
+  let text = decodeHtmlEntities(decodeHtmlEntities(raw));
+  text = text
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/http[s]?:\/\/[^\s]+/g, '')
+    .replace(/href=["'][^"']*["']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (text.length < 5 || text.startsWith('<a') || text.includes('news.google.com')) {
+    return '';
+  }
+  return text;
 }
 
 function generateSlug(title: string, idSuffix: string | number): string {
@@ -173,9 +190,23 @@ function parseRssXmlToArticles(
     const pubDate = pubDateStr ? new Date(pubDateStr).toISOString() : new Date().toISOString();
 
     const sourceTag = getTag('source');
-    const title = decodeHtmlEntities(rawTitle);
 
-    if (!title || title.length < 10) return;
+    let titleText = cleanRssText(rawTitle) || decodeHtmlEntities(decodeHtmlEntities(rawTitle)).replace(/<[^>]+>/g, '').trim();
+
+    // Parse Google News "Headline - Outlet Name" format
+    let sourceName = decodeHtmlEntities(sourceTag) || defaultSource;
+    if (titleText.includes(' - ')) {
+      const parts = titleText.split(' - ');
+      if (parts.length >= 2) {
+        const candidateSource = parts[parts.length - 1].trim();
+        if (candidateSource.length > 2 && candidateSource.length < 35 && !candidateSource.includes('http')) {
+          sourceName = candidateSource;
+          titleText = parts.slice(0, parts.length - 1).join(' - ').trim();
+        }
+      }
+    }
+
+    if (!titleText || titleText.length < 10 || titleText.includes('<a href')) return;
 
     // Enhanced real photograph extraction
     let imageUrl: string | undefined = undefined;
@@ -191,25 +222,28 @@ function parseRssXmlToArticles(
 
     // High quality real news photo fallback if direct image is missing
     if (!imageUrl) {
-      const photoIdx = Math.abs(title.length + idx) % REAL_POLITICAL_PHOTOS.length;
+      const photoIdx = Math.abs(titleText.length + idx) % REAL_POLITICAL_PHOTOS.length;
       imageUrl = REAL_POLITICAL_PHOTOS[photoIdx];
     }
 
     // Clean text snippet
-    const rawSnippet = description.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    const cleanSnippet = decodeHtmlEntities(rawSnippet).slice(0, 280);
+    let cleanSnippet = cleanRssText(description);
+    if (!cleanSnippet || cleanSnippet.length < 15 || cleanSnippet.includes('<a href')) {
+      cleanSnippet = `${titleText}. Official administrative reporting and governance update for ${countryName}.`;
+    } else {
+      cleanSnippet = cleanSnippet.slice(0, 280);
+    }
 
-    const sourceName = decodeHtmlEntities(sourceTag) || defaultSource;
     const articleId = `rss-${countryCode.toLowerCase()}-${Date.now()}-${idx}`;
-    const slug = generateSlug(title, idx);
+    const slug = generateSlug(titleText, idx);
 
     articles.push({
       id: articleId,
       slug,
-      title,
-      snippet: cleanSnippet || title,
+      title: titleText,
+      snippet: cleanSnippet,
       content: `${cleanSnippet}\n\nFull administrative reporting and continuous legislative updates are documented directly in official press archives.`,
-      ai_analysis: `• Core Fact: ${cleanSnippet || title}\n• Legislative Scope: Policy directives and structural governance protocols were introduced for public review.\n• Impact Summary: Measures undergo committee evaluation with multi-party oversight.`,
+      ai_analysis: `• Core Fact: ${cleanSnippet}\n• Legislative Scope: Policy directives and structural governance protocols were introduced for public review.\n• Impact Summary: Measures undergo committee evaluation with multi-party oversight.`,
       country_code: countryCode,
       language: 'en',
       category: 'politics',
@@ -224,7 +258,7 @@ function parseRssXmlToArticles(
       created_at: pubDate,
       poll: {
         id: `poll-${articleId}`,
-        question: `Do you support the policy developments outlined in this update regarding ${title.slice(0, 70)}?`,
+        question: `Do you support the policy developments outlined in this update regarding ${titleText.slice(0, 70)}?`,
         agree_count: 0,
         disagree_count: 0,
       },
