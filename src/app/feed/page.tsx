@@ -82,7 +82,7 @@ export default function FeedPage() {
       />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <HolidayBanner countryCode={selectedCountry.code} countryName={selectedCountry.name} />
+        <HolidayBanner countryCode={selectedCountry.code} />
 
         {/* Section Header Bar */}
         <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4 flex-wrap gap-4">
