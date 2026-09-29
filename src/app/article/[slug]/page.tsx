@@ -103,7 +103,16 @@ export default function ArticleDetailPage() {
       <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8">
-        {/* Exact Top-to-Bottom Layout Sequence */}
+        {/* Archived Report Badge */}
+        {article.is_archived && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs font-semibold flex items-center gap-2">
+            <span className="text-base">🏛</span>
+            <span>
+              <strong>Archived Report:</strong> Originally published on{' '}
+              {new Date(article.created_at).toLocaleDateString()}. Preserved in the Voxpolis Political Archive for historical research & permanent URL access.
+            </span>
+          </div>
+        )}
 
         {/* 1. Headline, Snippet & Header (Views count hidden if < 100) */}
         <ArticleImageHeader

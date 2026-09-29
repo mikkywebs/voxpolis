@@ -70,12 +70,15 @@ export default function CountryFeedPage() {
     localStorage.setItem('voxpolis_preferred_language', lang);
   };
 
+  const activeArticles = articles.filter((a) => !a.is_archived);
+  const archivedCount = articles.length - activeArticles.length;
+
   const [currentPage, setCurrentPage] = useState(1);
   const ARTICLES_PER_PAGE = 12;
 
-  const totalPages = Math.ceil(articles.length / ARTICLES_PER_PAGE) || 1;
+  const totalPages = Math.ceil(activeArticles.length / ARTICLES_PER_PAGE) || 1;
   const startIndex = (currentPage - 1) * ARTICLES_PER_PAGE;
-  const currentArticles = articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
+  const currentArticles = activeArticles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
 
   const firstHalf = currentArticles.slice(0, 6);
   const secondHalf = currentArticles.slice(6, 12);
@@ -148,7 +151,7 @@ export default function CountryFeedPage() {
               {selectedLanguage.toUpperCase()}
             </span>
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-800 px-2.5 py-1 rounded-full">
-              {articles.length} Reports
+              {activeArticles.length} Active Reports
             </span>
           </div>
         </div>
@@ -159,9 +162,18 @@ export default function CountryFeedPage() {
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-xs text-gray-500">Loading {selectedCountry.name} political coverage...</p>
           </div>
-        ) : articles.length === 0 ? (
+        ) : activeArticles.length === 0 ? (
           <div className="py-12 text-center text-gray-500 text-xs">
-            No political updates published in the last 30 days.
+            No active political updates published in the last 30 days.
+            <div className="mt-4">
+              <Link
+                href={`/${countrySlug}/archive`}
+                className="inline-flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow"
+              >
+                <span>Browse {selectedCountry.name} Historical Archive</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="space-y-8">
@@ -188,28 +200,45 @@ export default function CountryFeedPage() {
               </div>
             )}
 
-            {/* Pagination Navigation */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-800">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 disabled:opacity-40 text-xs font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+            {/* Pagination Navigation & Archive Banner */}
+            <div className="pt-6 border-t border-gray-200 dark:border-gray-800 space-y-4">
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 disabled:opacity-40 text-xs font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                  >
+                    ← Previous Page
+                  </button>
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 bg-blue-600 text-white disabled:opacity-40 text-xs font-bold rounded-xl hover:bg-blue-700 shadow transition"
+                  >
+                    Next Page →
+                  </button>
+                </div>
+              )}
+
+              {/* Link to Historical Archive Page */}
+              <div className="p-4 rounded-xl bg-gray-100/80 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 flex items-center justify-between gap-3 text-xs">
+                <div className="text-gray-600 dark:text-gray-400">
+                  <span className="font-bold text-gray-900 dark:text-white">Historical Archive: </span>
+                  Browse earlier reports older than 30 days for {selectedCountry.name}.
+                </div>
+                <Link
+                  href={`/${countrySlug}/archive`}
+                  className="shrink-0 text-blue-600 dark:text-blue-400 hover:underline font-bold flex items-center gap-1"
                 >
-                  ← Previous Page
-                </button>
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 bg-blue-600 text-white disabled:opacity-40 text-xs font-bold rounded-xl hover:bg-blue-700 shadow transition"
-                >
-                  Next Page →
-                </button>
+                  <span>View Archive</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
-            )}
+            </div>
           </div>
         )}
       </main>

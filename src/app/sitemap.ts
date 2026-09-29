@@ -13,10 +13,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1.0,
     },
     {
-      url: `${baseUrl}/feed`,
+      url: `${baseUrl}/archive`,
       lastModified: new Date(),
-      changeFrequency: 'always',
-      priority: 0.9,
+      changeFrequency: 'daily',
+      priority: 0.8,
     },
     {
       url: `${baseUrl}/privacy`,
@@ -32,19 +32,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  // Dynamically add article pages from supported countries
-  const articleRoutes: MetadataRoute.Sitemap = [];
-  for (const country of SUPPORTED_COUNTRIES.slice(0, 5)) {
+  // Dynamically add country archive routes and article routes (active + archived)
+  const dynamicRoutes: MetadataRoute.Sitemap = [];
+  for (const country of SUPPORTED_COUNTRIES.slice(0, 10)) {
+    const slug = country.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    
+    // Country archive page
+    dynamicRoutes.push({
+      url: `${baseUrl}/${slug}/archive`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.8,
+    });
+
     const articles = await fetchArticlesForCountry(country.code);
     articles.forEach((art) => {
-      articleRoutes.push({
+      dynamicRoutes.push({
         url: `${baseUrl}/article/${art.slug}`,
         lastModified: new Date(art.created_at),
-        changeFrequency: 'weekly',
-        priority: 0.8,
+        changeFrequency: art.is_archived ? 'yearly' : 'weekly',
+        priority: art.is_archived ? 0.6 : 0.8,
       });
     });
   }
 
-  return [...staticRoutes, ...articleRoutes];
+  return [...staticRoutes, ...dynamicRoutes];
 }

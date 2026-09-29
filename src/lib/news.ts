@@ -26,12 +26,19 @@ export interface ArticleData {
   views_count: number;
   total_reading_time_seconds: number;
   created_at: string;
+  is_archived?: boolean;
   poll?: {
     id: string;
     question: string;
     agree_count: number;
     disagree_count: number;
   };
+}
+
+export function isArticleArchived(createdAt: string): boolean {
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  const age = Date.now() - new Date(createdAt).getTime();
+  return age > thirtyDaysMs;
 }
 
 // Multi-language template content for localized news reports
@@ -176,6 +183,7 @@ export async function fetchArticlesForCountry(
               views_count: 0,
               total_reading_time_seconds: 180,
               created_at: item.pubDate || new Date().toISOString(),
+              is_archived: isArticleArchived(item.pubDate || new Date().toISOString()),
               poll: {
                 id: `poll-${idx}`,
                 question: `Do you agree with the policy developments reported in this update?`,
@@ -193,24 +201,21 @@ export async function fetchArticlesForCountry(
     const combined = [...newsDataArticles, ...rssArticles];
 
     if (combined.length > 0) {
-      // Deduplicate by title
+      // Deduplicate by title & annotate archiving status
       const seen = new Set<string>();
       const unique: ArticleData[] = [];
       for (const a of combined) {
         const k = a.title.toLowerCase().slice(0, 35);
         if (!seen.has(k)) {
           seen.add(k);
-          unique.push(a);
+          unique.push({
+            ...a,
+            is_archived: isArticleArchived(a.created_at),
+          });
         }
       }
       
-      // 30-Day Retention Filter: Wipe out news older than 30 days
-      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-      const freshUnique = unique.filter((a) => {
-        const time = new Date(a.created_at).getTime();
-        return !isNaN(time) && time >= thirtyDaysAgo;
-      });
-      return freshUnique;
+      return unique;
     }
   } catch (err) {
     console.warn('Server-side RSS/NewsData fetch error, using fallback seed.', err);

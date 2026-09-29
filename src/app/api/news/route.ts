@@ -95,17 +95,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 30-Day Retention Filter: Wipe out news older than 30 days
-  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const freshArticles = uniqueArticles.filter((art) => {
-    const time = new Date(art.created_at).getTime();
-    return !isNaN(time) && time >= thirtyDaysAgo;
-  });
-
   // 5. Store in Server Cache
-  if (freshArticles.length > 0) {
-    cacheMap.set(cacheKey, { timestamp: now, data: freshArticles });
+  if (uniqueArticles.length > 0) {
+    cacheMap.set(cacheKey, { timestamp: now, data: uniqueArticles });
   }
 
-  return NextResponse.json({ articles: freshArticles, cached: false });
+  return NextResponse.json({ articles: uniqueArticles, cached: false });
 }

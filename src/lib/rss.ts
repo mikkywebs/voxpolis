@@ -140,15 +140,8 @@ export async function fetchRssArticlesForCountry(
     }
   }
 
-  // 30-Day Retention Filter: Wipe out all news older than 30 days
-  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const freshArticles = uniqueArticles.filter((art) => {
-    const time = new Date(art.created_at).getTime();
-    return !isNaN(time) && time >= thirtyDaysAgo;
-  });
-
-  // Sort by created_at descending
-  return freshArticles.sort(
+  // Sort all articles (active and archived) by created_at descending
+  return uniqueArticles.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 }
