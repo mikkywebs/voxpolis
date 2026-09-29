@@ -70,6 +70,36 @@ export default function LoginPage() {
     }
   };
 
+  const handleTwitterLogin = async () => {
+    setErrorMsg('');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'twitter',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        if (
+          error.message?.toLowerCase().includes('not enabled') ||
+          error.message?.toLowerCase().includes('unsupported provider') ||
+          (error as any).code === 400 ||
+          (error as any).error_code === 'validation_failed'
+        ) {
+          setErrorMsg('X / Twitter Sign-In is not currently enabled in Supabase Auth settings. Please enable the Twitter provider in your Supabase Dashboard.');
+        } else {
+          setErrorMsg(error.message);
+        }
+        setLoading(false);
+      }
+    } catch (e: any) {
+      setErrorMsg(e.message || 'X / Twitter OAuth failed.');
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto w-full space-y-6 bg-white dark:bg-gray-900 p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl">
@@ -87,14 +117,25 @@ export default function LoginPage() {
           </div>
         )}
 
-        <button
-          onClick={handleGoogleLogin}
-          type="button"
-          className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 font-semibold text-xs hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm transition"
-        >
-          <Chrome className="w-4 h-4 text-blue-600" />
-          <span>Continue with Google</span>
-        </button>
+        <div className="space-y-2.5">
+          <button
+            onClick={handleGoogleLogin}
+            type="button"
+            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 font-semibold text-xs hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm transition"
+          >
+            <Chrome className="w-4 h-4 text-blue-600" />
+            <span>Continue with Google</span>
+          </button>
+
+          <button
+            onClick={handleTwitterLogin}
+            type="button"
+            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-black text-white font-semibold text-xs hover:bg-gray-900 shadow-sm transition"
+          >
+            <span className="font-black text-sm">𝕏</span>
+            <span>Continue with X / Twitter</span>
+          </button>
+        </div>
 
         <div className="relative flex items-center justify-center">
           <div className="border-t border-gray-200 dark:border-gray-800 w-full" />
