@@ -36,14 +36,11 @@ export interface ArticleData {
 }
 
 export function isArticleArchived(createdAt: string): boolean {
-  // Main live feeds display fresh daily news published within 48 hours (2 days).
-  // Articles older than 48 hours are automatically archived.
   const fortyEightHoursMs = 48 * 60 * 60 * 1000;
   const age = Date.now() - new Date(createdAt).getTime();
   return age > fortyEightHoursMs;
 }
 
-// Strict Political News Filter: Ensures non-political gossip news is excluded
 const POLITICAL_KEYWORDS = [
   'politic', 'politics', 'government', 'governance', 'parliament', 'parliamentary',
   'congress', 'congressional', 'president', 'presidential', 'minister', 'ministry',
@@ -72,7 +69,6 @@ export function isPoliticalNews(title: string, snippet: string = '', tags: strin
   return POLITICAL_KEYWORDS.some((kw) => text.includes(kw));
 }
 
-// Strict Country Relevance Filter: Ensures news belonging exclusively to another nation is not leaked
 export function isRelevantToCountry(title: string, snippet: string = '', countryCode: string): boolean {
   const country = getCountryByCode(countryCode);
   const text = `${title} ${snippet}`.toLowerCase();
@@ -80,7 +76,6 @@ export function isRelevantToCountry(title: string, snippet: string = '', country
   const cName = country.name.toLowerCase();
   const cCapital = country.capital.toLowerCase();
 
-  // Known demonyms and entity keywords per country code
   const DEMONYM_MAP: Record<string, string[]> = {
     NG: ['nigeria', 'nigerian', 'abuja', 'tinubu', 'naira', 'nass', 'inec', 'fct'],
     US: ['united states', 'us', 'usa', 'american', 'biden', 'trump', 'congress', 'white house', 'washington', 'capitol', 'senate'],
@@ -99,12 +94,10 @@ export function isRelevantToCountry(title: string, snippet: string = '', country
 
   const keywords = DEMONYM_MAP[country.code] || [cName, cCapital];
 
-  // If text explicitly mentions target country name, capital, or demonym, it is relevant
   if (keywords.some((kw) => text.includes(kw))) {
     return true;
   }
 
-  // Check if text explicitly names ANOTHER country exclusively without mentioning target country
   const OTHER_COUNTRIES: Record<string, string[]> = {
     US: ['united states', 'white house', 'joe biden', 'donald trump', 'washington d.c.'],
     GB: ['united kingdom', 'downing street', 'keir starmer', 'rishi sunak'],
@@ -126,7 +119,6 @@ export function isRelevantToCountry(title: string, snippet: string = '', country
   return true;
 }
 
-// Multi-language template content for localized news reports
 const LOCALIZED_NEWS_TEMPLATES: Record<string, (countryName: string, capital: string) => { title: string; snippet: string; content: string; analysis: string; pollQuestion: string }> = {
   fr: (country, capital) => ({
     title: `🇫🇷 ${country} : Le Parlement Ouvre les Débats sur la Grande Réforme Governance et Numérique`,
@@ -142,7 +134,7 @@ Les membres du comité ministériel ont souligné que ce texte de loi bénéfici
 • Fait 1 : Le Parlement à ${capital} a engagé les débats sur le projet de modernisation administrative et numérique de ${country}.
 • Fait 2 : Les dispositions clés couvrent la dématérialisation des démarches, l'efficacité budgétaire de la santé et la sécurité des données publiques.
 • Fait 3 : Le texte dispose d'un soutien multi-parti et passe en révision de commission avant le vote final.`,
-    pollQuestion: `Approuvez-vous la priorité accordée à la dématérialisation des services publics à ${country} ?`,
+    pollQuestion: `Êtes-vous d'accord avec la priorité accordée à la dématérialisation des services publics à ${country} ?`,
   }),
 
   es: (country, capital) => ({
@@ -157,7 +149,7 @@ Fuentes oficiales confirmaron que las propuestas pasarán a la comisión parlame
 • Hecho 1: El Congreso en ${capital} inició la discusión sobre la reforma de gobernanza digital de ${country}.
 • Hecho 2: La iniciativa abarca infraestructura de transporte, sanidad pública e inspecciones de ciberseguridad.
 • Hecho 3: El proyecto cuenta con amplio respaldo institucional y avanza a dictamen de comisión.`,
-    pollQuestion: `¿Apoya incrementar la inversión estatal en infraestructuras digitales públicas en ${country}?`,
+    pollQuestion: `¿Está de acuerdo con incrementar la inversión estatal en infraestructuras digitales públicas en ${country}?`,
   }),
 
   de: (country, capital) => ({
@@ -172,7 +164,7 @@ Die Gesetzesinitiative wird nun in den zuständigen Ausschüssen detailliert gep
 • Fakt 1: Das Parlament in ${capital} berät über ein Gesetzpaket zur Verwaltungsmodernisierung in ${country}.
 • Fakt 2: Die Schwerpunkte liegen auf Cybersicherheitsstandards, Kommunalförderung und Netzstabilität.
 • Fakt 3: Der Entwurf befindet sich in der Ausschussberatung vor der Schlussabstimmung.`,
-    pollQuestion: `Sollte ${country} die staatlichen Ausgaben für digitale Verwaltung priorisieren?`,
+    pollQuestion: `Stimmen Sie der Priorisierung digitaler Verwaltungsleistungen in ${country} zu?`,
   }),
 
   ja: (country, capital) => ({
@@ -187,7 +179,7 @@ Die Gesetzesinitiative wird nun in den zuständigen Ausschüssen detailliert gep
 ・事実 1：${capital}の国会にて、${country}の行政・デジタル基盤改革法案の審議が開始されました。
 ・事実 2：主要項目には、サイバーセキュリティ監査、地方自治体支援、および行政手続きのデジタル化が含まれます。
 ・事実 3：超党派の合意に基づき、委員会審議を経て最終採決へ進みます。`,
-    pollQuestion: `${country}における行政手続きの完全デジタル化推進に賛成ですか？`,
+    pollQuestion: `${country}における行政手続きのデジタル化推進方針に賛成ですか？`,
   }),
 
   en: (country, capital) => ({
@@ -216,7 +208,6 @@ export async function fetchArticlesForCountry(
   const country = getCountryByCode(code);
   const langCode = (language || country.languages[0]?.code || 'en').toLowerCase();
 
-  // 1. Client-Side Browser Context: Fetch from Server API Route to hide API Key and use Server Cache
   if (typeof window !== 'undefined') {
     try {
       const res = await fetch(`/api/news?country=${code}&language=${langCode}`);
@@ -231,7 +222,6 @@ export async function fetchArticlesForCountry(
     }
   }
 
-  // 2. Server-Side Context: Direct RSS + NewsData API Fetching
   try {
     const rssArticles = await fetchRssArticlesForCountry(code, langCode);
     
@@ -288,7 +278,7 @@ export async function fetchArticlesForCountry(
                 is_archived: isArticleArchived(item.pubDate || new Date().toISOString()),
                 poll: {
                   id: `poll-${idx}`,
-                  question: `What is your perspective on "${cleanTitle.slice(0, 75)}"?`,
+                  question: `Do you agree with the stance reported regarding "${cleanTitle.slice(0, 75)}"?`,
                   agree_count: 0,
                   disagree_count: 0,
                 },
@@ -304,7 +294,6 @@ export async function fetchArticlesForCountry(
     const combined = [...newsDataArticles, ...rssArticles];
 
     if (combined.length > 0) {
-      // Deduplicate by title, enforce strict political filtering & annotate archiving status
       const seen = new Set<string>();
       const unique: ArticleData[] = [];
       for (const a of combined) {
@@ -317,6 +306,12 @@ export async function fetchArticlesForCountry(
           unique.push({
             ...a,
             is_archived: isArticleArchived(a.created_at),
+            poll: a.poll || {
+              id: `poll-${a.id}`,
+              question: `Do you agree with the policy stance reported regarding "${a.title.slice(0, 75)}"?`,
+              agree_count: 0,
+              disagree_count: 0,
+            },
           });
         }
       }
@@ -329,7 +324,6 @@ export async function fetchArticlesForCountry(
     console.warn('Server-side RSS/NewsData fetch error, using fallback seed.', err);
   }
 
-  // 3. Fallback Seeded Template Content
   const templateFn = LOCALIZED_NEWS_TEMPLATES[langCode] || LOCALIZED_NEWS_TEMPLATES.en;
   const localizedData = templateFn(country.name, country.capital);
 
@@ -380,8 +374,7 @@ Addressing press representatives in ${country.capital}, government officials con
       country_code: code,
       language: langCode,
       category: 'infrastructure',
-      image_mode: 'ai_generated',
-      ai_image_url: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80',
+      image_mode: 'breaking_logo',
       source_name: `${country.name} Press Agency`,
       source_url: 'https://voxpolis.app',
       is_breaking: false,
@@ -393,7 +386,7 @@ Addressing press representatives in ${country.capital}, government officials con
       affiliate_link_url: 'https://voxpolis.app',
       poll: {
         id: `poll-${code}-2`,
-        question: `Do you support increasing national budget allocation for clean energy transit in ${country.name}?`,
+        question: `Do you agree with increasing national budget allocation for clean energy transit in ${country.name}?`,
         agree_count: 420,
         disagree_count: 58,
       },
@@ -416,28 +409,11 @@ export function formatExactTimestamp(dateStr?: string): string {
 
 const DIVERSE_POLITICAL_FALLBACKS = [
   '/breaking-news-banner.png',
-  'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1575320181282-9afab399332c?auto=format&fit=crop&w=800&q=80',
 ];
 
 export function getArticleImageUrl(article: Partial<ArticleData>): string {
-  if (article.image_mode === 'breaking_logo' || article.is_breaking) {
-    return '/breaking-news-banner.png';
-  }
   if (article.original_image_url && article.original_image_url.trim() !== '' && !article.original_image_url.includes('google.com/news')) {
     return article.original_image_url;
   }
-  if (article.ai_image_url && article.ai_image_url.trim() !== '') {
-    return article.ai_image_url;
-  }
-  const titleStr = article.title || 'news';
-  let hash = 0;
-  for (let i = 0; i < titleStr.length; i++) {
-    hash = (hash << 5) - hash + titleStr.charCodeAt(i);
-    hash |= 0;
-  }
-  const idx = Math.abs(hash) % DIVERSE_POLITICAL_FALLBACKS.length;
-  return DIVERSE_POLITICAL_FALLBACKS[idx];
+  return '/breaking-news-banner.png';
 }

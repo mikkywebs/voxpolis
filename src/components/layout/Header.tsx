@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import SiteLogo from '@/components/branding/SiteLogo';
 import RegionalCountrySelectorModal from '@/components/layout/RegionalCountrySelectorModal';
-import { CountryConfig } from '@/config/countries';
+import { CountryConfig, SUPPORTED_COUNTRIES } from '@/config/countries';
 import { WeatherData } from '@/lib/weather';
-import { Sun, Moon, Palette, ChevronDown, User, Shield, LogOut, Languages } from 'lucide-react';
+import { Sun, Moon, Palette, ChevronDown, User, Shield, LogOut, Languages, Globe, Check } from 'lucide-react';
 
 interface HeaderProps {
   user?: {
@@ -33,9 +33,12 @@ export default function Header({
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [accentColor, setAccentColor] = useState<'blue' | 'emerald' | 'purple' | 'amber' | 'rose'>('blue');
+
+  const countryDropdownRef = useRef<HTMLDivElement>(null);
 
   // Compute time-of-day greeting
   useEffect(() => {
@@ -65,7 +68,17 @@ export default function Header({
     loadWeather();
   }, [selectedCountry]);
 
-  // Toggle Dark Mode
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (countryDropdownRef.current && !countryDropdownRef.current.contains(e.target as Node)) {
+        setIsCountryDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const toggleDarkMode = () => {
     const nextMode = !isDarkMode;
     setIsDarkMode(nextMode);
@@ -76,7 +89,6 @@ export default function Header({
     }
   };
 
-  // Cycle Accent Colors
   const cycleAccentColor = () => {
     const colors: Array<'blue' | 'emerald' | 'purple' | 'amber' | 'rose'> = [
       'blue',
@@ -93,48 +105,108 @@ export default function Header({
 
   const activeLangObj = selectedCountry.languages.find((l) => l.code === selectedLanguage) || selectedCountry.languages[0];
 
+  // Quick Top Countries for fast access in desktop dropdown
+  const QUICK_COUNTRIES = SUPPORTED_COUNTRIES.slice(0, 8);
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
         {/* Left: Branding Logo, About Link & Greeting */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 shrink-0">
           <Link href="/feed" className="flex items-center gap-2 group">
             <SiteLogo variant="full" className="h-8 sm:h-9 w-auto" />
           </Link>
-          <nav className="hidden sm:flex items-center gap-3 border-l border-gray-200 dark:border-gray-700 pl-4 py-1 text-xs font-semibold">
+          <nav className="hidden md:flex items-center gap-3 border-l border-gray-200 dark:border-gray-700 pl-3 py-1 text-xs font-semibold">
             <Link href="/about" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">
               About Us
             </Link>
-            <span className="hidden md:inline text-gray-300 dark:text-gray-700">•</span>
-            <span className="hidden md:inline font-medium text-gray-500 dark:text-gray-400">{greeting}</span>
+            <span className="hidden lg:inline text-gray-300 dark:text-gray-700">•</span>
+            <span className="hidden lg:inline font-medium text-gray-500 dark:text-gray-400 truncate max-w-[150px]">{greeting}</span>
           </nav>
         </div>
 
-        {/* Right: Weather Chip, Regional Country Switcher, Recognized Language Toggle, Theme & User */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Weather Chip */}
+        {/* Right: Weather Chip, Regional Country Switcher Dropdown, Language Toggle, Theme & User */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Weather Chip (Controlled width so it never crowds header elements) */}
           {weather && (
-            <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-semibold px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm">
+            <div className="hidden sm:flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-semibold px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm shrink-0">
               <span>{weather.icon}</span>
               <span>{weather.tempC}°C</span>
-              <span className="hidden sm:inline text-gray-400">| {weather.condition}</span>
+              <span className="hidden lg:inline text-gray-400 truncate max-w-[90px]">| {weather.condition}</span>
             </div>
           )}
 
-          {/* Regional Country Selector Trigger */}
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 hover:from-blue-100 hover:to-indigo-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs font-bold px-3 py-1.5 rounded-xl border border-blue-200 dark:border-gray-700 shadow-sm transition"
-          >
-            <span className="text-base">{selectedCountry.flag}</span>
-            <span className="hidden sm:inline">{selectedCountry.name}</span>
-            <span className="sm:hidden font-mono">{selectedCountry.code}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-          </button>
+          {/* Regional Country Selector Trigger & Dropdown Menu */}
+          <div className="relative shrink-0" ref={countryDropdownRef}>
+            <button
+              onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
+              type="button"
+              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 hover:from-blue-100 hover:to-indigo-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs font-extrabold px-3 py-1.5 rounded-xl border border-blue-300 dark:border-gray-600 shadow-sm transition cursor-pointer shrink-0"
+              title="Select Country Coverage"
+            >
+              <span className="text-base leading-none">{selectedCountry.flag}</span>
+              <span className="font-bold">{selectedCountry.code}</span>
+              <span className="hidden md:inline font-semibold">{selectedCountry.name}</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-blue-600 dark:text-blue-400 transition-transform ${isCountryDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-          {/* Country Recognized Language Switcher (User Request) */}
+            {/* Desktop Quick Country Dropdown */}
+            {isCountryDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl z-50 py-2 text-xs">
+                <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-700/60 flex items-center justify-between">
+                  <span className="font-extrabold text-[11px] text-gray-400 uppercase tracking-wider">
+                    Quick Country Switch
+                  </span>
+                  <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold px-1.5 py-0.5 rounded">
+                    119 Nations
+                  </span>
+                </div>
+
+                <div className="max-h-60 overflow-y-auto py-1 space-y-0.5">
+                  {QUICK_COUNTRIES.map((c) => {
+                    const isSelected = selectedCountry.code === c.code;
+                    return (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => {
+                          onSelectCountry(c);
+                          setIsCountryDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between font-medium hover:bg-blue-50 dark:hover:bg-gray-700 transition ${
+                          isSelected ? 'bg-blue-50/70 dark:bg-gray-700/70 text-blue-600 font-bold' : 'text-gray-800 dark:text-gray-200'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          <span className="text-base">{c.flag}</span>
+                          <span className="truncate">{c.name}</span>
+                        </span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="p-2 border-t border-gray-100 dark:border-gray-700/60">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCountryDropdownOpen(false);
+                      setIsModalOpen(true);
+                    }}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5"
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Explore All 119 Countries...</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Country Recognized Language Switcher */}
           {selectedCountry.languages.length > 1 && (
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 onClick={() => setIsLangOpen(!isLangOpen)}
                 className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-xs font-bold text-gray-700 dark:text-gray-200 rounded-xl border border-gray-200 dark:border-gray-700 transition"
@@ -176,7 +248,7 @@ export default function Header({
           <button
             onClick={toggleDarkMode}
             title="Toggle Dark/Light Mode"
-            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition shrink-0"
           >
             {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -184,14 +256,14 @@ export default function Header({
           <button
             onClick={cycleAccentColor}
             title={`Accent Color: ${accentColor}`}
-            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition hidden sm:flex"
+            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition hidden sm:flex shrink-0"
           >
             <Palette className="w-4 h-4 text-blue-500" />
           </button>
 
-          {/* User Profile / Admin Link */}
+          {/* User Profile / Auth Links */}
           {user ? (
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 className="flex items-center gap-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
@@ -237,10 +309,10 @@ export default function Header({
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <Link
                 href="/login"
-                className="text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 px-2.5 py-1.5"
+                className="text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 px-2 py-1.5"
               >
                 Log In
               </Link>

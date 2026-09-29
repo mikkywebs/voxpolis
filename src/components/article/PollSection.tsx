@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Vote, CheckCircle2 } from 'lucide-react';
+import { Vote, CheckCircle2, MessageSquare } from 'lucide-react';
 
 interface PollSectionProps {
   poll?: {
@@ -22,7 +22,17 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
   const [disagree, setDisagree] = useState(initialDisagree);
   const [userVote, setUserVote] = useState<'agree' | 'disagree' | null>(null);
 
-  const question = poll?.question || 'Do you support the policy developments reported in this executive summary?';
+  const rawQuestion = poll?.question || 'Do you support the policy developments reported in this executive summary?';
+
+  // Normalize open-ended questions into binary agreement questions if needed
+  let displayQuestion = rawQuestion;
+  if (rawQuestion.toLowerCase().startsWith('what is your perspective on')) {
+    const topic = rawQuestion.replace(/what is your perspective on\s*/i, '').replace(/\?$/, '');
+    displayQuestion = `Do you agree with the position regarding ${topic}?`;
+  } else if (rawQuestion.toLowerCase().startsWith('what ') || rawQuestion.toLowerCase().startsWith('how ') || rawQuestion.toLowerCase().startsWith('why ')) {
+    const topic = rawQuestion.replace(/^(what|how|why)\s+(is|are|do|does|did|would)\s*/i, '').replace(/\?$/, '');
+    displayQuestion = `Do you agree with the reported stance on ${topic}?`;
+  }
 
   const total = agree + disagree;
   const agreePercent = total > 0 ? Math.round((agree / total) * 100) : 0;
@@ -46,19 +56,31 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
     setUserVote(type);
   };
 
+  const scrollToComments = () => {
+    const commentEl = document.getElementById('comments-section') || document.querySelector('form');
+    if (commentEl) {
+      commentEl.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="my-6 p-6 rounded-2xl bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 shadow-md">
-      <div className="flex items-center gap-2 mb-3">
-        <Vote className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          Public Opinion Poll (Members Only)
-        </span>
+    <div className="my-6 p-6 rounded-2xl bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 shadow-md space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Vote className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Public Opinion Poll (Members Only)
+          </span>
+        </div>
+        <span className="text-[11px] font-semibold text-gray-400">Binary Policy Stance</span>
       </div>
 
-      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white mb-4">{question}</h4>
+      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-relaxed">
+        {displayQuestion}
+      </h4>
 
       {/* Progress Bar */}
-      <div className="mb-4">
+      <div>
         {total === 0 ? (
           <div>
             <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden" />
@@ -84,7 +106,7 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => handleVote('agree')}
-          className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 ${
+          className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 cursor-pointer ${
             userVote === 'agree'
               ? 'bg-emerald-600 text-white border-emerald-600 shadow'
               : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
@@ -96,7 +118,7 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
 
         <button
           onClick={() => handleVote('disagree')}
-          className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 ${
+          className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 cursor-pointer ${
             userVote === 'disagree'
               ? 'bg-rose-600 text-white border-rose-600 shadow'
               : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-100'
@@ -104,6 +126,21 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
         >
           {userVote === 'disagree' && <CheckCircle2 className="w-4 h-4" />}
           Vote Disagree
+        </button>
+      </div>
+
+      {/* Discussion Prompt for Detailed Thoughts */}
+      <div className="pt-2 border-t border-gray-100 dark:border-gray-700/60 flex items-center justify-between flex-wrap gap-2 text-xs">
+        <span className="text-gray-500 dark:text-gray-400 font-medium">
+          Have a nuanced or detailed perspective?
+        </span>
+        <button
+          type="button"
+          onClick={scrollToComments}
+          className="text-blue-600 dark:text-blue-400 hover:underline font-bold flex items-center gap-1.5 cursor-pointer"
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span>Share thoughts in comments →</span>
         </button>
       </div>
     </div>
