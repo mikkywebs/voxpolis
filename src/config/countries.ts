@@ -226,8 +226,8 @@ export function getGroupedRegions(): RegionGroup[] {
 }
 
 export function getCountryByCode(code: string): CountryConfig {
-  return (
-    ALL_COUNTRIES.find((c) => c.code.toUpperCase() === code.toUpperCase()) ||
-    ALL_COUNTRIES[0] // fallback to US/Nigeria
-  );
+  const found = ALL_COUNTRIES.find((c) => c.code.toUpperCase() === code.toUpperCase());
+  if (found) return found;
+  const us = ALL_COUNTRIES.find((c) => c.code === 'US');
+  return us || ALL_COUNTRIES[0];
 }

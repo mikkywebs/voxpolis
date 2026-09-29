@@ -30,7 +30,7 @@ export default function LandingPage() {
   const [user, setUser] = useState<any>(null);
 
   // IP-detected location & preview feed articles
-  const [detectedCountry, setDetectedCountry] = useState<CountryConfig>(ALL_COUNTRIES[0]);
+  const [detectedCountry, setDetectedCountry] = useState<CountryConfig>(getCountryByCode('US'));
   const [allArticles, setAllArticles] = useState<ArticleData[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(true);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -50,7 +50,7 @@ export default function LandingPage() {
   useEffect(() => {
     async function detectLocationAndLoadNews() {
       setLoadingArticles(true);
-      let countryCode = 'NG';
+      let countryCode = 'US';
 
       const savedCountry = typeof window !== 'undefined' ? localStorage.getItem('voxpolis_primary_country') : null;
 
@@ -87,7 +87,7 @@ export default function LandingPage() {
               }
             }
           } catch {
-            countryCode = 'NG';
+            countryCode = 'US';
           }
         }
       }

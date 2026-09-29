@@ -21,7 +21,7 @@ interface CommentInputFormProps {
 }
 
 export function CommentInputForm({
-  userCountryFlag = '🇳🇬',
+  userCountryFlag = '🌐',
   onRequireAuth,
   isLoggedIn = false,
   onCommentSubmitted,
@@ -137,7 +137,7 @@ interface CommentListProps {
 
 export function CommentList({
   comments,
-  userCountryFlag = '🇳🇬',
+  userCountryFlag = '🌐',
   onRequireAuth,
   isLoggedIn = false,
   onAddReply,

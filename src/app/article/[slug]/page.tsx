@@ -205,7 +205,7 @@ export default function ArticleDetailPage() {
 
         {/* 7. Comment Input Window (Form placed immediately after the poll) */}
         <CommentInputForm
-          userCountryFlag="🇳🇬"
+          userCountryFlag={selectedCountry.flag}
           onRequireAuth={() => setShowAuthModal(true)}
           isLoggedIn={isLoggedIn}
           onCommentSubmitted={handleAddComment}
@@ -220,7 +220,7 @@ export default function ArticleDetailPage() {
         {/* 9. Global Member Discussion List (Placed after related posts) */}
         <CommentList
           comments={comments}
-          userCountryFlag="🇳🇬"
+          userCountryFlag={selectedCountry.flag}
           onRequireAuth={() => setShowAuthModal(true)}
           isLoggedIn={isLoggedIn}
           onAddReply={handleAddReply}
