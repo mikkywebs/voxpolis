@@ -144,12 +144,22 @@ export default function SignupPage() {
     setErrorMsg('');
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'twitter',
+      let { error } = await supabase.auth.signInWithOAuth({
+        provider: 'x' as any,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
+
+      if (error) {
+        const fallback = await supabase.auth.signInWithOAuth({
+          provider: 'twitter',
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+        error = fallback.error;
+      }
 
       if (error) {
         if (
@@ -158,7 +168,7 @@ export default function SignupPage() {
           (error as any).code === 400 ||
           (error as any).error_code === 'validation_failed'
         ) {
-          setErrorMsg('X / Twitter Sign-In is not currently enabled in Supabase Auth settings. Please register using your Email Address below, or enable the Twitter provider in your Supabase Dashboard.');
+          setErrorMsg('X / Twitter Sign-In is not currently enabled in Supabase Auth settings. Please register using your Email Address below, or enable the Twitter (X) provider in your Supabase Dashboard.');
         } else {
           setErrorMsg(error.message);
         }
