@@ -12,7 +12,6 @@ interface AIAnalysisSectionProps {
 }
 
 export default function AIAnalysisSection({ analysisText, readAlsoArticle }: AIAnalysisSectionProps) {
-  // Filter out ugly meta tags and unwanted boilerplate strings
   const rawLines = analysisText
     .split('\n')
     .map((l) => l.trim())
@@ -31,7 +30,8 @@ export default function AIAnalysisSection({ analysisText, readAlsoArticle }: AIA
       !lower.startsWith('- headline:') &&
       !lower.startsWith('headline:') &&
       !lower.includes('only available in paid plans') &&
-      !lower.includes('appeared first on')
+      !lower.includes('appeared first on') &&
+      !lower.includes('policy directives and structural governance protocols were introduced for public review')
     );
   });
 
@@ -42,23 +42,19 @@ export default function AIAnalysisSection({ analysisText, readAlsoArticle }: AIA
 
   return (
     <div className="my-6 pt-4 pb-2 border-t border-b border-gray-200/80 dark:border-gray-800 text-gray-900 dark:text-gray-100 transition-colors">
-      <div className="mb-4">
-        <h3 className="font-bold text-sm sm:text-base tracking-wide text-gray-900 dark:text-white uppercase">
-          Executive Fact Analysis & Context
-        </h3>
-        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-          Verified core report facts • Objective & non-partisan synthesis
-        </p>
+      <div className="mb-3">
+        <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
+          NEWS RECAP & KEY IMPACT
+        </span>
       </div>
 
-      <div className="space-y-4 text-xs sm:text-sm leading-relaxed">
+      <div className="space-y-3 text-xs sm:text-sm leading-relaxed">
         {firstPart.map((line, idx) => (
           <p key={idx} className="text-gray-800 dark:text-gray-200 leading-relaxed">
             {line.replace(/^•\s*/, '')}
           </p>
         ))}
 
-        {/* Embedded "Read Also" Link */}
         {readAlsoArticle && (
           <div className="my-4 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 flex items-center justify-between gap-3 shadow-sm">
             <div className="text-xs">

@@ -47,7 +47,7 @@ export default function ArticleDetailPage() {
     }
   }, [slug, router]);
 
-  // Check user session
+  // Check auth session
   useEffect(() => {
     async function checkUser() {
       try {
@@ -141,7 +141,6 @@ export default function ArticleDetailPage() {
 
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col">
-        {/* Noindex header meta for guest-walled page without body */}
         <head>
           <meta name="robots" content="noindex, follow" />
           <title>Member Access Required | Voxpolis</title>
@@ -196,7 +195,7 @@ export default function ArticleDetailPage() {
   }
 
   // -------------------------------------------------------------
-  // PIPELINE ARTICLE DISPLAY (Distinct Fields, Zero Duplicate Modules)
+  // PIPELINE ARTICLE DISPLAY
   // -------------------------------------------------------------
   if (pipelineArticle) {
     const paragraphs = pipelineArticle.body_markdown.split('\n\n').filter(Boolean);
@@ -236,10 +235,9 @@ export default function ArticleDetailPage() {
 
           <SocialShareButtons title={pipelineArticle.headline} slug={pipelineArticle.slug} />
 
-          {/* Ad Slot 1: Below Dek */}
           <AdSlot slotLocation="below_dek" isAllowed={true} />
 
-          {/* Featured Image (Source image or site default breaking news asset) */}
+          {/* Featured Image */}
           {pipelineArticle.original_image_url && (
             <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-md">
               {/* eslint-disable-next-html-element-suppression */}
@@ -263,11 +261,11 @@ export default function ArticleDetailPage() {
             </div>
           )}
 
-          {/* Executive Summary */}
+          {/* News Recap */}
           {pipelineArticle.executive_summary && (
             <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-1">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
-                EXECUTIVE BRIEF SUMMARY
+                NEWS RECAP
               </span>
               <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 leading-relaxed">
                 {pipelineArticle.executive_summary}
@@ -287,8 +285,8 @@ export default function ArticleDetailPage() {
             </div>
           )}
 
-          {/* Legislative Scope (Omitted when null) */}
-          {pipelineArticle.legislative_scope && (
+          {/* Legislative Scope (Rendered ONLY if non-null and not boilerplate) */}
+          {pipelineArticle.legislative_scope && !pipelineArticle.legislative_scope.includes('policy directives and structural governance protocols') && (
             <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-1">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-300 block flex items-center gap-1">
                 <FileText className="w-3.5 h-3.5" />
@@ -304,7 +302,7 @@ export default function ArticleDetailPage() {
           {pipelineArticle.fact_analysis && pipelineArticle.fact_analysis.length > 0 && (
             <div className="space-y-3 pt-2">
               <span className="text-xs font-black uppercase tracking-wider text-gray-500 block">
-                FACT & ALLEGATION ANALYSIS
+                REPORTED FACTS & ATTRBUTIONS
               </span>
               <div className="space-y-2.5">
                 {pipelineArticle.fact_analysis.map((fa, i) => (
@@ -365,13 +363,12 @@ export default function ArticleDetailPage() {
             </div>
           )}
 
-          {/* Main Body Markdown Content with Mid-Article Ad */}
+          {/* Main Body Content */}
           <div className="prose dark:prose-invert max-w-none text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-relaxed space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
             {paragraphs.slice(0, midPoint).map((para, i) => (
               <p key={i}>{para}</p>
             ))}
 
-            {/* Ad Slot 2: Mid-Article */}
             <AdSlot slotLocation="mid_article" isAllowed={true} />
 
             {paragraphs.slice(midPoint).map((para, i) => (
@@ -381,10 +378,8 @@ export default function ArticleDetailPage() {
 
           <OriginalSourceLink sourceName={pipelineArticle.source_name} sourceUrl={pipelineArticle.source_url} />
 
-          {/* Ad Slot 3: Below Sources */}
           <AdSlot slotLocation="below_sources" isAllowed={true} />
 
-          {/* Poll & Comments */}
           <PollSection onRequireAuth={() => router.push('/login')} isLoggedIn={isLoggedIn} />
           <CommentInputForm
             userCountryFlag={selectedCountry.flag}
@@ -442,7 +437,7 @@ export default function ArticleDetailPage() {
 
         <div className="my-6 pt-2 text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
           <span className="font-bold text-blue-600 dark:text-blue-400 block uppercase tracking-wider text-[11px] mb-1">
-            EXECUTIVE REPORT SUMMARY
+            NEWS RECAP
           </span>
           <p className="text-gray-800 dark:text-gray-200 font-semibold leading-relaxed">
             {article!.snippet || article!.content.slice(0, 220)}

@@ -1,5 +1,34 @@
 import { ScrapedSourcePage } from './types';
 
+export function isValidContentImage(url?: string): boolean {
+  if (!url || typeof url !== 'string' || !url.startsWith('http')) return false;
+
+  const lower = url.toLowerCase();
+
+  const REJECT_PATTERNS = [
+    'punchng.com',
+    'default-logo',
+    'site-logo',
+    'brand-logo',
+    'favicon',
+    'placeholder',
+    'avatar',
+    'header-logo',
+    'footer-logo',
+    'punch-logo',
+    'rss-logo',
+    'wordpress/assets',
+    'wp-content/uploads/logo',
+    'icon-192',
+    'apple-touch-icon',
+    'default_news',
+    'no-image',
+    'logo',
+  ];
+
+  return !REJECT_PATTERNS.some((pattern) => lower.includes(pattern));
+}
+
 function cleanHtmlTags(html: string): string {
   if (!html) return '';
 
@@ -14,7 +43,6 @@ function cleanHtmlTags(html: string): string {
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<(div|section|aside|ul|ol)[^>]*?(class|id)=["'][^"']*(?:comment|share|social|related|sidebar|advert|widget|nav|menu|footer|banner|promo)[^"']*["'][\s\S]*?<\/\1>/gi, ' ');
 
-  // Extract text from paragraph tags, headers, list items
   const blockMatches = clean.match(/<(?:p|h[1-6]|li|blockquote)[^>]*>([\s\S]*?)<\/(?:p|h[1-6]|li|blockquote)>/gi);
 
   let textContent = '';
@@ -35,7 +63,6 @@ function cleanHtmlTags(html: string): string {
       .filter((t) => t.length > 25 && !t.match(/^(share|tweet|facebook|whatsapp|copy link|follow us|copyright|all rights reserved|read also|advertisement)/i))
       .join('\n\n');
   } else {
-    // Fallback simple HTML tag stripping
     textContent = clean
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -112,7 +139,6 @@ export async function fetchAndExtractSourcePage(
 
     const html = await res.text();
 
-    // Check paywall markers
     const paywallMarkers = ['paywall', 'subscriber only', 'subscribe to read', 'register to read full story', 'membership required'];
     const lowerHtml = html.toLowerCase();
     if (paywallMarkers.some((marker) => lowerHtml.includes(marker))) {
@@ -134,6 +160,22 @@ export async function fetchAndExtractSourcePage(
     const fullText = cleanHtmlTags(html);
     const charCount = fullText.length;
     const wordCount = fullText.split(/\s+/).filter(Boolean).length;
+
+    // Reject Gate Rule: Must have a clear, real content photograph (not a publisher logo like punchng.com)
+    if (!isValidContentImage(imageUrl)) {
+      return {
+        source_url: sourceUrl,
+        source_name: sourceName,
+        source_published_at: publishedAt,
+        source_headline: headline,
+        extracted_full_text: fullText,
+        image_url: undefined,
+        character_count: charCount,
+        word_count: wordCount,
+        is_valid: false,
+        reject_reason: 'Source page lacks a clear content image or displays a generic publisher logo (e.g. punchng.com logo)',
+      };
+    }
 
     // Reject Gate Rule 1: Extract < 800 characters
     if (charCount < 800) {

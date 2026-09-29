@@ -1,18 +1,17 @@
 import { getCountryByCode } from '@/config/countries';
 import { ArticleData } from './news';
+import { isValidContentImage } from './pipeline/extractor';
 
 export interface RssFeedConfig {
   name: string;
   url: string;
 }
 
-// Map of dedicated national political RSS feeds per country
 const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
   NG: [
     { name: 'DailyPost Nigeria', url: 'https://dailypost.ng/category/politics/feed/' },
     { name: 'Vanguard Nigeria', url: 'https://www.vanguardngr.com/category/politics/feed/' },
     { name: 'Premium Times Nigeria', url: 'https://www.premiumtimesng.com/category/news/top-news/feed' },
-    { name: 'Punch Nigeria', url: 'https://punchng.com/topics/politics/feed/' },
   ],
   US: [
     { name: 'Politico', url: 'https://rss.politico.com/politics-news.xml' },
@@ -42,14 +41,6 @@ const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
   ],
 };
 
-const REAL_POLITICAL_PHOTOS = [
-  'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1575320181282-9afab399332c?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1200&q=80',
-];
-
 function decodeHtmlEntities(str: string): string {
   if (!str) return '';
   return str
@@ -67,7 +58,6 @@ function decodeHtmlEntities(str: string): string {
 
 function cleanRssText(raw: string): string {
   if (!raw) return '';
-  // Double decode to handle encoded HTML tags like &lt;a href="..."&gt;
   let text = decodeHtmlEntities(decodeHtmlEntities(raw));
   text = text
     .replace(/<[^>]+>/g, ' ')
@@ -101,10 +91,8 @@ export async function fetchRssArticlesForCountry(
   const code = countryCode.toUpperCase();
   const country = getCountryByCode(code);
 
-  // Build full list of RSS feeds for this country
   const explicitFeeds = COUNTRY_RSS_MAP[code] || [];
   
-  // Always append Google News RSS for prompt regional coverage
   const googleNewsUrl = `https://news.google.com/rss/search?q=politics+${encodeURIComponent(country.name)}&hl=en-${code}&gl=${code}&ceid=${code}:en`;
   
   const targetFeeds: RssFeedConfig[] = [
@@ -148,11 +136,13 @@ export async function fetchRssArticlesForCountry(
     }
   });
 
-  // Deduplicate articles by title/slug
   const seenTitles = new Set<string>();
   const uniqueArticles: ArticleData[] = [];
 
   for (const art of fetchedResults) {
+    // Completely ignore articles without a valid content photograph
+    if (!isValidContentImage(art.original_image_url)) continue;
+
     const titleKey = art.title.toLowerCase().slice(0, 40);
     if (!seenTitles.has(titleKey)) {
       seenTitles.add(titleKey);
@@ -160,7 +150,6 @@ export async function fetchRssArticlesForCountry(
     }
   }
 
-  // Sort all articles (active and archived) by created_at descending
   return uniqueArticles.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -196,7 +185,6 @@ function parseRssXmlToArticles(
 
     let titleText = cleanRssText(rawTitle) || decodeHtmlEntities(decodeHtmlEntities(rawTitle)).replace(/<[^>]+>/g, '').trim();
 
-    // Parse Google News "Headline - Outlet Name" format
     let sourceName = decodeHtmlEntities(sourceTag) || defaultSource;
     if (titleText.includes(' - ')) {
       const parts = titleText.split(' - ');
@@ -211,7 +199,7 @@ function parseRssXmlToArticles(
 
     if (!titleText || titleText.length < 10 || titleText.includes('<a href')) return;
 
-    // Enhanced real photograph extraction
+    // Direct content image extraction
     let imageUrl: string | undefined = undefined;
     const enclosureMatch = itemXml.match(/<(?:enclosure|media:content)[^>]+url=["']([^"']+)["']/i);
     if (enclosureMatch && enclosureMatch[1].match(/https?:\/\//i)) {
@@ -223,15 +211,14 @@ function parseRssXmlToArticles(
       }
     }
 
-    // Breaking news banner fallback if direct image is missing
-    if (!imageUrl) {
-      imageUrl = '/breaking-news-banner.png';
+    // Completely skip articles without a valid content photograph (e.g. punchng.com logos)
+    if (!isValidContentImage(imageUrl)) {
+      return;
     }
 
-    // Clean text snippet
     let cleanSnippet = cleanRssText(description);
     if (!cleanSnippet || cleanSnippet.length < 15 || cleanSnippet.includes('<a href')) {
-      cleanSnippet = `${titleText}. Official administrative reporting and governance update for ${countryName}.`;
+      cleanSnippet = `${titleText}. Official administrative reporting for ${countryName}.`;
     } else {
       cleanSnippet = cleanSnippet.slice(0, 280);
     }
@@ -244,8 +231,8 @@ function parseRssXmlToArticles(
       slug,
       title: titleText,
       snippet: cleanSnippet,
-      content: `${cleanSnippet}\n\nFull administrative reporting and continuous legislative updates are documented directly in official press archives.`,
-      ai_analysis: `• Core Fact: ${cleanSnippet}\n• Legislative Scope: Policy directives and structural governance protocols were introduced for public review.\n• Impact Summary: Measures undergo committee evaluation with multi-party oversight.`,
+      content: `${cleanSnippet}\n\nFull reporting documented directly in official press archives.`,
+      ai_analysis: `• News Recap: ${cleanSnippet}\n• Key Impact: Relevant reporting and policy details as documented by ${sourceName}.`,
       country_code: countryCode,
       language: 'en',
       category: 'politics',
@@ -260,7 +247,7 @@ function parseRssXmlToArticles(
       created_at: pubDate,
       poll: {
         id: `poll-${articleId}`,
-        question: `What is your perspective on the decision regarding "${titleText.slice(0, 75)}"?`,
+        question: `Do you agree with the stance regarding "${titleText.slice(0, 75)}"?`,
         agree_count: 0,
         disagree_count: 0,
       },
