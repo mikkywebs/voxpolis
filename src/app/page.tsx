@@ -1,11 +1,14 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import SiteLogo from '@/components/branding/SiteLogo';
 import FeedCard from '@/components/feed/FeedCard';
 import Footer from '@/components/layout/Footer';
 import RegionalCountrySelectorModal from '@/components/layout/RegionalCountrySelectorModal';
+import AuthPromptModal from '@/components/auth/AuthPromptModal';
 import { createClient } from '@/lib/supabase/client';
 import { ALL_COUNTRIES, CountryConfig, getCountryByCode } from '@/config/countries';
 import { fetchArticlesForCountry, ArticleData, formatExactTimestamp, getArticleImageUrl } from '@/lib/news';
@@ -32,6 +35,7 @@ export default function LandingPage() {
   const [loadingArticles, setLoadingArticles] = useState(true);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isCountryModalOpen, setIsCountryModalOpen] = useState(false);
+  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
 
   useEffect(() => {
     async function checkUser() {
@@ -173,7 +177,13 @@ export default function LandingPage() {
               {isAutoDetected ? 'Live Detected Region:' : 'Selected Country:'}
             </span>
             <button
-              onClick={() => setIsCountryModalOpen(true)}
+              onClick={() => {
+                if (!user) {
+                  setIsAuthPromptOpen(true);
+                } else {
+                  setIsCountryModalOpen(true);
+                }
+              }}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-900 border border-gray-700 text-white font-bold text-xs hover:border-blue-500 transition cursor-pointer"
             >
               <span className="text-base">{selectedCountry.flag}</span>
@@ -328,6 +338,12 @@ export default function LandingPage() {
         onClose={() => setIsCountryModalOpen(false)}
         selectedCountry={selectedCountry}
         onSelectCountry={handleSelectCountry}
+      />
+
+      {/* Auth Prompt Modal for Guests */}
+      <AuthPromptModal
+        isOpen={isAuthPromptOpen}
+        onClose={() => setIsAuthPromptOpen(false)}
       />
     </div>
   );

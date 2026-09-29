@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import SiteLogo from '@/components/branding/SiteLogo';
 import RegionalCountrySelectorModal from '@/components/layout/RegionalCountrySelectorModal';
+import AuthPromptModal from '@/components/auth/AuthPromptModal';
 import { CountryConfig, SUPPORTED_COUNTRIES } from '@/config/countries';
 import { WeatherData } from '@/lib/weather';
 import { Sun, Moon, Palette, ChevronDown, User, Shield, LogOut, Languages, Globe, Check } from 'lucide-react';
@@ -32,6 +33,7 @@ export default function Header({
   const [greeting, setGreeting] = useState<string>('');
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
@@ -139,7 +141,13 @@ export default function Header({
           {/* Regional Country Selector Trigger & Dropdown Menu */}
           <div className="relative shrink-0" ref={countryDropdownRef}>
             <button
-              onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
+              onClick={() => {
+                if (!user) {
+                  setIsAuthPromptOpen(true);
+                } else {
+                  setIsCountryDropdownOpen(!isCountryDropdownOpen);
+                }
+              }}
               type="button"
               className="flex items-center gap-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 hover:from-blue-100 hover:to-indigo-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs font-extrabold px-3 py-1.5 rounded-xl border border-blue-300 dark:border-gray-600 shadow-sm transition cursor-pointer shrink-0"
               title="Select Country Coverage"
@@ -333,6 +341,12 @@ export default function Header({
         onClose={() => setIsModalOpen(false)}
         selectedCountry={selectedCountry}
         onSelectCountry={onSelectCountry}
+      />
+
+      {/* Auth Prompt Modal for Guests */}
+      <AuthPromptModal
+        isOpen={isAuthPromptOpen}
+        onClose={() => setIsAuthPromptOpen(false)}
       />
     </header>
   );

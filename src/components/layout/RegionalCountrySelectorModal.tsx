@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getGroupedRegions, CountryConfig, Continent } from '@/config/countries';
 import { Search, ChevronDown, X, Globe, Check } from 'lucide-react';
@@ -18,6 +19,7 @@ export default function RegionalCountrySelectorModal({
   selectedCountry,
   onSelectCountry,
 }: RegionalCountrySelectorModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeContinent, setActiveContinent] = useState<Continent | 'All'>('All');
   const [expandedRegions, setExpandedRegions] = useState<Record<string, boolean>>({
@@ -26,6 +28,10 @@ export default function RegionalCountrySelectorModal({
     'Western/Northern Europe': true,
     'East Asia': true,
   });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Handle ESC key to close modal instantly
   useEffect(() => {
@@ -78,14 +84,14 @@ export default function RegionalCountrySelectorModal({
       .filter((g): g is NonNullable<typeof g> => g !== null);
   }, [allRegionGroups, activeContinent, searchQuery]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {/* Backdrop with direct click to exit */}
       <div
         onClick={onClose}
-        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto cursor-pointer"
+        className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto cursor-pointer"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -256,6 +262,7 @@ export default function RegionalCountrySelectorModal({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
