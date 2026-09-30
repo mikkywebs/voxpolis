@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchRssArticlesForCountry } from '@/lib/rss';
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData } from '@/lib/news';
+import { ArticleData, generateAiAnalysisSummary } from '@/lib/news';
 import { isValidContentImage } from '@/lib/pipeline/extractor';
 
 export const dynamic = 'force-dynamic';
@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
                 .replace(/The post .* appeared first on .*/gi, '')
                 .replace(/appeared first on .*/gi, '')
                 .trim();
+              const sourceName = item.source_id || `${country.name} Press`;
 
               return {
                 id: item.article_id || `newsdata-${countryCode}-${idx}`,
@@ -54,13 +55,13 @@ export async function GET(request: NextRequest) {
                 title: cleanTitle,
                 snippet: rawDesc,
                 content: rawContent,
-                ai_analysis: `• News Recap: ${rawDesc}\n• Key Impact: Official evaluation procedures and regional report context.`,
+                ai_analysis: generateAiAnalysisSummary(cleanTitle, rawDesc, sourceName, country.name),
                 country_code: countryCode,
                 language: language,
                 category: item.category?.[0] || 'politics',
                 image_mode: 'original' as const,
                 original_image_url: item.image_url,
-                source_name: item.source_id || `${country.name} Press`,
+                source_name: sourceName,
                 source_url: item.link || 'https://voxpolis.app',
                 is_breaking: idx === 0,
                 tags: item.keywords || ['Politics', country.name],

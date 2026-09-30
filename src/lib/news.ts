@@ -200,6 +200,34 @@ Committee sponsors underscored that the reform package enjoys broad multi-party 
   }),
 };
 
+export function generateAiAnalysisSummary(
+  title: string,
+  snippet: string,
+  sourceName: string = 'Press Outlet',
+  countryName: string = 'National'
+): string {
+  const cleanTitle = (title || '').replace(/<[^>]+>/g, '').trim();
+  const cleanSnippet = (snippet || '').replace(/<[^>]+>/g, '').trim();
+
+  const recap = cleanSnippet.length > 20 ? cleanSnippet : cleanTitle;
+  const text = `${cleanTitle} ${cleanSnippet}`.toLowerCase();
+
+  let impactArea = 'Policy & Governance Directives';
+  if (text.includes('econ') || text.includes('budget') || text.includes('tax') || text.includes('finance') || text.includes('naira') || text.includes('dollar') || text.includes('trade')) {
+    impactArea = 'Economic Resilience & Financial Oversight';
+  } else if (text.includes('health') || text.includes('hospital') || text.includes('disease') || text.includes('medical')) {
+    impactArea = 'Public Health Policy & Infrastructure';
+  } else if (text.includes('elect') || text.includes('vote') || text.includes('ballot') || text.includes('party') || text.includes('campaign')) {
+    impactArea = 'Electoral Oversight & Democratic Reform';
+  } else if (text.includes('court') || text.includes('law') || text.includes('judge') || text.includes('police') || text.includes('security')) {
+    impactArea = 'Legal Standards & Judicial Accountability';
+  } else if (text.includes('energy') || text.includes('power') || text.includes('oil') || text.includes('gas') || text.includes('climate')) {
+    impactArea = 'Energy Transition & Infrastructure Planning';
+  }
+
+  return `• News Recap: ${recap}\n• Key Impact: "${cleanTitle}" directly influences ${impactArea} across ${countryName}, as documented by ${sourceName}.`;
+}
+
 export async function fetchArticlesForCountry(
   countryCode: string,
   language: string = 'en'
@@ -251,6 +279,7 @@ export async function fetchArticlesForCountry(
                 .replace(/The post .* appeared first on .*/gi, '')
                 .replace(/appeared first on .*/gi, '')
                 .trim();
+              const sourceName = item.source_id || `${country.name} Press`;
 
               return {
                 id: item.article_id || `newsdata-${idx}`,
@@ -262,13 +291,13 @@ export async function fetchArticlesForCountry(
                 title: cleanTitle,
                 snippet: rawDesc,
                 content: rawContent,
-                ai_analysis: `Executive Summary & Core Impact:\n• Fact Analysis: ${rawDesc}\n• Policy Directive: Structural governance and administrative protocols remain under legislative review.\n• Public Impact: Official evaluation procedures involve multi-party committee oversight.`,
+                ai_analysis: generateAiAnalysisSummary(cleanTitle, rawDesc, sourceName, country.name),
                 country_code: code,
                 language: langCode,
                 category: item.category?.[0] || 'politics',
                 image_mode: item.image_url ? 'original' : 'breaking_logo',
                 original_image_url: item.image_url || undefined,
-                source_name: item.source_id || `${country.name} Press`,
+                source_name: sourceName,
                 source_url: item.link || 'https://voxpolis.app',
                 is_breaking: idx === 0,
                 tags: item.keywords || ['Politics', country.name],

@@ -1,5 +1,5 @@
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData } from './news';
+import { ArticleData, generateAiAnalysisSummary } from './news';
 import { isValidContentImage } from './pipeline/extractor';
 
 export interface RssFeedConfig {
@@ -232,7 +232,7 @@ function parseRssXmlToArticles(
       title: titleText,
       snippet: cleanSnippet,
       content: `${cleanSnippet}\n\nFull reporting documented directly in official press archives.`,
-      ai_analysis: `• News Recap: ${cleanSnippet}\n• Key Impact: Relevant reporting and policy details as documented by ${sourceName}.`,
+      ai_analysis: generateAiAnalysisSummary(titleText, cleanSnippet, sourceName, countryName),
       country_code: countryCode,
       language: 'en',
       category: 'politics',

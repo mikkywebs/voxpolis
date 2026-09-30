@@ -192,5 +192,32 @@ export async function processSourceUrlThroughPipeline(
   articlesBySourceUrl.set(normUrl, publishedRecord);
   articlesBySlug.set(slug, publishedRecord);
 
+  // Persist to Supabase Postgres database for permanent multi-instance availability
+  try {
+    const { supabaseAdmin } = await import('@/lib/supabase/admin');
+    await supabaseAdmin.from('articles').upsert(
+      {
+        slug,
+        title: publishedRecord.headline,
+        snippet: publishedRecord.dek || publishedRecord.executive_summary || publishedRecord.headline,
+        content: publishedRecord.body_markdown,
+        ai_analysis: publishedRecord.executive_summary
+          ? `• Executive Summary: ${publishedRecord.executive_summary}\n• Why It Matters: ${publishedRecord.why_it_matters}`
+          : `• News Recap: ${publishedRecord.dek}\n• Key Impact: Relevant policy updates documented by ${sourceName}.`,
+        country_code: targetCountry,
+        language: 'en',
+        category: 'politics',
+        original_image_url: featuredImage,
+        source_name: sourceName,
+        source_url: normUrl,
+        tags: publishedRecord.tags,
+        created_at: publishedRecord.created_at,
+      },
+      { onConflict: 'slug' }
+    );
+  } catch (err) {
+    console.warn('Could not persist pipeline article to Supabase database:', err);
+  }
+
   return publishedRecord;
 }
