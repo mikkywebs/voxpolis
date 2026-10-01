@@ -7,7 +7,7 @@ import RegionalCountrySelectorModal from '@/components/layout/RegionalCountrySel
 import AuthPromptModal from '@/components/auth/AuthPromptModal';
 import { CountryConfig, SUPPORTED_COUNTRIES } from '@/config/countries';
 import { WeatherData } from '@/lib/weather';
-import { Sun, Moon, Palette, ChevronDown, User, Shield, LogOut, Languages, Globe, Check } from 'lucide-react';
+import { Sun, Moon, PenTool, ChevronDown, User, Shield, LogOut, Languages, Globe, Check } from 'lucide-react';
 
 interface HeaderProps {
   user?: {
@@ -252,21 +252,22 @@ export default function Header({
             </div>
           )}
 
-          {/* Theme & Accent Switchers */}
+          {/* Write Op-Ed Button */}
+          <Link
+            href="/columnist/submit"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-sm transition shrink-0"
+          >
+            <PenTool className="w-3.5 h-3.5" />
+            <span>Write Op-Ed</span>
+          </Link>
+
+          {/* Night/Day Mode Toggle */}
           <button
             onClick={toggleDarkMode}
             title="Toggle Dark/Light Mode"
             className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition shrink-0"
           >
             {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
-          </button>
-
-          <button
-            onClick={cycleAccentColor}
-            title={`Accent Color: ${accentColor}`}
-            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition hidden sm:flex shrink-0"
-          >
-            <Palette className="w-4 h-4 text-blue-500" />
           </button>
 
           {/* User Profile / Auth Links */}
@@ -287,7 +288,7 @@ export default function Header({
                     <p className="font-semibold text-gray-800 dark:text-gray-100 truncate">{user.fullName || 'User'}</p>
                     <p className="text-[10px] text-gray-400 truncate">{user.email}</p>
                   </div>
-                  {user.isAdmin && (
+                  {(user.isAdmin || (user.email && user.email.toLowerCase() === 'michael.eboh@gmail.com')) && (
                     <Link
                       href="/admin"
                       className="flex items-center gap-2 px-4 py-2 text-amber-600 dark:text-amber-400 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700"

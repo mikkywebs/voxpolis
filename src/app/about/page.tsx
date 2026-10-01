@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import { ALL_COUNTRIES, CountryConfig } from '@/config/countries';
@@ -19,6 +19,29 @@ import {
 
 export default function AboutPage() {
   const [selectedCountry, setSelectedCountry] = useState<CountryConfig>(ALL_COUNTRIES[0]);
+  const [pageData, setPageData] = useState({
+    badge: 'Global Independent News & Civic Voice',
+    title: 'Unbiased Political News Tailored to Your Nation',
+    subtitle: `Voxpolis delivers real-time, independent political coverage and executive fact summaries from ${ALL_COUNTRIES.length} supported nations. Access direct regional political developments and active civic sentiment polls with zero paywalls.`,
+    mission: 'Our mission is to empower citizens worldwide with uncompromised political intelligence, balanced regional perspectives, and civic participation without corporate paywalls.',
+  });
+
+  useEffect(() => {
+    async function loadPage() {
+      try {
+        const res = await fetch('/api/site-pages?page=about');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            setPageData((prev) => ({ ...prev, ...json.data }));
+          }
+        }
+      } catch (e) {
+        console.warn('Using default about content', e);
+      }
+    }
+    loadPage();
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col selection:bg-blue-600 selection:text-white">
@@ -29,18 +52,15 @@ export default function AboutPage() {
         <section className="text-center space-y-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-900/40 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-wider shadow-sm">
             <Globe2 className="w-3.5 h-3.5 text-blue-400" />
-            <span>Global Independent News & Civic Voice</span>
+            <span>{pageData.badge}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight max-w-3xl mx-auto">
-            Unbiased Political News <br />
-            <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-400 bg-clip-text text-transparent">
-              Tailored to Your Nation
-            </span>
+            {pageData.title}
           </h1>
 
           <p className="text-sm sm:text-base text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            Voxpolis delivers real-time, independent political coverage and executive fact summaries from {ALL_COUNTRIES.length} supported nations. Access direct regional political developments and active civic sentiment polls with zero paywalls.
+            {pageData.subtitle}
           </p>
 
           <div className="flex items-center justify-center gap-4 pt-2 flex-wrap">

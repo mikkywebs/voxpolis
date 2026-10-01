@@ -225,7 +225,7 @@ export function generateAiAnalysisSummary(
     impactArea = 'Energy Transition & Infrastructure Planning';
   }
 
-  return `• News Recap: ${recap}\n• Key Impact: "${cleanTitle}" directly influences ${impactArea} across ${countryName}, as documented by ${sourceName}.`;
+  return `• Strategic Context: Developments surrounding this report directly impact ${impactArea} across ${countryName}.\n• Key Takeaway: Administrative and policy directives remain under ongoing oversight as verified by ${sourceName}.`;
 }
 
 export async function fetchArticlesForCountry(
@@ -281,17 +281,21 @@ export async function fetchArticlesForCountry(
                 .trim();
               const sourceName = item.source_id || `${country.name} Press`;
 
+              const displayTitle = cleanTitle.endsWith(' - Voxpolis') ? cleanTitle : `${cleanTitle} - Voxpolis`;
+              const cleanSlug = cleanTitle
+                .toLowerCase()
+                .replace(/ - voxpolis$/i, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '')
+                .slice(0, 80);
+
               return {
                 id: item.article_id || `newsdata-${idx}`,
-                slug:
-                  cleanTitle
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, '-')
-                    .replace(/(^-|-$)/g, '') + `-${idx}`,
-                title: cleanTitle,
+                slug: cleanSlug,
+                title: displayTitle,
                 snippet: rawDesc,
                 content: rawContent,
-                ai_analysis: generateAiAnalysisSummary(cleanTitle, rawDesc, sourceName, country.name),
+                ai_analysis: generateAiAnalysisSummary(displayTitle, rawDesc, sourceName, country.name),
                 country_code: code,
                 language: langCode,
                 category: item.category?.[0] || 'politics',

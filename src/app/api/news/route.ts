@@ -45,17 +45,21 @@ export async function GET(request: NextRequest) {
                 .trim();
               const sourceName = item.source_id || `${country.name} Press`;
 
+              const displayTitle = cleanTitle.endsWith(' - Voxpolis') ? cleanTitle : `${cleanTitle} - Voxpolis`;
+              const cleanSlug = cleanTitle
+                .toLowerCase()
+                .replace(/ - voxpolis$/i, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '')
+                .slice(0, 80);
+
               return {
                 id: item.article_id || `newsdata-${countryCode}-${idx}`,
-                slug:
-                  cleanTitle
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, '-')
-                    .replace(/(^-|-$)/g, '') + `-${idx}`,
-                title: cleanTitle,
+                slug: cleanSlug,
+                title: displayTitle,
                 snippet: rawDesc,
                 content: rawContent,
-                ai_analysis: generateAiAnalysisSummary(cleanTitle, rawDesc, sourceName, country.name),
+                ai_analysis: generateAiAnalysisSummary(displayTitle, rawDesc, sourceName, country.name),
                 country_code: countryCode,
                 language: language,
                 category: item.category?.[0] || 'politics',
@@ -90,8 +94,8 @@ export async function GET(request: NextRequest) {
   const { isPoliticalNews, isRelevantToCountry } = await import('@/lib/news');
   const combined = [...newsDataArticles, ...rssArticles];
 
-  // Deduplicate by title similarity & enforce political filtering and country relevance
-  const seenTitles = new Set<string>();
+  // Deduplicate by story key & enforce political filtering and country relevance
+  const seenStoryKeys = new Set<string>();
   const uniqueArticles: ArticleData[] = [];
 
   for (const art of combined) {
@@ -99,9 +103,19 @@ export async function GET(request: NextRequest) {
     if (!isRelevantToCountry(art.title, art.snippet, countryCode)) continue;
     if (!isValidContentImage(art.original_image_url)) continue;
 
-    const key = art.title.toLowerCase().slice(0, 35);
-    if (!seenTitles.has(key)) {
-      seenTitles.add(key);
+    const normKey = art.title
+      .toLowerCase()
+      .replace(/ - voxpolis$/i, '')
+      .replace(/[^a-z0-9]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(' ')
+      .slice(0, 6)
+      .join(' ');
+
+    if (!seenStoryKeys.has(normKey) && !seenStoryKeys.has(art.slug)) {
+      seenStoryKeys.add(normKey);
+      seenStoryKeys.add(art.slug);
       uniqueArticles.push(art);
     }
   }

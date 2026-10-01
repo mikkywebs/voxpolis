@@ -75,13 +75,14 @@ function cleanRssText(raw: string): string {
   return text;
 }
 
-function generateSlug(title: string, idSuffix: string | number): string {
+function generateSlug(title: string): string {
   const clean = title
     .toLowerCase()
+    .replace(/ - voxpolis$/i, '')
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return `${clean.slice(0, 80)}-${idSuffix}`;
+  return clean.slice(0, 80);
 }
 
 export async function fetchRssArticlesForCountry(
@@ -224,12 +225,13 @@ function parseRssXmlToArticles(
     }
 
     const articleId = `rss-${countryCode.toLowerCase()}-${Date.now()}-${idx}`;
-    const slug = generateSlug(titleText, idx);
+    const slug = generateSlug(titleText);
+    const displayTitle = titleText.endsWith(' - Voxpolis') ? titleText : `${titleText} - Voxpolis`;
 
     articles.push({
       id: articleId,
       slug,
-      title: titleText,
+      title: displayTitle,
       snippet: cleanSnippet,
       content: `${cleanSnippet}\n\nFull reporting documented directly in official press archives.`,
       ai_analysis: generateAiAnalysisSummary(titleText, cleanSnippet, sourceName, countryName),

@@ -13,8 +13,14 @@ export function register301Redirect(oldSlug: string, newSlug: string) {
 }
 
 export function get301Redirect(oldSlug: string): string | null {
+  if (!oldSlug) return null;
   const rec = redirectRegistry.get(oldSlug);
-  return rec ? rec.new_slug : null;
+  if (rec) return rec.new_slug;
+  // If slug ends with a legacy numeric suffix like -7 or -0, redirect cleanly to canonical slug
+  if (/-\d+$/.test(oldSlug)) {
+    return oldSlug.replace(/-\d+$/, '');
+  }
+  return null;
 }
 
 export function getAllRedirects(): RedirectRecord[] {

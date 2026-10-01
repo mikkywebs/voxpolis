@@ -5,6 +5,8 @@ import CookieConsentBanner from '@/components/layout/CookieConsentBanner';
 import StickyFooterAd from '@/components/layout/StickyFooterAd';
 import ScrollToTopButton from '@/components/layout/ScrollToTopButton';
 
+import NetworkErrorOverlay from '@/components/common/NetworkErrorOverlay';
+
 export const metadata: Metadata = {
   title: 'Voxpolis - Global Political Intelligence & News Platform',
   description:
@@ -42,6 +44,7 @@ export default function RootLayout({
         <ScrollToTopButton />
         <CookieConsentBanner />
         <StickyFooterAd />
+        <NetworkErrorOverlay />
       </body>
     </html>
   );

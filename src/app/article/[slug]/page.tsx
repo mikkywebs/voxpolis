@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -15,12 +16,12 @@ import RelatedArticlesSection from '@/components/article/RelatedArticlesSection'
 import { CommentInputForm, CommentList, CommentItem } from '@/components/article/CommentSection';
 import OriginalSourceLink from '@/components/article/OriginalSourceLink';
 import AdSlot from '@/components/article/AdSlot';
-import { SUPPORTED_COUNTRIES, getCountryByCode } from '@/config/countries';
+import { SUPPORTED_COUNTRIES, getCountryByCode, getCountrySlug } from '@/config/countries';
 import { fetchArticlesForCountry, ArticleData } from '@/lib/news';
 import { getPipelineArticleBySlug } from '@/lib/pipeline';
 import { get301Redirect } from '@/lib/pipeline/redirects';
 import { PipelineArticleRecord } from '@/lib/pipeline/types';
-import { Lock, LogIn, ExternalLink, ShieldAlert, CheckCircle2, HelpCircle, FileText, Globe } from 'lucide-react';
+import { Lock, LogIn, ExternalLink, ShieldAlert, CheckCircle2, HelpCircle, FileText, Globe, ArrowRight } from 'lucide-react';
 import SocialShareButtons from '@/components/article/SocialShareButtons';
 
 export default function ArticleDetailPage() {
@@ -81,17 +82,17 @@ export default function ArticleDetailPage() {
         setArticle(found);
         const artCountry = getCountryByCode(found.country_code);
         if (artCountry) setSelectedCountry(artCountry);
-      } else if (!pipeArt) {
-        setArticle(list[0] || null);
-      }
-      setRelatedArticles(list.filter((a) => a.slug !== (found?.slug || list[0]?.slug)));
-
-      if (found) {
+        setRelatedArticles(list.filter((a) => a.slug !== found.slug));
         const storedKey = `voxpolis_views_${found.id}`;
         const prevViews = parseInt(localStorage.getItem(storedKey) || '0', 10);
         const nextViews = prevViews + 1;
         localStorage.setItem(storedKey, nextViews.toString());
         setRealViews(nextViews);
+      } else if (pipeArt) {
+        setRelatedArticles(list.slice(0, 6));
+      } else {
+        setArticle(null);
+        setRelatedArticles(list.slice(0, 6));
       }
 
       setLoading(false);
@@ -399,6 +400,75 @@ export default function ArticleDetailPage() {
           />
         </main>
 
+        <Footer />
+      </div>
+    );
+  }
+ 
+  // Loading State
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-gray-100 flex flex-col justify-between">
+        <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+        <main className="flex-1 flex flex-col items-center justify-center py-24">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-xs text-gray-400">Loading political report...</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Not Found State
+  if (!pipelineArticle && !article) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-gray-100 flex flex-col justify-between">
+        <head>
+          <meta name="robots" content="noindex, follow" />
+          <title>Report Not Found | Voxpolis</title>
+        </head>
+        <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+        <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-16 text-center space-y-6">
+          <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <h1 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white">
+            Article or Policy Brief Not Found
+          </h1>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
+            This political story may have been archived, renamed, or is unavailable in our active feeds.
+          </p>
+          <div className="pt-2">
+            <Link
+              href={`/${getCountrySlug(selectedCountry)}`}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg transition"
+            >
+              <span>Explore {selectedCountry.flag} {selectedCountry.name} News Desk</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          {relatedArticles.length > 0 && (
+            <div className="pt-10 border-t border-gray-200 dark:border-gray-800 text-left space-y-4">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Trending Stories in {selectedCountry.name}
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {relatedArticles.slice(0, 4).map((art) => (
+                  <Link
+                    key={art.id}
+                    href={`/article/${art.slug}`}
+                    className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 hover:border-blue-500 transition block"
+                  >
+                    <h4 className="text-xs font-bold text-gray-900 dark:text-white line-clamp-2 mb-1">
+                      {art.title}
+                    </h4>
+                    <p className="text-[11px] text-gray-500 line-clamp-2">{art.snippet}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </main>
         <Footer />
       </div>
     );

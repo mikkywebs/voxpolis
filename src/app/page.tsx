@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ArrowRight,
   Newspaper,
+  PenTool,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -279,6 +280,28 @@ export default function LandingPage() {
             </div>
           </section>
         ) : null}
+
+        {/* Write on Country Politics Callout Banner */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-950/70 via-slate-900 to-indigo-950/70 border border-blue-800/40 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 shrink-0">
+              <PenTool className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">Write on {selectedCountry.name} Politics & Policy</h3>
+              <p className="text-xs text-gray-300">
+                Share in-depth analysis and editorial columns on {selectedCountry.name}’s political landscape with our civic readership.
+              </p>
+            </div>
+          </div>
+          <Link
+            href={`/columnist/submit?country=${selectedCountry.code}`}
+            className="shrink-0 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5"
+          >
+            <span>Submit Op-Ed</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
 
         {/* Primary Country Feed Section */}
         <section className="space-y-6">

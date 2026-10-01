@@ -29,6 +29,9 @@ export default function AIAnalysisSection({ analysisText, readAlsoArticle }: AIA
       !lower.startsWith('executive fact analysis:') &&
       !lower.startsWith('- headline:') &&
       !lower.startsWith('headline:') &&
+      !lower.startsWith('news recap:') &&
+      !lower.startsWith('- news recap:') &&
+      !lower.startsWith('• news recap:') &&
       !lower.includes('only available in paid plans') &&
       !lower.includes('appeared first on') &&
       !lower.includes('policy directives and structural governance protocols were introduced for public review')
@@ -44,7 +47,7 @@ export default function AIAnalysisSection({ analysisText, readAlsoArticle }: AIA
     <div className="my-6 pt-4 pb-2 border-t border-b border-gray-200/80 dark:border-gray-800 text-gray-900 dark:text-gray-100 transition-colors">
       <div className="mb-3">
         <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
-          NEWS RECAP & KEY IMPACT
+          KEY DEVELOPMENTS & STRATEGIC CONTEXT
         </span>
       </div>
 

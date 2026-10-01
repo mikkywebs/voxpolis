@@ -1,0 +1,30 @@
+{
+  "about": {
+    "badge": "Global Independent News & Civic Voice",
+    "title": "Unbiased Political News Tailored to Your Nation",
+    "subtitle": "Voxpolis delivers real-time, independent political coverage and executive fact analysis across global nations with direct civic polling.",
+    "mission": "Our mission is to empower citizens worldwide with uncompromised political intelligence, balanced regional perspectives, and civic participation without corporate paywalls.",
+    "founded_year": "2026",
+    "headquarters": "Abuja, Nigeria",
+    "coverage_scope": "Global Coverage across 119 Nations"
+  },
+  "contact": {
+    "title": "Contact Voxpolis Editorial & Operations",
+    "subtitle": "Reach out directly to our editorial team, corrections desk, or executive management.",
+    "email": "contact@voxpolis.app",
+    "desk_phone": "+234 (0) 906 000 0000",
+    "headquarters_address": "Plot 42, Central Business District, Abuja, Federal Capital Territory, Nigeria",
+    "press_inquiries": "press@voxpolis.app",
+    "response_time": "Typically within 24 business hours"
+  },
+  "privacy": {
+    "title": "Privacy Policy & Data Protection Standards",
+    "subtitle": "Voxpolis adheres to strict global data privacy standards, GDPR, and NDPR protocols.",
+    "content": "Voxpolis values your privacy. We collect minimal personal data required for account authentication and localized political news delivery. We do not sell your personal data to third parties. Member polling data is aggregated and anonymized for civic sentiment representation."
+  },
+  "terms": {
+    "title": "Terms of Service & Reader Conduct",
+    "subtitle": "Fair use terms for readers, members, and accredited columnists.",
+    "content": "By accessing Voxpolis, you agree to engage in civilized, constructive civic discourse. Columnist submissions must be original, 500+ words, respectful, and adhere to truthfulness and editorial integrity. Hate speech, abusive language, and unauthorized promotional links are strictly prohibited."
+  }
+}

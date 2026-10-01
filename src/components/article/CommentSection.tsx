@@ -14,6 +14,7 @@ export interface CommentItem {
 }
 
 interface CommentInputFormProps {
+  userName?: string;
   userCountryFlag?: string;
   onRequireAuth?: () => void;
   isLoggedIn?: boolean;
@@ -21,6 +22,7 @@ interface CommentInputFormProps {
 }
 
 export function CommentInputForm({
+  userName,
   userCountryFlag = '🌐',
   onRequireAuth,
   isLoggedIn = false,
@@ -56,7 +58,7 @@ export function CommentInputForm({
       const added: CommentItem = {
         id: `c-${Date.now()}`,
         parentId: null,
-        user_name: 'Verified Member',
+        user_name: userName || 'Contributor',
         country_flag: userCountryFlag,
         content: newComment.trim(),
         created_at: 'Just now',
@@ -79,12 +81,9 @@ export function CommentInputForm({
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
-            Join the Member Discussion
+            Join the Discussion
           </h3>
         </div>
-        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800">
-          Verified Members
-        </span>
       </div>
 
       <form onSubmit={handleMainSubmit}>
@@ -104,8 +103,8 @@ export function CommentInputForm({
             }}
             placeholder={
               isLoggedIn
-                ? `Share your perspective... (Your comment will display your country flag ${userCountryFlag})`
-                : "Log in or sign up to join the member discussion..."
+                ? "Share your perspective on this report..."
+                : "Log in or sign up to join the discussion..."
             }
             className="w-full text-xs p-3 pr-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -119,7 +118,7 @@ export function CommentInputForm({
         </div>
         <p className="text-[10px] text-gray-400 mt-1.5 flex items-center gap-1">
           <span>Official Moderation:</span>
-          <span>No external links permitted. Your country flag ({userCountryFlag}) is attached automatically.</span>
+          <span>No external links or abusive language permitted.</span>
         </p>
       </form>
     </div>
@@ -128,6 +127,7 @@ export function CommentInputForm({
 
 interface CommentListProps {
   comments: CommentItem[];
+  userName?: string;
   userCountryFlag?: string;
   onRequireAuth?: () => void;
   isLoggedIn?: boolean;
@@ -137,6 +137,7 @@ interface CommentListProps {
 
 export function CommentList({
   comments,
+  userName,
   userCountryFlag = '🌐',
   onRequireAuth,
   isLoggedIn = false,
@@ -171,7 +172,7 @@ export function CommentList({
     const added: CommentItem = {
       id: `c-${Date.now()}`,
       parentId,
-      user_name: 'Verified Member',
+      user_name: userName || 'Contributor',
       country_flag: userCountryFlag,
       content: replyText.trim(),
       created_at: 'Just now',
@@ -185,6 +186,10 @@ export function CommentList({
     setReplyingToId(null);
   };
 
+  if (comments.length === 0) {
+    return null;
+  }
+
   const parentComments = comments.filter((c) => !c.parentId);
   const getReplies = (parentId: string) => comments.filter((c) => c.parentId === parentId);
 
@@ -194,12 +199,9 @@ export function CommentList({
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <h3 className="text-base font-bold text-gray-900 dark:text-white">
-            Global Member Discussion ({comments.length})
+            Discussion ({comments.length})
           </h3>
         </div>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-full">
-          Verified Members Only
-        </span>
       </div>
 
       {errorMsg && (
@@ -209,18 +211,7 @@ export function CommentList({
         </div>
       )}
 
-      {comments.length === 0 ? (
-        <div className="py-8 text-center bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
-          <MessageSquare className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-            No member comments yet.
-          </p>
-          <p className="text-[11px] text-gray-400 mt-0.5">
-            Be the first verified member to share your policy insight using the discussion box above.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-6">
+      <div className="space-y-6">
           {parentComments.map((c) => {
             const replies = getReplies(c.id);
             return (
@@ -314,7 +305,6 @@ export function CommentList({
             );
           })}
         </div>
-      )}
     </div>
   );
 }

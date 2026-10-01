@@ -1,9 +1,44 @@
+'use client';
+
 export const dynamic = 'force-dynamic';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import SiteLogo from '@/components/branding/SiteLogo';
 
 export default function TermsOfServicePage() {
+  const [data, setData] = useState({
+    title: 'Terms of Service & Editorial Standards',
+    subtitle: 'Fair use guidelines for readers, civic participants, and contributing columnists.',
+    content: `Welcome to Voxpolis ("voxpolis.app"). By accessing our political intelligence platform, you agree to these Terms of Service.
+
+1. Editorial Mission & Content Use
+All news coverage, policy analyses, and primary-source citations are published for civic knowledge, educational transparency, and research purposes.
+
+2. Community Discourse & Commentary
+Users participating in political discussions agree to maintain respectful, civil engagement. Defamatory statements, abusive language, promotional spam, and malicious links are strictly removed.
+
+3. Contributing Columnists
+Columnist contributions must be original works (minimum 500 words), factually grounded, and adhere to journalistic ethics. Submissions remain subject to editorial desk review prior to publication.`,
+  });
+
+  useEffect(() => {
+    async function loadTerms() {
+      try {
+        const res = await fetch('/api/site-pages?page=terms');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            setData((prev) => ({ ...prev, ...json.data }));
+          }
+        }
+      } catch (e) {
+        console.warn('Using default terms', e);
+      }
+    }
+    loadTerms();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 py-12 px-6">
       <div className="max-w-3xl mx-auto bg-white dark:bg-gray-900 p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-lg space-y-6">
@@ -11,23 +46,11 @@ export default function TermsOfServicePage() {
           <SiteLogo variant="full" className="h-9 w-auto mb-4" />
         </Link>
 
-        <h1 className="text-2xl font-black">Terms of Service</h1>
-        <p className="text-xs text-gray-500">Last updated: September 27, 2026</p>
+        <h1 className="text-2xl font-black">{data.title}</h1>
+        <p className="text-xs text-gray-500">{data.subtitle}</p>
 
-        <div className="prose dark:prose-invert text-xs space-y-4 leading-relaxed">
-          <p>
-            Welcome to Voxpolis (&quot;voxpolis.app&quot;). By accessing or using our personalized political news platform, you agree to these Terms of Service.
-          </p>
-
-          <h3 className="font-bold text-sm">1. Use of Content</h3>
-          <p>
-            All news summaries, factual analyses, and original source citations are provided for informational and educational purposes.
-          </p>
-
-          <h3 className="font-bold text-sm">2. Comment Moderation</h3>
-          <p>
-            Users posting comments agree to abide by our automated moderation policy. Comments containing promotional URLs, hate speech, or harassment are automatically blocked.
-          </p>
+        <div className="prose dark:prose-invert text-xs space-y-4 leading-relaxed whitespace-pre-line text-gray-700 dark:text-gray-300">
+          {data.content}
         </div>
 
         <div className="pt-4 border-t border-gray-200 dark:border-gray-800">

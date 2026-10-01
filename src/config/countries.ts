@@ -231,3 +231,16 @@ export function getCountryByCode(code: string): CountryConfig {
   const us = ALL_COUNTRIES.find((c) => c.code === 'US');
   return us || ALL_COUNTRIES[0];
 }
+
+export function getCountrySlug(c: CountryConfig): string {
+  return c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+export function getCountryBySlug(slug: string): CountryConfig {
+  const s = slug.toLowerCase();
+  const found = ALL_COUNTRIES.find((c) => {
+    const nameSlug = getCountrySlug(c);
+    return nameSlug === s || c.code.toLowerCase() === s;
+  });
+  return found || getCountryByCode('US');
+}

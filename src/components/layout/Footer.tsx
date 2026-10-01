@@ -27,9 +27,6 @@ export default function Footer() {
           <Link href="/contact" className="hover:text-blue-400 transition">
             Contact Us
           </Link>
-          <Link href="/corrections" className="hover:text-blue-400 transition">
-            Corrections Policy
-          </Link>
           <Link href="/privacy" className="hover:text-blue-400 transition">
             Privacy Policy
           </Link>
@@ -40,8 +37,8 @@ export default function Footer() {
 
         {/* Copyright & Platform Description */}
         <div className="space-y-1 text-[11px] text-gray-500 max-w-md">
-          <p>© {new Date().getFullYear()} Voxpolis. Multi-country Political News Briefs.</p>
-          <p>Automated news briefs from primary source feeds. Operated from Abuja, Nigeria.</p>
+          <p>© {new Date().getFullYear()} Voxpolis. Independent Global Political Journalism.</p>
+          <p>Authoritative political analysis, multi-nation coverage, and civic intelligence. Operated from Abuja, Nigeria.</p>
         </div>
       </div>
     </footer>
