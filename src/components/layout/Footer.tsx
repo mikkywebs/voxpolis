@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import SiteLogo from '@/components/branding/SiteLogo';
 
 export default function Footer() {
   return (
@@ -8,12 +9,7 @@ export default function Footer() {
       <div className="max-w-6xl mx-auto flex flex-col items-center justify-center text-center space-y-6">
         {/* Centered App Logo */}
         <Link href="/" className="inline-block hover:opacity-90 transition">
-          {/* eslint-disable-next-html-element-suppression */}
-          <img
-            src="/footer-logo.png"
-            alt="Voxpolis Logo"
-            className="h-14 sm:h-16 w-auto mx-auto object-contain"
-          />
+          <SiteLogo variant="dark" className="h-12 sm:h-14 w-auto mx-auto" />
         </Link>
 
         {/* Footer Navigation Links for All Trust Pages (Historical Archive link removed per request) */}

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 
 interface SiteLogoProps {
   variant?: 'full' | 'icon' | 'light' | 'dark';
@@ -13,10 +12,13 @@ interface SiteLogoProps {
 export default function SiteLogo({
   variant = 'full',
   className = 'h-9 w-auto',
-  width = 180,
-  height = 45,
 }: SiteLogoProps) {
-  const [logoUrl, setLogoUrl] = useState<string>('');
+  const [settings, setSettings] = useState<{
+    light_logo_url?: string;
+    dark_logo_url?: string;
+    icon_url?: string;
+    full_logo_url?: string;
+  }>({});
 
   useEffect(() => {
     async function loadLogos() {
@@ -25,10 +27,7 @@ export default function SiteLogo({
         if (res.ok) {
           const data = await res.json();
           if (data) {
-            if (variant === 'full' && data.full_logo_url) setLogoUrl(data.full_logo_url);
-            else if (variant === 'icon' && data.icon_url) setLogoUrl(data.icon_url);
-            else if (variant === 'light' && data.light_logo_url) setLogoUrl(data.light_logo_url);
-            else if (variant === 'dark' && data.dark_logo_url) setLogoUrl(data.dark_logo_url);
+            setSettings(data);
           }
         }
       } catch (e) {
@@ -36,25 +35,67 @@ export default function SiteLogo({
       }
     }
     loadLogos();
-  }, [variant]);
+  }, []);
 
-  // Default fallbacks from voxpolis-logo-kit if setting not yet returned
-  const fallbackMap = {
-    full: '/voxpolis-logo-kit/01-original-full-lockup.png',
-    icon: '/voxpolis-logo-kit/12-transparent-icon.png',
-    light: '/voxpolis-logo-kit/11-transparent-blog-header.png',
-    dark: '/voxpolis-logo-kit/04-blog-header-dark.jpg',
-  };
+  const defaultLight = settings.light_logo_url || '/voxpolis-logo-light.png';
+  const defaultDark = settings.dark_logo_url || '/voxpolis-logo-dark.png';
+  const defaultIcon = settings.icon_url || '/voxpolis-icon.png';
 
-  const src = logoUrl || fallbackMap[variant];
+  if (variant === 'icon') {
+    return (
+      <div className={`relative flex items-center shrink-0 ${className}`}>
+        {/* eslint-disable-next-html-element-suppression */}
+        <img
+          src={defaultIcon}
+          alt="Voxpolis Icon"
+          className={`${className} object-contain`}
+        />
+      </div>
+    );
+  }
 
+  if (variant === 'light') {
+    return (
+      <div className={`relative flex items-center shrink-0 ${className}`}>
+        {/* eslint-disable-next-html-element-suppression */}
+        <img
+          src={defaultLight}
+          alt="Voxpolis Logo"
+          className={`${className} object-contain`}
+        />
+      </div>
+    );
+  }
+
+  if (variant === 'dark') {
+    return (
+      <div className={`relative flex items-center shrink-0 ${className}`}>
+        {/* eslint-disable-next-html-element-suppression */}
+        <img
+          src={defaultDark}
+          alt="Voxpolis Logo"
+          className={`${className} object-contain`}
+        />
+      </div>
+    );
+  }
+
+  // variant === 'full' responds automatically to light and dark theme
   return (
     <div className={`relative flex items-center shrink-0 ${className}`}>
+      {/* Light Mode Logo: Visible in light mode, hidden in dark mode */}
       {/* eslint-disable-next-html-element-suppression */}
       <img
-        src={src}
+        src={defaultLight}
         alt="Voxpolis Logo"
-        className={`${className} object-contain transition-opacity duration-200`}
+        className={`${className} object-contain dark:hidden`}
+      />
+      {/* Dark Mode Logo: Visible in dark mode, hidden in light mode */}
+      {/* eslint-disable-next-html-element-suppression */}
+      <img
+        src={defaultDark}
+        alt="Voxpolis Logo"
+        className={`${className} object-contain hidden dark:block`}
       />
     </div>
   );

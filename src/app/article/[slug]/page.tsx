@@ -201,14 +201,28 @@ export default function ArticleDetailPage() {
   // PIPELINE ARTICLE DISPLAY
   // -------------------------------------------------------------
   if (pipelineArticle) {
-    const paragraphs = pipelineArticle.body_markdown.split('\n\n').filter(Boolean);
+    const cleanPipeBody = pipelineArticle.body_markdown
+      .replace(/https?:\/\/[^\s)]+/gi, '')
+      .replace(/www\.[^\s)]+/gi, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/(read more on|also read|click here to read|visit our website|source:)[^.\n]*/gi, '')
+      .trim();
+    const paragraphs = cleanPipeBody.split('\n\n').filter(Boolean);
     const midPoint = Math.min(2, Math.floor(paragraphs.length / 2));
 
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
         <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
 
-        <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
+        <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-2 sm:px-4">
+          {/* Left Wide Skyscraper (160x600 px) - strictly desktop */}
+          <aside className="hidden xl:block shrink-0 w-[160px] mr-6">
+            <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
+              <AdSlot slotLocation="skyscraper_left" isAllowed={true} />
+            </div>
+          </aside>
+
+          <main className="flex-1 max-w-3xl w-full min-w-0 py-8 space-y-6">
           {/* Headline & Dek */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -400,6 +414,14 @@ export default function ArticleDetailPage() {
           />
         </main>
 
+          {/* Right Wide Skyscraper (160x600 px) - strictly desktop */}
+          <aside className="hidden xl:block shrink-0 w-[160px] ml-6">
+            <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
+              <AdSlot slotLocation="skyscraper_right" isAllowed={true} />
+            </div>
+          </aside>
+        </div>
+
         <Footer />
       </div>
     );
@@ -477,44 +499,49 @@ export default function ArticleDetailPage() {
   // -------------------------------------------------------------
   // FALLBACK STANDARD ARTICLE DISPLAY
   // -------------------------------------------------------------
-  const fallbackParagraphs = (article?.content || '').split('\n\n').filter(Boolean);
+  const cleanStandardBody = (article?.content || '')
+    .replace(/https?:\/\/[^\s)]+/gi, '')
+    .replace(/www\.[^\s)]+/gi, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/(read more on|also read|click here to read|visit our website|source:)[^.\n]*/gi, '')
+    .trim();
+  const fallbackParagraphs = cleanStandardBody.split('\n\n').filter(Boolean);
   const fbMidPoint = Math.min(2, Math.floor(fallbackParagraphs.length / 2));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
       <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8">
-        <ArticleImageHeader
-          title={article!.title}
-          snippet={article!.snippet}
-          imageMode={article!.image_mode === 'original' ? 'original' : 'breaking_logo'}
-          originalImageUrl={article!.original_image_url || '/breaking-news-banner.png'}
-          sourceName={article!.source_name}
-          sourceUrl={article!.source_url}
-          isBreaking={article!.is_breaking}
-          viewsCount={realViews}
-          createdAt={article!.created_at}
-        />
+      <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-2 sm:px-4">
+        {/* Left Wide Skyscraper (160x600 px) - strictly desktop */}
+        <aside className="hidden xl:block shrink-0 w-[160px] mr-6">
+          <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
+            <AdSlot slotLocation="skyscraper_left" isAllowed={true} />
+          </div>
+        </aside>
 
-        <SocialShareButtons title={article!.title} slug={article!.slug} />
+        <main className="flex-1 max-w-3xl w-full min-w-0 py-8">
+          <ArticleImageHeader
+            title={article!.title}
+            snippet={article!.snippet}
+            imageMode={article!.image_mode === 'original' ? 'original' : 'breaking_logo'}
+            originalImageUrl={article!.original_image_url || '/breaking-news-banner.png'}
+            sourceName={article!.source_name}
+            sourceUrl={article!.source_url}
+            isBreaking={article!.is_breaking}
+            viewsCount={realViews}
+            createdAt={article!.created_at}
+          />
 
-        <AdSlot slotLocation="below_dek" isAllowed={true} />
+          <SocialShareButtons title={article!.title} slug={article!.slug} />
 
-        <EmojiReactions
-          articleId={article!.id}
-          onRequireAuth={() => router.push('/login')}
-          isLoggedIn={isLoggedIn}
-        />
+          <AdSlot slotLocation="below_dek" isAllowed={true} />
 
-        <div className="my-6 pt-2 text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
-          <span className="font-bold text-blue-600 dark:text-blue-400 block uppercase tracking-wider text-[11px] mb-1">
-            NEWS RECAP
-          </span>
-          <p className="text-gray-800 dark:text-gray-200 font-semibold leading-relaxed">
-            {article!.snippet || article!.content.slice(0, 220)}
-          </p>
-        </div>
+          <EmojiReactions
+            articleId={article!.id}
+            onRequireAuth={() => router.push('/login')}
+            isLoggedIn={isLoggedIn}
+          />
 
         <div className="prose dark:prose-invert max-w-none text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-relaxed space-y-4 my-6">
           {fallbackParagraphs.slice(0, fbMidPoint).map((paragraph, i) => (
@@ -566,7 +593,15 @@ export default function ArticleDetailPage() {
         <OriginalSourceLink sourceName={article!.source_name} sourceUrl={article!.source_url} />
 
         <AdSlot slotLocation="below_sources" isAllowed={true} />
-      </main>
+        </main>
+
+        {/* Right Wide Skyscraper (160x600 px) - strictly desktop */}
+        <aside className="hidden xl:block shrink-0 w-[160px] ml-6">
+          <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
+            <AdSlot slotLocation="skyscraper_right" isAllowed={true} />
+          </div>
+        </aside>
+      </div>
 
       <Footer />
     </div>

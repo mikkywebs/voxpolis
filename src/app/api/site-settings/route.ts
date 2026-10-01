@@ -21,10 +21,10 @@ export async function GET() {
 
   // Fallback defaults
   return NextResponse.json({
-    full_logo_url: '/voxpolis-logo-kit/01-original-full-lockup.png',
-    icon_url: '/voxpolis-logo-kit/12-transparent-icon.png',
-    light_logo_url: '/voxpolis-logo-kit/11-transparent-blog-header.png',
-    dark_logo_url: '/voxpolis-logo-kit/04-blog-header-dark.jpg',
+    full_logo_url: '/voxpolis-logo-light.png',
+    icon_url: '/voxpolis-icon.png',
+    light_logo_url: '/voxpolis-logo-light.png',
+    dark_logo_url: '/voxpolis-logo-dark.png',
   });
 }
 

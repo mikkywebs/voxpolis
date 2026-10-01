@@ -61,11 +61,14 @@ function cleanRssText(raw: string): string {
   let text = decodeHtmlEntities(decodeHtmlEntities(raw));
   text = text
     .replace(/<[^>]+>/g, ' ')
-    .replace(/http[s]?:\/\/[^\s]+/g, '')
+    .replace(/https?:\/\/[^\s)]+/gi, '')
+    .replace(/www\.[^\s)]+/gi, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/href=["'][^"']*["']/g, '')
     .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
     .replace(/The post .* appeared first on .*/gi, '')
     .replace(/appeared first on .*/gi, '')
+    .replace(/(read more on|also read|click here to read|visit our website|source:)[^.\n]*/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 

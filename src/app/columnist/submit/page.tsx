@@ -1,26 +1,41 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { ALL_COUNTRIES, CountryConfig, getCountryByCode } from '@/config/countries';
-import { PenTool, CheckCircle2, AlertCircle, FileText, Image as ImageIcon, User, ArrowLeft } from 'lucide-react';
+import {
+  PenTool,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  Upload,
+  User,
+  ArrowLeft,
+  ShieldCheck,
+  BookOpen,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
 
 export default function ColumnistSubmitPage() {
   const [selectedCountry, setSelectedCountry] = useState<CountryConfig>(getCountryByCode('NG') || ALL_COUNTRIES[0]);
 
-  // Author details
+  // Author credentials
   const [authorName, setAuthorName] = useState('');
   const [authorEmail, setAuthorEmail] = useState('');
   const [authorBio, setAuthorBio] = useState('');
-  const [authorAvatar, setAuthorAvatar] = useState('');
 
   // Article details
   const [targetCountry, setTargetCountry] = useState('NG');
   const [title, setTitle] = useState('');
   const [featuredImage, setFeaturedImage] = useState('');
+  const [featuredImagePreview, setFeaturedImagePreview] = useState<string | null>(null);
   const [content, setContent] = useState('');
+  const [agreedToPublish, setAgreedToPublish] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form submission state
   const [wordCount, setWordCount] = useState(0);
@@ -33,12 +48,47 @@ export default function ColumnistSubmitPage() {
     setWordCount(words);
   }, [content]);
 
+  // Handle local image file upload
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg('Please select a valid image file (JPG, PNG, WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg('Featured image size must be under 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setFeaturedImage(result);
+      setFeaturedImagePreview(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearFeaturedImage = () => {
+    setFeaturedImage('');
+    setFeaturedImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
     if (wordCount < 500) {
-      setErrorMsg(`Your article is currently ${wordCount} words. Voxpolis editorial guidelines require a minimum of 500 words for accredited op-eds.`);
+      setErrorMsg(`Your article currently contains ${wordCount} words. Voxpolis editorial standards require at least 500 words for accredited op-eds.`);
+      return;
+    }
+
+    if (!agreedToPublish) {
+      setErrorMsg('Please confirm agreement for Voxpolis to publish your political commentary by ticking the declaration box.');
       return;
     }
 
@@ -51,7 +101,6 @@ export default function ColumnistSubmitPage() {
           author_name: authorName,
           author_email: authorEmail,
           author_bio: authorBio,
-          author_avatar: authorAvatar || '/breaking-news-banner.png',
           country_code: targetCountry,
           title,
           content,
@@ -90,13 +139,67 @@ export default function ColumnistSubmitPage() {
               <PenTool className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black">Columnist & Op-Ed Editorial Desk</h1>
+              <h1 className="text-2xl sm:text-3xl font-black">Columnist & Op-Ed Submissions</h1>
               <p className="text-xs sm:text-sm text-gray-400">
-                Submit original political commentary and policy analysis. Submissions must be 500+ words and adhere to civilized civic discourse.
+                Independent political perspectives, policy analysis, and governance reporting.
               </p>
             </div>
           </div>
         </div>
+
+        {/* Columnist Editorial Charter & Rules Banner */}
+        <section className="p-6 rounded-3xl bg-gradient-to-br from-blue-950/40 via-slate-900 to-indigo-950/30 border border-blue-800/40 shadow-xl space-y-4">
+          <div className="flex items-center gap-2 text-blue-400 text-xs font-extrabold uppercase tracking-wider">
+            <BookOpen className="w-4 h-4" />
+            <span>Voxpolis Editorial Rules & Columnist Charter</span>
+          </div>
+
+          <h2 className="text-base sm:text-lg font-bold text-white leading-snug">
+            We Welcome Independent Thought & Rigorous Political Analysis
+          </h2>
+
+          <p className="text-xs text-gray-300 leading-relaxed">
+            Voxpolis provides an open, authoritative civic platform for analysts, scholars, citizens, and political commentators across 119 nations. We invite well-reasoned, independent opinions strictly focused on political and public affairs.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-gray-800/80 space-y-1">
+              <span className="font-bold text-white flex items-center gap-1.5">
+                <span className="text-blue-400">1.</span> Strictly Political & Governance Focus
+              </span>
+              <p className="text-[11px] text-gray-400">
+                Articles must address elections, policy, legislation, institutional governance, regional diplomacy, or civic affairs.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-gray-800/80 space-y-1">
+              <span className="font-bold text-white flex items-center gap-1.5">
+                <span className="text-blue-400">2.</span> 500+ Words Minimum Substantive Depth
+              </span>
+              <p className="text-[11px] text-gray-400">
+                Submissions must be at least 500 words long to ensure deep, analytical reporting. There is no upper limit.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-gray-800/80 space-y-1">
+              <span className="font-bold text-white flex items-center gap-1.5">
+                <span className="text-blue-400">3.</span> Decency & Civil Public Discourse
+              </span>
+              <p className="text-[11px] text-gray-400">
+                We strictly prohibit abusive language, defamation, profanity, and hate speech. We respect differing views expressed with dignity.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-gray-800/80 space-y-1">
+              <span className="font-bold text-white flex items-center gap-1.5">
+                <span className="text-blue-400">4.</span> Originality & No Commercial Links
+              </span>
+              <p className="text-[11px] text-gray-400">
+                Content must be your original work. Promotional backlinking or affiliate URLs are rejected automatically.
+              </p>
+            </div>
+          </div>
+        </section>
 
         {isSuccess ? (
           <div className="p-8 rounded-3xl bg-slate-900 border border-emerald-500/30 text-center space-y-4 shadow-2xl">
@@ -119,6 +222,8 @@ export default function ColumnistSubmitPage() {
                   setIsSuccess(false);
                   setTitle('');
                   setContent('');
+                  setAgreedToPublish(false);
+                  clearFeaturedImage();
                 }}
                 className="px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-bold rounded-xl transition"
               >
@@ -169,16 +274,6 @@ export default function ColumnistSubmitPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-gray-300 block mb-1">Profile Photo Image URL *</label>
-                  <input
-                    type="url"
-                    value={authorAvatar}
-                    onChange={(e) => setAuthorAvatar(e.target.value)}
-                    placeholder="https://images.unsplash.com/photo-..."
-                    className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
                   <label className="text-xs font-bold text-gray-300 block mb-1">Primary Country Beat *</label>
                   <select
                     value={targetCountry}
@@ -192,17 +287,17 @@ export default function ColumnistSubmitPage() {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1">Short Author Bio / Affiliation</label>
-                <input
-                  type="text"
-                  value={authorBio}
-                  onChange={(e) => setAuthorBio(e.target.value)}
-                  placeholder="Political analyst, Senior Research Fellow at the African Center for Governance..."
-                  className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div>
+                  <label className="text-xs font-bold text-gray-300 block mb-1">Short Author Bio / Institutional Affiliation</label>
+                  <input
+                    type="text"
+                    value={authorBio}
+                    onChange={(e) => setAuthorBio(e.target.value)}
+                    placeholder="Political analyst, Senior Fellow at Governance Institute..."
+                    className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
             </div>
 
@@ -220,33 +315,83 @@ export default function ColumnistSubmitPage() {
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="The Fiscal Realities of Fuel Subsidy Deregulation Across Regional States"
+                  placeholder="The Fiscal Realities of Energy Subsidies Across Regional States"
                   className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1">Featured Photograph URL (Header Image)</label>
-                <input
-                  type="url"
-                  value={featuredImage}
-                  onChange={(e) => setFeaturedImage(e.target.value)}
-                  placeholder="https://images.unsplash.com/photo-..."
-                  className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              {/* Featured Image Attachment: File Upload + Optional URL */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-300 block">Featured Photograph (Optional)</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                  <div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="columnist-photo-file"
+                    />
+                    <label
+                      htmlFor="columnist-photo-file"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-gray-700 hover:border-blue-500 bg-slate-950 cursor-pointer text-xs font-semibold text-gray-300 hover:text-white transition"
+                    >
+                      <Upload className="w-4 h-4 text-blue-400" />
+                      <span>Upload Photo from Device</span>
+                    </label>
+                  </div>
+
+                  <div>
+                    <input
+                      type="url"
+                      value={featuredImagePreview && !featuredImage.startsWith('http') ? '' : featuredImage}
+                      onChange={(e) => {
+                        setFeaturedImage(e.target.value);
+                        setFeaturedImagePreview(e.target.value || null);
+                      }}
+                      placeholder="Or paste an image web URL..."
+                      className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Image Preview thumbnail */}
+                {featuredImagePreview && (
+                  <div className="relative w-36 h-24 rounded-xl overflow-hidden border border-gray-700 mt-2 group">
+                    {/* eslint-disable-next-html-element-suppression */}
+                    <img
+                      src={featuredImagePreview}
+                      alt="Featured Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearFeaturedImage}
+                      className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-red-600 text-white rounded-full transition"
+                      title="Remove image"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-gray-300 block">Article Body (500+ Words Required) *</label>
+                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                  <label className="text-xs font-bold text-gray-300 block">
+                    Article Body (500+ Words Minimum) *
+                  </label>
                   <span
-                    className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${
+                    className={`text-xs font-extrabold px-3 py-1 rounded-full border transition ${
                       wordCount >= 500
-                        ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800'
-                        : 'bg-amber-950/60 text-amber-400 border-amber-800'
+                        ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700'
+                        : 'bg-amber-950/60 text-amber-300 border-amber-700'
                     }`}
                   >
-                    {wordCount} / 500 words
+                    {wordCount >= 500
+                      ? `${wordCount} words (Minimum 500 met ✓)`
+                      : `${wordCount} words (At least 500 required)`}
                   </span>
                 </div>
                 <textarea
@@ -254,22 +399,37 @@ export default function ColumnistSubmitPage() {
                   required
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="Compose your comprehensive political analysis or op-ed here. Detail the legislative context, regional implications, stakeholders involved, and projected outcomes..."
+                  placeholder="Compose your comprehensive political analysis or op-ed here. Detail the legislative context, regional implications, stakeholders involved, and projected policy outcomes..."
                   className="w-full text-xs sm:text-sm p-4 rounded-2xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
                 />
                 <p className="text-[11px] text-gray-400 mt-1">
-                  Tip: Structure your column into clear thematic sections, reference factual data or policy frameworks, and maintain a constructive, scholarly tone.
+                  Articles can extend to 1,000+ words. Structure your arguments with clear paragraphs and factual references.
                 </p>
+              </div>
+
+              {/* Publisher Agreement Checkbox */}
+              <div className="pt-2">
+                <label className="flex items-start gap-3 p-4 rounded-2xl bg-slate-950 border border-gray-800 hover:border-gray-700 cursor-pointer select-none transition">
+                  <input
+                    type="checkbox"
+                    checked={agreedToPublish}
+                    onChange={(e) => setAgreedToPublish(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 text-blue-600 rounded bg-gray-900 border-gray-700 focus:ring-blue-500 shrink-0"
+                  />
+                  <span className="text-xs text-gray-300 leading-relaxed">
+                    I confirm that this political commentary is my original intellectual work and adheres strictly to Voxpolis standards of civil discourse. I grant Voxpolis the right to publish and syndicate this content across its multi-national platform upon editorial approval.
+                  </span>
+                </label>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-800 flex items-center justify-between">
+            <div className="pt-4 border-t border-gray-800 flex items-center justify-between flex-wrap gap-4">
               <span className="text-xs text-gray-400">
                 All submissions undergo editorial review before appearing on the live country feed.
               </span>
               <button
                 type="submit"
-                disabled={isSubmitting || wordCount < 500}
+                disabled={isSubmitting || wordCount < 500 || !agreedToPublish}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-black rounded-xl shadow-lg transition flex items-center gap-2"
               >
                 <PenTool className="w-4 h-4" />

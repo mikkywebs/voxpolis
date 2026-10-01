@@ -228,6 +228,21 @@ export function generateAiAnalysisSummary(
   return `• Strategic Context: Developments surrounding this report directly impact ${impactArea} across ${countryName}.\n• Key Takeaway: Administrative and policy directives remain under ongoing oversight as verified by ${sourceName}.`;
 }
 
+export function cleanNewsText(raw: string): string {
+  if (!raw) return '';
+  return raw
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/https?:\/\/[^\s)]+/gi, '')
+    .replace(/www\.[^\s)]+/gi, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
+    .replace(/The post .* appeared first on .*/gi, '')
+    .replace(/appeared first on .*/gi, '')
+    .replace(/(read more on|also read|click here to read|visit our website|source:)[^.\n]*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export async function fetchArticlesForCountry(
   countryCode: string,
   language: string = 'en'
@@ -264,21 +279,9 @@ export async function fetchArticlesForCountry(
           const data = await res.json();
           if (data.results && Array.isArray(data.results)) {
             newsDataArticles = data.results.map((item: any, idx: number) => {
-              const cleanTitle = (item.title || 'Political Update')
-                .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
-                .replace(/The post .* appeared first on .*/gi, '')
-                .replace(/appeared first on .*/gi, '')
-                .trim();
-              const rawDesc = (item.description || item.snippet || item.title || '')
-                .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
-                .replace(/The post .* appeared first on .*/gi, '')
-                .replace(/appeared first on .*/gi, '')
-                .trim();
-              const rawContent = (item.content || item.description || item.title || '')
-                .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
-                .replace(/The post .* appeared first on .*/gi, '')
-                .replace(/appeared first on .*/gi, '')
-                .trim();
+              const cleanTitle = cleanNewsText(item.title || 'Political Update');
+              const rawDesc = cleanNewsText(item.description || item.snippet || item.title || '');
+              const rawContent = cleanNewsText(item.content || item.description || item.title || '');
               const sourceName = item.source_id || `${country.name} Press`;
 
               const displayTitle = cleanTitle.endsWith(' - Voxpolis') ? cleanTitle : `${cleanTitle} - Voxpolis`;

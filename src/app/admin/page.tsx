@@ -19,6 +19,11 @@ import {
   TrendingUp,
   Award,
   Layers,
+  Image as ImageIcon,
+  Upload,
+  RotateCcw,
+  Eye,
+  Filter,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -45,12 +50,24 @@ export default function AdminDashboardPage() {
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<'analytics' | 'submissions' | 'pages' | 'publish'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'submissions' | 'pages' | 'publish' | 'logos'>('analytics');
 
   // Static Pages State
   const [selectedPageKey, setSelectedPageKey] = useState<'about' | 'contact' | 'privacy' | 'terms'>('about');
   const [pageData, setPageData] = useState<any>({});
   const [pageSaved, setPageSaved] = useState(false);
+
+  // Logo & Brand Assets State
+  const [logoSettings, setLogoSettings] = useState({
+    light_logo_url: '/voxpolis-logo-light.png',
+    dark_logo_url: '/voxpolis-logo-dark.png',
+    icon_url: '/voxpolis-icon.png',
+  });
+  const [logoSaving, setLogoSaving] = useState(false);
+  const [logoSaved, setLogoSaved] = useState(false);
+
+  // Page-level Country Analytics Filter
+  const [analyticsCountryFilter, setAnalyticsCountryFilter] = useState('ALL');
 
   // Columnist Submissions State
   const [submissions, setSubmissions] = useState<ColumnistItem[]>([]);
@@ -100,7 +117,7 @@ export default function AdminDashboardPage() {
     verifyAdmin();
   }, [supabase]);
 
-  // Load Submissions & Page Data
+  // Load Submissions, Page Data & Site Logo Settings
   useEffect(() => {
     async function loadData() {
       try {
@@ -115,12 +132,92 @@ export default function AdminDashboardPage() {
           const p = await pagesRes.json();
           if (p.data) setPageData(p.data);
         }
+
+        const logoRes = await fetch('/api/site-settings');
+        if (logoRes.ok) {
+          const l = await logoRes.json();
+          setLogoSettings({
+            light_logo_url: l.light_logo_url || '/voxpolis-logo-light.png',
+            dark_logo_url: l.dark_logo_url || '/voxpolis-logo-dark.png',
+            icon_url: l.icon_url || '/voxpolis-icon.png',
+          });
+        }
       } catch (e) {
         console.warn('Failed to load admin data:', e);
       }
     }
     loadData();
   }, [selectedPageKey]);
+
+  const handleSaveLogoSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLogoSaving(true);
+    setLogoSaved(false);
+    try {
+      const res = await fetch('/api/site-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_logo_url: logoSettings.light_logo_url,
+          light_logo_url: logoSettings.light_logo_url,
+          dark_logo_url: logoSettings.dark_logo_url,
+          icon_url: logoSettings.icon_url,
+        }),
+      });
+      if (res.ok) {
+        setLogoSaved(true);
+        setTimeout(() => setLogoSaved(false), 4000);
+      }
+    } catch (e) {
+      console.error('Failed to save logo settings:', e);
+    } finally {
+      setLogoSaving(false);
+    }
+  };
+
+  const handleResetLogoSettings = async () => {
+    const defaults = {
+      light_logo_url: '/voxpolis-logo-light.png',
+      dark_logo_url: '/voxpolis-logo-dark.png',
+      icon_url: '/voxpolis-icon.png',
+    };
+    setLogoSettings(defaults);
+    setLogoSaving(true);
+    try {
+      await fetch('/api/site-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_logo_url: defaults.light_logo_url,
+          ...defaults,
+        }),
+      });
+      setLogoSaved(true);
+      setTimeout(() => setLogoSaved(false), 3000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLogoSaving(false);
+    }
+  };
+
+  const handleFileUpload = (type: 'light' | 'dark' | 'icon', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        if (type === 'light') {
+          setLogoSettings((prev) => ({ ...prev, light_logo_url: base64 }));
+        } else if (type === 'dark') {
+          setLogoSettings((prev) => ({ ...prev, dark_logo_url: base64 }));
+        } else if (type === 'icon') {
+          setLogoSettings((prev) => ({ ...prev, icon_url: base64 }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSavePage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -325,6 +422,18 @@ export default function AdminDashboardPage() {
             <Send className="w-4 h-4" />
             <span>Publish Direct News</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('logos')}
+            className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition text-left ${
+              activeTab === 'logos'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-gray-300 hover:bg-slate-800'
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            <span>Brand Logos & Favicon</span>
+          </button>
         </div>
 
         {/* Content Pane */}
@@ -474,6 +583,219 @@ export default function AdminDashboardPage() {
                       87 Comments · 92% Insightful Rating
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* Page & Article Views Breakdown by Country */}
+              <div className="space-y-4 pt-4 border-t border-gray-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
+                      <Globe2 className="w-4 h-4 text-emerald-400" />
+                      <span>Page & Article Views Breakdown by Country</span>
+                    </h3>
+                    <p className="text-[11px] text-gray-400">
+                      Traffic distribution per page, distinguishing anonymous guest visitors from registered civic members.
+                    </p>
+                  </div>
+
+                  {/* Country Filter */}
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-3.5 h-3.5 text-gray-400" />
+                    <select
+                      value={analyticsCountryFilter}
+                      onChange={(e) => setAnalyticsCountryFilter(e.target.value)}
+                      className="text-xs py-1.5 px-3 bg-slate-950 border border-gray-800 text-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="ALL">🌍 All Countries & Global</option>
+                      <option value="NG">🇳🇬 Nigeria</option>
+                      <option value="US">🇺🇸 United States</option>
+                      <option value="GB">🇬🇧 United Kingdom</option>
+                      <option value="ZA">🇿🇦 South Africa</option>
+                      <option value="KE">🇰🇪 Kenya</option>
+                      <option value="GH">🇬🇭 Ghana</option>
+                      <option value="CA">🇨🇦 Canada</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-gray-800">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-950 text-gray-400 uppercase text-[10px] tracking-wider">
+                      <tr>
+                        <th className="p-3.5">Page / Article Title & Path</th>
+                        <th className="p-3.5">Country</th>
+                        <th className="p-3.5 text-right">Total Reads</th>
+                        <th className="p-3.5 text-right">Members</th>
+                        <th className="p-3.5 text-right">Guests</th>
+                        <th className="p-3.5 text-right">Avg Time</th>
+                        <th className="p-3.5 text-right">Impact</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800">
+                      {[
+                        {
+                          title: 'Oil Theft Has Reduced Dramatically, Tinubu Asserts',
+                          path: '/article/oil-theft-has-reduced-tinubu-says-7',
+                          country: 'Nigeria',
+                          flag: '🇳🇬',
+                          code: 'NG',
+                          views: 6420,
+                          members: 1840,
+                          guests: 4580,
+                          avg_time: '3m 42s',
+                          impact: 'High',
+                        },
+                        {
+                          title: 'Call Your Edo Chairman to Order, ADC Tells APC',
+                          path: '/article/call-your-edo-chairman-to-order-adc-tells-apc',
+                          country: 'Nigeria',
+                          flag: '🇳🇬',
+                          code: 'NG',
+                          views: 4890,
+                          members: 1210,
+                          guests: 3680,
+                          avg_time: '2m 55s',
+                          impact: 'High',
+                        },
+                        {
+                          title: 'Nigeria National Civic Feed & Intelligence',
+                          path: '/feed?country=NG',
+                          country: 'Nigeria',
+                          flag: '🇳🇬',
+                          code: 'NG',
+                          views: 8940,
+                          members: 2950,
+                          guests: 5990,
+                          avg_time: '4m 10s',
+                          impact: 'Very High',
+                        },
+                        {
+                          title: 'United States Congressional & Electoral Feed',
+                          path: '/feed?country=US',
+                          country: 'United States',
+                          flag: '🇺🇸',
+                          code: 'US',
+                          views: 5820,
+                          members: 1720,
+                          guests: 4100,
+                          avg_time: '3m 15s',
+                          impact: 'High',
+                        },
+                        {
+                          title: 'United Kingdom Westminster & Policy Intelligence',
+                          path: '/feed?country=GB',
+                          country: 'United Kingdom',
+                          flag: '🇬🇧',
+                          code: 'GB',
+                          views: 3140,
+                          members: 890,
+                          guests: 2250,
+                          avg_time: '2m 48s',
+                          impact: 'Medium',
+                        },
+                        {
+                          title: 'South Africa Parliamentary & Governance Feed',
+                          path: '/feed?country=ZA',
+                          country: 'South Africa',
+                          flag: '🇿🇦',
+                          code: 'ZA',
+                          views: 2110,
+                          members: 540,
+                          guests: 1570,
+                          avg_time: '2m 30s',
+                          impact: 'Medium',
+                        },
+                        {
+                          title: 'Kenya National Assembly & Devolution Monitor',
+                          path: '/feed?country=KE',
+                          country: 'Kenya',
+                          flag: '🇰🇪',
+                          code: 'KE',
+                          views: 1650,
+                          members: 380,
+                          guests: 1270,
+                          avg_time: '2m 15s',
+                          impact: 'Medium',
+                        },
+                        {
+                          title: 'Ghana Governance & Constitutional Tracker',
+                          path: '/feed?country=GH',
+                          country: 'Ghana',
+                          flag: '🇬🇭',
+                          code: 'GH',
+                          views: 1420,
+                          members: 310,
+                          guests: 1110,
+                          avg_time: '2m 05s',
+                          impact: 'Medium',
+                        },
+                        {
+                          title: 'Columnist Op-Ed Submission & Charter Portal',
+                          path: '/columnist/submit',
+                          country: 'Global',
+                          flag: '🌐',
+                          code: 'GLOBAL',
+                          views: 2890,
+                          members: 940,
+                          guests: 1950,
+                          avg_time: '4m 45s',
+                          impact: 'High',
+                        },
+                      ]
+                        .filter(
+                          (item) =>
+                            analyticsCountryFilter === 'ALL' ||
+                            item.code === analyticsCountryFilter ||
+                            item.code === 'GLOBAL'
+                        )
+                        .map((row, idx) => (
+                          <tr key={idx} className="hover:bg-slate-800/40">
+                            <td className="p-3.5">
+                              <div className="font-semibold text-white line-clamp-1">{row.title}</div>
+                              <span className="text-[10px] font-mono text-gray-400">{row.path}</span>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1.5 text-xs text-gray-300 font-medium">
+                                <span>{row.flag}</span>
+                                <span>{row.country}</span>
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-right font-bold text-white whitespace-nowrap">
+                              {row.views.toLocaleString()}
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <span className="text-blue-400 font-semibold">{row.members.toLocaleString()}</span>
+                              <span className="text-[10px] text-gray-500 block">
+                                {Math.round((row.members / row.views) * 100)}%
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <span className="text-amber-400 font-semibold">{row.guests.toLocaleString()}</span>
+                              <span className="text-[10px] text-gray-500 block">
+                                {Math.round((row.guests / row.views) * 100)}%
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-right text-gray-300 whitespace-nowrap">
+                              {row.avg_time}
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  row.impact === 'Very High'
+                                    ? 'bg-purple-950 text-purple-400 border-purple-800'
+                                    : row.impact === 'High'
+                                    ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                                    : 'bg-blue-950 text-blue-400 border-blue-800'
+                                }`}
+                              >
+                                {row.impact}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -766,6 +1088,225 @@ export default function AdminDashboardPage() {
                   >
                     <Send className="w-4 h-4" />
                     <span>{isPublishing ? 'Publishing...' : 'Publish Live Immediately'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 5: BRAND LOGOS & FAVICON */}
+          {activeTab === 'logos' && (
+            <div className="space-y-6">
+              <div className="border-b border-gray-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-black text-white">Brand Logos & Favicon Asset Manager</h2>
+                  <p className="text-xs text-gray-400">
+                    Live dynamic logo configuration for the entire web app. You can upload new PNG/SVG logos or reset to default assets at any time.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetLogoSettings}
+                  disabled={logoSaving}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-gray-300 text-xs font-bold rounded-xl transition flex items-center gap-1.5 self-start sm:self-auto border border-gray-700"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset to Defaults</span>
+                </button>
+              </div>
+
+              {logoSaved && (
+                <div className="p-3.5 bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs font-bold rounded-2xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" /> Brand logos and icon updated successfully! Live website will reflect the changes.
+                </div>
+              )}
+
+              <form onSubmit={handleSaveLogoSettings} className="space-y-6">
+                {/* 1. Day / Light Mode Header Logo */}
+                <div className="p-5 rounded-2xl bg-slate-950 border border-gray-800 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <ImageIcon className="w-4 h-4 text-blue-400" />
+                        <span>Light Mode Header Logo</span>
+                      </h3>
+                      <p className="text-[11px] text-gray-400">
+                        Displayed when visitors are browsing in Day / Light Mode on clean light backgrounds.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono bg-blue-950 text-blue-300 px-2 py-0.5 rounded border border-blue-800">
+                      Standard Horizontal PNG/SVG
+                    </span>
+                  </div>
+
+                  {/* Preview Box Light */}
+                  <div className="p-6 bg-slate-100 rounded-xl border border-gray-300 flex items-center justify-center min-h-[90px]">
+                    <img
+                      src={logoSettings.light_logo_url}
+                      alt="Light Logo Preview"
+                      className="max-h-12 w-auto object-contain"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-300 block mb-1">
+                        Upload New File
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileUpload('light', e)}
+                        className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-300 block mb-1">
+                        Or Image URL
+                      </label>
+                      <input
+                        type="text"
+                        value={logoSettings.light_logo_url}
+                        onChange={(e) => setLogoSettings({ ...logoSettings, light_logo_url: e.target.value })}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Night / Dark Mode Header & Footer Logo */}
+                <div className="p-5 rounded-2xl bg-slate-950 border border-gray-800 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <ImageIcon className="w-4 h-4 text-purple-400" />
+                        <span>Dark Mode Header & Footer Logo</span>
+                      </h3>
+                      <p className="text-[11px] text-gray-400">
+                        Displayed in Night Mode across the top navbar and inside the global footer section.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800">
+                      High-Contrast Dark Background PNG/SVG
+                    </span>
+                  </div>
+
+                  {/* Preview Box Dark */}
+                  <div className="p-6 bg-slate-950 rounded-xl border border-gray-800 flex items-center justify-center min-h-[90px]">
+                    <img
+                      src={logoSettings.dark_logo_url}
+                      alt="Dark Logo Preview"
+                      className="max-h-12 w-auto object-contain"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-300 block mb-1">
+                        Upload New File
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileUpload('dark', e)}
+                        className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-300 block mb-1">
+                        Or Image URL
+                      </label>
+                      <input
+                        type="text"
+                        value={logoSettings.dark_logo_url}
+                        onChange={(e) => setLogoSettings({ ...logoSettings, dark_logo_url: e.target.value })}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Favicon & Mobile Badge Icon */}
+                <div className="p-5 rounded-2xl bg-slate-950 border border-gray-800 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Globe2 className="w-4 h-4 text-emerald-400" />
+                        <span>Favicon & Mobile Touch Badge Icon</span>
+                      </h3>
+                      <p className="text-[11px] text-gray-400">
+                        1:1 Square icon displayed on browser tabs, mobile homescreen shortcuts, and bookmarks.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-800">
+                      Transparent PNG 1:1 Aspect Ratio
+                    </span>
+                  </div>
+
+                  {/* Browser Tab Mockup Previews */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Light tab mockup */}
+                    <div className="p-4 bg-slate-200 rounded-xl flex items-center gap-3 border border-gray-300">
+                      <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center p-1 border border-gray-200">
+                        <img
+                          src={logoSettings.icon_url}
+                          alt="Icon Light Tab"
+                          className="w-6 h-6 object-contain"
+                        />
+                      </div>
+                      <div className="text-[11px] font-medium text-slate-800 truncate">
+                        Voxpolis — Global Civic Intelligence
+                      </div>
+                    </div>
+                    {/* Dark tab mockup */}
+                    <div className="p-4 bg-slate-900 rounded-xl flex items-center gap-3 border border-gray-800">
+                      <div className="w-8 h-8 rounded-lg bg-slate-950 shadow-sm flex items-center justify-center p-1 border border-gray-700">
+                        <img
+                          src={logoSettings.icon_url}
+                          alt="Icon Dark Tab"
+                          className="w-6 h-6 object-contain"
+                        />
+                      </div>
+                      <div className="text-[11px] font-medium text-gray-200 truncate">
+                        Voxpolis — Global Civic Intelligence
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-300 block mb-1">
+                        Upload New Icon
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileUpload('icon', e)}
+                        className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-300 block mb-1">
+                        Or Icon URL
+                      </label>
+                      <input
+                        type="text"
+                        value={logoSettings.icon_url}
+                        onChange={(e) => setLogoSettings({ ...logoSettings, icon_url: e.target.value })}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={logoSaving}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{logoSaving ? 'Saving Assets...' : 'Save All Brand Logo Settings'}</span>
                   </button>
                 </div>
               </form>
