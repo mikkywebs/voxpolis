@@ -5,6 +5,7 @@ import Link from 'next/link';
 import SiteLogo from '@/components/branding/SiteLogo';
 import RegionalCountrySelectorModal from '@/components/layout/RegionalCountrySelectorModal';
 import AuthPromptModal from '@/components/auth/AuthPromptModal';
+import MilestoneAchievementModal from '@/components/profile/MilestoneAchievementModal';
 import { CountryConfig, SUPPORTED_COUNTRIES } from '@/config/countries';
 import { WeatherData } from '@/lib/weather';
 import { Sun, Moon, PenTool, ChevronDown, User, Shield, LogOut, Languages, Globe, Check } from 'lucide-react';
@@ -39,10 +40,11 @@ export default function Header({
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [accentColor, setAccentColor] = useState<'blue' | 'emerald' | 'purple' | 'amber' | 'rose'>('blue');
+  const [memberSince, setMemberSince] = useState<string | null>(null);
 
   const countryDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Compute time-of-day greeting
+  // Compute time-of-day greeting and load member registration date
   useEffect(() => {
     const hour = new Date().getHours();
     let timeOfDay = 'day';
@@ -52,6 +54,11 @@ export default function Header({
 
     const name = user?.fullName || (user?.email ? user.email.split('@')[0] : 'Guest');
     setGreeting(`Good ${timeOfDay}, ${name}`);
+
+    const storedSince = localStorage.getItem('voxpolis_member_since');
+    if (storedSince) {
+      setMemberSince(storedSince);
+    }
   }, [user]);
 
   // Fetch weather for selected country capital
@@ -298,11 +305,18 @@ export default function Header({
                     </Link>
                   )}
                   <Link
+                    href="/profile"
+                    className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium"
+                  >
+                    <User className="w-3.5 h-3.5 text-blue-500" />
+                    <span>My Profile & Badges</span>
+                  </Link>
+                  <Link
                     href="/onboarding"
                     className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
                   >
-                    <User className="w-3.5 h-3.5" />
-                    Country Preferences
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Country Preferences</span>
                   </Link>
                   <button
                     onClick={() => {
@@ -319,17 +333,26 @@ export default function Header({
             </div>
           ) : (
             <div className="flex items-center gap-1.5 shrink-0">
+              {/* Desktop: Distinct Log In & Sign Up */}
               <Link
                 href="/login"
-                className="text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 px-2 py-1.5"
+                className="hidden sm:inline-block text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 px-2 py-1.5"
               >
                 Log In
               </Link>
               <Link
                 href="/signup"
-                className="text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg shadow-sm transition"
+                className="hidden sm:inline-block text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg shadow-sm transition"
               >
                 Sign Up
+              </Link>
+
+              {/* Mobile: Merged single button for space saving */}
+              <Link
+                href="/login"
+                className="sm:hidden text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"
+              >
+                Sign In / Up
               </Link>
             </div>
           )}
@@ -348,6 +371,12 @@ export default function Header({
       <AuthPromptModal
         isOpen={isAuthPromptOpen}
         onClose={() => setIsAuthPromptOpen(false)}
+      />
+
+      {/* Member Milestone Achievement Pop-up */}
+      <MilestoneAchievementModal
+        memberSince={memberSince}
+        userName={user?.fullName || 'Citizen'}
       />
     </header>
   );

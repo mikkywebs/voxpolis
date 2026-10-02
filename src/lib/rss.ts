@@ -1,5 +1,5 @@
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle } from './news';
+import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion } from './news';
 import { isValidContentImage } from './pipeline/extractor';
 
 export interface RssFeedConfig {
@@ -298,7 +298,7 @@ function parseRssXmlToArticles(
       created_at: pubDate,
       poll: {
         id: `poll-${articleId}`,
-        question: `Do you agree with the stance regarding "${titleText.slice(0, 75)}"?`,
+        question: generateCivicPollQuestion(titleText, cleanSnippet),
         agree_count: 0,
         disagree_count: 0,
       },

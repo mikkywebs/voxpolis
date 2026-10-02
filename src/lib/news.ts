@@ -250,6 +250,52 @@ The Verdict:
 Public pronouncements and symbolic gestures must be measured against concrete delivery and constitutional standards. In ${countryName}, genuine democratic accountability requires that institutions operate with transparency and fair play, ensuring that public resources, legal processes, and governance decisions serve ordinary citizens without political favoritism.`;
 }
 
+export function generateCivicPollQuestion(title: string, snippet?: string): string {
+  const cleanTitle = (title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
+  const text = `${cleanTitle} ${snippet || ''}`.toLowerCase();
+
+  // Specific political figures & topics
+  if (text.includes('atiku') && (text.includes('subsidy') || text.includes('fuel') || text.includes('president'))) {
+    return 'Do you agree Atiku will do better if elected as president come 2027?';
+  }
+  if (text.includes('tinubu') && (text.includes('subsidy') || text.includes('economy') || text.includes('reform') || text.includes('hardship'))) {
+    return 'Do you believe the administration\'s current economic reform policies are leading Nigeria in the right direction?';
+  }
+  if (text.includes('peter obi') || text.includes('obi:') || (text.includes('obi') && text.includes('leadership'))) {
+    return 'Do you agree with Peter Obi that Nigeria\'s primary challenge is leadership failure rather than resource scarcity?';
+  }
+  if (text.includes('minimum wage') || text.includes('salary') || text.includes('workers') || text.includes('wage')) {
+    return 'Should federal and state governments accelerate the full implementation of the new minimum wage?';
+  }
+  if (text.includes('state police') || text.includes('policing')) {
+    return 'Should individual states be granted constitutional authority to establish and fund their own state police?';
+  }
+  if (text.includes('local government') && (text.includes('autonomy') || text.includes('allocation'))) {
+    return 'Do you support direct financial allocations to local governments without state government control?';
+  }
+  if (text.includes('inec') || text.includes('election') || text.includes('vote') || text.includes('transmission')) {
+    return 'Do you agree that electronic transmission of election results should be made strictly mandatory?';
+  }
+  if (text.includes('tariff') || text.includes('electricity') || text.includes('power')) {
+    return 'Do you agree with the current electricity tariff pricing structure for consumers?';
+  }
+  if (text.includes('tax') || text.includes('vat') || text.includes('revenue')) {
+    return 'Do you support the introduction of new tax reforms under current economic conditions?';
+  }
+  if (text.includes('oil theft') || text.includes('pipeline') || text.includes('crude')) {
+    return 'Do you believe security operations and surveillance measures have effectively curbed crude oil theft?';
+  }
+  if (cleanTitle.includes(':') || cleanTitle.includes('—') || cleanTitle.includes('-')) {
+    const parts = cleanTitle.split(/[:—–-]/);
+    const speaker = parts[0]?.trim();
+    if (speaker && speaker.length > 2 && speaker.length < 30) {
+      return `Do you agree with the position taken by ${speaker} on this national issue?`;
+    }
+  }
+
+  return 'Do you support the policy direction and governance approach proposed in this report?';
+}
+
 export function cleanNewsText(raw: string): string {
   if (!raw) return '';
   return raw
@@ -336,7 +382,7 @@ export async function fetchArticlesForCountry(
                 is_archived: isArticleArchived(item.pubDate || new Date().toISOString()),
                 poll: {
                   id: `poll-${idx}`,
-                  question: `Do you agree with the stance reported regarding "${cleanTitle.slice(0, 75)}"?`,
+                  question: generateCivicPollQuestion(displayTitle, rawDesc),
                   agree_count: 0,
                   disagree_count: 0,
                 },

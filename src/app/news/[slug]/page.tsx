@@ -37,6 +37,7 @@ export default function NewsDetailPage() {
 
   // Auth & Geo Gate State
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [realViews, setRealViews] = useState(0);
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [userNameDisplay, setUserNameDisplay] = useState<string | undefined>(undefined);
@@ -58,44 +59,73 @@ export default function NewsDetailPage() {
     }
   }, [slug, router]);
 
-  // Check auth session & load member display name and username
+  // Check auth session & load member display name and username with real-time sync
   useEffect(() => {
+    let authListener: any = null;
+
     async function checkUser() {
       try {
         const { createClient } = await import('@/lib/supabase/client');
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
         const user = data?.session?.user;
-        setIsLoggedIn(!!user);
+
+        const localName = localStorage.getItem('voxpolis_user_name');
+        const localUname = localStorage.getItem('voxpolis_username');
+        const localActive = localStorage.getItem('voxpolis_session_active') === 'true';
+
+        const loggedIn = !!user || localActive || !!localName;
+        setIsLoggedIn(loggedIn);
 
         if (user) {
-          let name = user.user_metadata?.full_name || '';
-          let uname = user.user_metadata?.username || '';
-          try {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('full_name, username')
-              .eq('id', user.id)
-              .single();
-            if (profile?.full_name) name = profile.full_name;
-            if (profile?.username) uname = profile.username;
-          } catch {}
-
-          if (!name) name = localStorage.getItem('voxpolis_user_name') || user.email?.split('@')[0] || 'Citizen';
-          if (!uname) uname = localStorage.getItem('voxpolis_username') || '';
+          const name = user.user_metadata?.full_name || localName || user.email?.split('@')[0] || 'Citizen';
+          const uname = user.user_metadata?.username || localUname || '';
+          setCurrentUser({
+            id: user.id,
+            email: user.email,
+            fullName: name,
+            primaryCountry: user.user_metadata?.primary_country || 'NG',
+          });
           setUserNameDisplay(uname ? `${name} (@${uname})` : name);
-        } else {
-          const localName = localStorage.getItem('voxpolis_user_name');
-          const localUname = localStorage.getItem('voxpolis_username');
-          if (localName) {
-            setUserNameDisplay(localUname ? `${localName} (@${localUname})` : localName);
-          }
+        } else if (localName) {
+          setCurrentUser({
+            id: 'local-member',
+            fullName: localName,
+            primaryCountry: localStorage.getItem('voxpolis_primary_country') || 'NG',
+          });
+          setUserNameDisplay(localUname ? `${localName} (@${localUname})` : localName);
         }
+
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+          const sessionUser = session?.user;
+          if (sessionUser) {
+            setIsLoggedIn(true);
+            localStorage.setItem('voxpolis_session_active', 'true');
+            const name = sessionUser.user_metadata?.full_name || localStorage.getItem('voxpolis_user_name') || sessionUser.email?.split('@')[0] || 'Citizen';
+            const uname = sessionUser.user_metadata?.username || localStorage.getItem('voxpolis_username') || '';
+            setCurrentUser({
+              id: sessionUser.id,
+              email: sessionUser.email,
+              fullName: name,
+              primaryCountry: sessionUser.user_metadata?.primary_country || 'NG',
+            });
+            setUserNameDisplay(uname ? `${name} (@${uname})` : name);
+          }
+        });
+        authListener = sub?.subscription;
       } catch (e) {
-        setIsLoggedIn(false);
+        const localName = localStorage.getItem('voxpolis_user_name');
+        if (localName) {
+          setIsLoggedIn(true);
+          setUserNameDisplay(localName);
+        }
       }
     }
     checkUser();
+
+    return () => {
+      if (authListener) authListener.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -210,7 +240,7 @@ export default function NewsDetailPage() {
           <title>Member Access Required | Voxpolis</title>
         </head>
 
-        <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+        <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
 
         <main className="flex-1 max-w-xl mx-auto w-full px-4 py-16 text-center space-y-6 my-auto">
           <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-950/80 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center shadow-lg">
@@ -287,9 +317,9 @@ export default function NewsDetailPage() {
 
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
-        <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+        <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
 
-        <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-2 sm:px-4">
+        <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-4 sm:px-6">
           {/* Left Wide Skyscraper (160x600 px) - strictly desktop when ads active */}
           {hasActiveAds && (
             <aside className="hidden xl:block shrink-0 w-[160px] mr-6">
@@ -443,7 +473,13 @@ export default function NewsDetailPage() {
 
             <AdSlot slotLocation="below_sources" isAllowed={true} />
 
-            <PollSection onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)} isLoggedIn={isLoggedIn} />
+            <PollSection
+              poll={(pipelineArticle as any).poll}
+              articleTitle={pipelineArticle.headline}
+              articleSnippet={pipelineArticle.dek}
+              onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
+              isLoggedIn={isLoggedIn}
+            />
             <CommentInputForm
               userName={userNameDisplay}
               userCountryFlag={selectedCountry.flag}
@@ -570,9 +606,9 @@ export default function NewsDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
-      <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+      <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
 
-      <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-2 sm:px-4">
+      <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-4 sm:px-6">
         {/* Left Wide Skyscraper (160x600 px) - strictly desktop when ads active */}
         {hasActiveAds && (
           <aside className="hidden xl:block shrink-0 w-[160px] mr-6">
@@ -632,6 +668,8 @@ export default function NewsDetailPage() {
 
           <PollSection
             poll={article!.poll}
+            articleTitle={article!.title}
+            articleSnippet={article!.snippet}
             onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
             isLoggedIn={isLoggedIn}
           />

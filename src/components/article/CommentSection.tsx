@@ -116,9 +116,8 @@ export function CommentInputForm({
             <Send className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1.5 flex items-center gap-1">
-          <span>Official Moderation:</span>
-          <span>No external links or abusive language permitted.</span>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2.5 text-center font-medium">
+          No external links or abusive language permitted.
         </p>
       </form>
     </div>

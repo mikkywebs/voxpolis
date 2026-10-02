@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchRssArticlesForCountry } from '@/lib/rss';
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle } from '@/lib/news';
+import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion } from '@/lib/news';
 import { isValidContentImage } from '@/lib/pipeline/extractor';
 
 export const dynamic = 'force-dynamic';
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
                 created_at: item.pubDate || new Date().toISOString(),
                 poll: {
                   id: `poll-newsdata-${idx}`,
-                  question: `Do you agree with the stance regarding "${cleanTitle.slice(0, 75)}"?`,
+                  question: generateCivicPollQuestion(cleanTitle, rawDesc),
                   agree_count: 0,
                   disagree_count: 0,
                 },

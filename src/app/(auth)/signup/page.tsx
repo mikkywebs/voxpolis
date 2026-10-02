@@ -24,9 +24,16 @@ export default function SignupPage() {
 
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [nextParam, setNextParam] = useState<string>('');
 
   // Auto-detect Country via IP address on mount
   useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const n = params.get('next') || params.get('redirect') || '';
+      if (n) setNextParam(n);
+    } catch {}
+
     // Generate simple security math puzzle
     const num1 = Math.floor(Math.random() * 8) + 2;
     const num2 = Math.floor(Math.random() * 8) + 1;
@@ -76,9 +83,10 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const redirectUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/auth/callback`
-        : 'https://voxpolis.app/auth/callback';
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://voxpolis.app';
+      const redirectUrl = nextParam
+        ? `${origin}/auth/callback?next=${encodeURIComponent(nextParam)}`
+        : `${origin}/auth/callback`;
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -120,10 +128,14 @@ export default function SignupPage() {
     setErrorMsg('');
     setLoading(true);
     try {
+      const callbackUrl = nextParam
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextParam)}`
+        : `${window.location.origin}/auth/callback`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
         },
       });
 
@@ -150,10 +162,14 @@ export default function SignupPage() {
     setErrorMsg('');
     setLoading(true);
     try {
+      const callbackUrl = nextParam
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextParam)}`
+        : `${window.location.origin}/auth/callback`;
+
       let { error } = await supabase.auth.signInWithOAuth({
         provider: 'x' as any,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
         },
       });
 
@@ -161,7 +177,7 @@ export default function SignupPage() {
         const fallback = await supabase.auth.signInWithOAuth({
           provider: 'twitter',
           options: {
-            redirectTo: `${window.location.origin}/auth/callback`,
+            redirectTo: callbackUrl,
           },
         });
         error = fallback.error;
@@ -368,7 +384,10 @@ export default function SignupPage() {
 
         <p className="text-xs text-center text-gray-500 dark:text-gray-400">
           Already have an account?{' '}
-          <Link href="/login" className="text-blue-600 dark:text-blue-400 font-bold hover:underline">
+          <Link
+            href={nextParam ? `/login?next=${encodeURIComponent(nextParam)}` : '/login'}
+            className="text-blue-600 dark:text-blue-400 font-bold hover:underline"
+          >
             Sign In
           </Link>
         </p>

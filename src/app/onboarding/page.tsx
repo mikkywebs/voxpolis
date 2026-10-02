@@ -3,8 +3,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import SiteLogo from '@/components/branding/SiteLogo';
-import { getGroupedRegions, CountryConfig, getCountryByCode, ALL_COUNTRIES } from '@/config/countries';
-import { Check, ArrowRight, ChevronDown, Search, User, ShieldCheck } from 'lucide-react';
+import { getGroupedRegions, CountryConfig, getCountryByCode, ALL_COUNTRIES, getCountrySlug } from '@/config/countries';
+import { Check, ArrowRight, ChevronDown, Search, User, ShieldCheck, Sparkles, Award } from 'lucide-react';
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -16,6 +16,7 @@ export default function OnboardingPage() {
   const [preferredLanguage, setPreferredLanguage] = useState<string>('en');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [showCongratulations, setShowCongratulations] = useState(false);
 
   const [openRegions, setOpenRegions] = useState<Record<string, boolean>>({
     'West Africa': true,
@@ -40,15 +41,16 @@ export default function OnboardingPage() {
           if (metaUsername) setUsername(metaUsername);
 
           // Fetch from Supabase profiles if exists
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name, username, country_code')
-            .eq('id', user.id)
-            .single();
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name, primary_country')
+              .eq('id', user.id)
+              .single();
 
-          if (profile?.full_name) setFullName(profile.full_name);
-          if (profile?.username) setUsername(profile.username);
-          if (profile?.country_code) setPrimaryCountry(profile.country_code);
+            if (profile?.full_name) setFullName(profile.full_name);
+            if (profile?.primary_country) setPrimaryCountry(profile.primary_country);
+          } catch {}
         } else {
           // Check localStorage
           const localName = localStorage.getItem('voxpolis_user_name') || '';
@@ -91,30 +93,67 @@ export default function OnboardingPage() {
       const { data } = await supabase.auth.getSession();
       const user = data?.session?.user;
       const cleanUsername = username.replace(/^@/, '').trim().toLowerCase();
+      const cleanFullName = fullName.trim() || user?.email?.split('@')[0] || 'Member';
 
       if (user) {
+        // 1. Update Supabase Auth user_metadata (native support for username & initial_name)
+        await supabase.auth.updateUser({
+          data: {
+            full_name: cleanFullName,
+            username: cleanUsername,
+            primary_country: primaryCountry,
+            initial_name: user.user_metadata?.initial_name || cleanFullName,
+            member_since: user.created_at || new Date().toISOString(),
+          },
+        });
+
+        // 2. Update Supabase profiles table
         await supabase.from('profiles').upsert({
           id: user.id,
-          full_name: fullName.trim() || user.email?.split('@')[0] || 'Member',
-          username: cleanUsername || (user.email?.split('@')[0] || 'citizen'),
-          country_code: primaryCountry,
+          email: user.email,
+          full_name: cleanFullName,
+          primary_country: primaryCountry,
+          followed_countries: followedCountries,
+          preferred_language: preferredLanguage,
           updated_at: new Date().toISOString(),
         });
       }
 
-      if (fullName) localStorage.setItem('voxpolis_user_name', fullName.trim());
-      if (cleanUsername) localStorage.setItem('voxpolis_username', cleanUsername);
+      // 3. Save to localStorage cache
+      localStorage.setItem('voxpolis_user_name', cleanFullName);
+      localStorage.setItem('voxpolis_username', cleanUsername);
       localStorage.setItem('voxpolis_primary_country', primaryCountry);
       localStorage.setItem('voxpolis_followed_countries', JSON.stringify(followedCountries));
       localStorage.setItem('voxpolis_preferred_language', preferredLanguage);
+      if (!localStorage.getItem('voxpolis_initial_name')) {
+        localStorage.setItem('voxpolis_initial_name', cleanFullName);
+      }
+      if (!localStorage.getItem('voxpolis_member_since')) {
+        localStorage.setItem('voxpolis_member_since', new Date().toISOString());
+      }
+      localStorage.setItem('voxpolis_session_active', 'true');
 
-      router.push('/feed');
+      // Show congratulations screen
+      setShowCongratulations(true);
     } catch (e) {
       console.error('Error saving profile:', e);
-      router.push('/feed');
+      setShowCongratulations(true);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleProceedToNewsroom = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const nextParam = params.get('next');
+      if (nextParam && nextParam.startsWith('/')) {
+        router.push(nextParam);
+        return;
+      }
+    } catch {}
+    const slug = getCountrySlug(primaryObj);
+    router.push(`/${slug}`);
   };
 
   const filteredGroups = useMemo(() => {
@@ -308,13 +347,55 @@ export default function OnboardingPage() {
           <button
             type="submit"
             disabled={isSaving}
-            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>{isSaving ? 'Saving Profile...' : `Complete Profile & Enter ${primaryObj.name} Feed`}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
       </div>
+
+      {/* Congratulations Modal */}
+      {showCongratulations && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white dark:bg-gray-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-5">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white mx-auto flex items-center justify-center text-3xl shadow-lg shadow-emerald-500/30">
+              🌱
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 text-xs font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Profile 100% Completed</span>
+              </div>
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white">
+                Congratulations, {fullName || 'Citizen'}!
+              </h2>
+              <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                You are recognized as a verified Newbie Citizen (🌱)
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/80 space-y-2">
+              <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-200 italic leading-relaxed">
+                "Every great democracy is built on the voices of citizens who dare to care. Welcome to the public square!"
+              </p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                Assigned Desk: <strong>{primaryObj.flag} {primaryObj.name}</strong> • Handle: <strong>@{username || 'member'}</strong>
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleProceedToNewsroom}
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Enter {primaryObj.flag} {primaryObj.name} Newsroom</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

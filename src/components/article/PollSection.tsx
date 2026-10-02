@@ -10,11 +10,135 @@ interface PollSectionProps {
     agree_count: number;
     disagree_count: number;
   };
+  articleTitle?: string;
+  articleSnippet?: string;
   onRequireAuth?: () => void;
   isLoggedIn?: boolean;
 }
 
-export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }: PollSectionProps) {
+/**
+ * Intelligently deduplicate, rewrite, and humanize poll questions into natural civic questions.
+ * Avoids dumping raw article titles or robotic "Do you agree with the stance regarding..." templates.
+ */
+function humanizeQuestion(raw: string, title?: string, snippet?: string): {
+  isPolicyDebate: boolean;
+  questionText: string;
+  discussionPrompt: string;
+} {
+  const cleanTitle = (title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
+  const cleanRaw = (raw || '').replace(/^Do you agree with the (stance|position) regarding\s*["“]?/i, '').replace(/["”]?\??$/i, '').trim();
+  const context = `${cleanTitle} ${cleanRaw} ${snippet || ''}`.toLowerCase();
+
+  // 1. Stories that are non-controversial events, ceremonies, legal procedural steps, or tragedies
+  const isNonDebate =
+    context.includes('premiere') ||
+    context.includes('documentary') ||
+    context.includes('memorial') ||
+    context.includes('anniversary') ||
+    context.includes('condolence') ||
+    context.includes('mourn') ||
+    context.includes('adjourn') ||
+    context.includes('rejects application to remove') ||
+    context.includes('justice khobo') ||
+    context.includes('recusal') ||
+    context.includes('arrest') ||
+    context.includes('plane crash') ||
+    context.includes('boat mishap') ||
+    context.includes('kidnap') ||
+    context.includes('abduction');
+
+  if (isNonDebate) {
+    let prompt = 'What is your perspective on this political development?';
+    if (context.includes('el-rufai') || context.includes('khobo')) {
+      prompt = 'What is your perspective on the court\'s proceedings regarding former Governor El-Rufai?';
+    } else if (context.includes('mko') || context.includes('documentary') || context.includes('abiola')) {
+      prompt = 'What are your thoughts on preserving the democratic legacy of June 12 and MKO Abiola?';
+    } else if (cleanTitle) {
+      prompt = `What are your thoughts on the latest developments regarding "${cleanTitle.slice(0, 80)}"?`;
+    }
+
+    return {
+      isPolicyDebate: false,
+      questionText: prompt,
+      discussionPrompt: prompt,
+    };
+  }
+
+  // 2. Specific Policy Topics rewritten with natural human wording
+  let humanQ = '';
+
+  // Atiku on Fuel Subsidy / Presidency
+  if (context.includes('atiku') && (context.includes('subsidy') || context.includes('fuel') || context.includes('president'))) {
+    humanQ = 'Do you agree Atiku will do better if elected as president come 2027?';
+  }
+  // Tinubu on Economic Reforms / Hardship / Subsidies
+  else if (context.includes('tinubu') && (context.includes('subsidy') || context.includes('reform') || context.includes('hardship') || context.includes('economy'))) {
+    humanQ = 'Do you believe the administration\'s current economic reform policies are leading Nigeria in the right direction?';
+  }
+  // Peter Obi on Governance / Leadership
+  else if (context.includes('peter obi') || context.includes('obi:') || (context.includes('obi') && context.includes('leadership'))) {
+    humanQ = 'Do you agree with Peter Obi that Nigeria\'s primary challenge is leadership failure rather than resource scarcity?';
+  }
+  // Minimum Wage & Salaries
+  else if (context.includes('minimum wage') || context.includes('wage') || context.includes('labour') || context.includes('salary')) {
+    humanQ = 'Should federal and state governments accelerate the full, mandatory implementation of the new minimum wage?';
+  }
+  // State Police & Internal Security
+  else if (context.includes('state police') || context.includes('policing')) {
+    humanQ = 'Should individual states be granted constitutional authority to establish and fund their own state police forces?';
+  }
+  // Local Government Financial Autonomy
+  else if (context.includes('local government') && (context.includes('autonomy') || context.includes('allocation'))) {
+    humanQ = 'Do you support direct federation revenue disbursement to local governments without state government control?';
+  }
+  // Electoral Reforms & INEC
+  else if (context.includes('inec') || context.includes('electoral act') || context.includes('electronic transmission')) {
+    humanQ = 'Do you agree that electronic transmission of election results from polling units should be made strictly mandatory?';
+  }
+  // Electricity Tariff & Power
+  else if (context.includes('electricity') || context.includes('tariff') || context.includes('band a')) {
+    humanQ = 'Do you agree with the current electricity tariff pricing structure for commercial and residential consumers?';
+  }
+  // Tax Reforms & VAT
+  else if (context.includes('tax') || context.includes('vat') || context.includes('revenue')) {
+    humanQ = 'Do you support the implementation of new tax reforms under current economic conditions?';
+  }
+  // Crude Oil Theft & Energy Resources
+  else if (context.includes('oil theft') || context.includes('pipeline') || (context.includes('crude') && context.includes('theft'))) {
+    humanQ = 'Do you believe security operations and surveillance contracts have significantly reduced crude oil theft?';
+  }
+  // General speaker-based statement (e.g. "Gov X calls for Y")
+  else if (cleanTitle.includes(':') || cleanTitle.includes('—') || cleanTitle.includes('-')) {
+    const parts = cleanTitle.split(/[:—–-]/);
+    const speaker = parts[0]?.trim();
+    if (speaker && speaker.length > 2 && speaker.length < 35) {
+      humanQ = `Do you agree with the policy stance expressed by ${speaker} on this issue?`;
+    }
+  }
+
+  // Fallback if no specific template matched
+  if (!humanQ) {
+    if (raw && !raw.toLowerCase().includes('do you agree with the stance regarding') && raw.endsWith('?')) {
+      humanQ = raw;
+    } else {
+      humanQ = 'Do you support the proposed policy measures and governance approach reported in this briefing?';
+    }
+  }
+
+  return {
+    isPolicyDebate: true,
+    questionText: humanQ,
+    discussionPrompt: humanQ,
+  };
+}
+
+export default function PollSection({
+  poll,
+  articleTitle,
+  articleSnippet,
+  onRequireAuth,
+  isLoggedIn = false,
+}: PollSectionProps) {
   const initialAgree = poll?.agree_count || 0;
   const initialDisagree = poll?.disagree_count || 0;
 
@@ -23,36 +147,7 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
   const [userVote, setUserVote] = useState<'agree' | 'disagree' | null>(null);
 
   const rawQuestion = poll?.question || '';
-
-  // Determine if this news story has a genuine binary policy proposal / debate
-  const lq = rawQuestion.toLowerCase();
-  const isNonDebate =
-    !rawQuestion ||
-    lq.includes('premiere') ||
-    lq.includes('documentary') ||
-    lq.includes('memorial') ||
-    lq.includes('anniversary') ||
-    lq.includes('condolence') ||
-    lq.includes('mourn') ||
-    lq.includes('adjourn') ||
-    lq.includes('rejects application') ||
-    lq.includes('trial') ||
-    lq.includes('court') ||
-    lq.includes('arrest') ||
-    lq.includes('death') ||
-    lq.includes('crash');
-
-  const isPolicyDebate =
-    !isNonDebate &&
-    (lq.startsWith('do you support') ||
-      lq.startsWith('do you agree') ||
-      lq.startsWith('should ') ||
-      lq.includes('support the policy') ||
-      lq.includes('agree with the decision') ||
-      lq.includes('subsidy') ||
-      lq.includes('tax') ||
-      lq.includes('bill') ||
-      lq.includes('reform'));
+  const { isPolicyDebate, questionText, discussionPrompt } = humanizeQuestion(rawQuestion, articleTitle, articleSnippet);
 
   const total = agree + disagree;
   const agreePercent = total > 0 ? Math.round((agree / total) * 100) : 0;
@@ -85,19 +180,8 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
     }
   };
 
-  // If the news content doesn't provide a binary policy debate, invite readers to comment
+  // If the news story is not a binary policy dispute, render the clean Community Perspective card
   if (!isPolicyDebate) {
-    let cleanPrompt = rawQuestion
-      ? rawQuestion
-          .replace(/Do you agree with the stance regarding /i, 'What are your thoughts on ')
-          .replace(/Do you support the policy developments reported in this executive summary\?/i, 'What are your thoughts on this political development?')
-          .replace(/["']/g, '')
-      : 'What is your perspective on this political development?';
-
-    if (!cleanPrompt.endsWith('?')) {
-      cleanPrompt += '?';
-    }
-
     return (
       <div className="my-6 p-6 rounded-2xl bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 shadow-md space-y-4">
         <div className="flex items-center gap-2">
@@ -108,7 +192,7 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
         </div>
 
         <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-relaxed">
-          {cleanPrompt}
+          {discussionPrompt}
         </h4>
 
         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
@@ -128,8 +212,6 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
   }
 
   // Binary Policy Poll (for genuine policy disputes and reform proposals)
-  const displayQuestion = rawQuestion || 'Do you support the policy developments reported in this briefing?';
-
   return (
     <div className="my-6 p-6 rounded-2xl bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 shadow-md space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -142,7 +224,7 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
       </div>
 
       <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-relaxed">
-        {displayQuestion}
+        {questionText}
       </h4>
 
       {/* Progress Bar */}

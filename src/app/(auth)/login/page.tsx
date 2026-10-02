@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import SiteLogo from '@/components/branding/SiteLogo';
 import { createClient } from '@/lib/supabase/client';
+import { getCountryByCode, getCountrySlug } from '@/config/countries';
 import { Mail, Lock, LogIn, Chrome } from 'lucide-react';
 
 export default function LoginPage() {
@@ -15,6 +16,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [nextParam, setNextParam] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const n = params.get('next') || params.get('redirect') || '';
+      if (n) setNextParam(n);
+    } catch {}
+  }, []);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +32,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -33,7 +43,14 @@ export default function LoginPage() {
         return;
       }
 
-      router.push('/feed');
+      if (nextParam && nextParam.startsWith('/')) {
+        router.push(nextParam);
+        return;
+      }
+
+      const countryCode = data.user?.user_metadata?.primary_country || localStorage.getItem('voxpolis_primary_country') || 'NG';
+      const countryObj = getCountryByCode(countryCode);
+      router.push(`/${getCountrySlug(countryObj)}`);
     } catch (e: any) {
       setErrorMsg(e.message || 'Login failed.');
       setLoading(false);
@@ -44,10 +61,14 @@ export default function LoginPage() {
     setErrorMsg('');
     setLoading(true);
     try {
+      const callbackUrl = nextParam
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextParam)}`
+        : `${window.location.origin}/auth/callback`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
         },
       });
 
@@ -74,10 +95,14 @@ export default function LoginPage() {
     setErrorMsg('');
     setLoading(true);
     try {
+      const callbackUrl = nextParam
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextParam)}`
+        : `${window.location.origin}/auth/callback`;
+
       let { error } = await supabase.auth.signInWithOAuth({
         provider: 'x' as any,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
         },
       });
 
@@ -85,7 +110,7 @@ export default function LoginPage() {
         const fallback = await supabase.auth.signInWithOAuth({
           provider: 'twitter',
           options: {
-            redirectTo: `${window.location.origin}/auth/callback`,
+            redirectTo: callbackUrl,
           },
         });
         error = fallback.error;
@@ -197,7 +222,10 @@ export default function LoginPage() {
 
         <p className="text-xs text-center text-gray-500 dark:text-gray-400">
           Don’t have an account?{' '}
-          <Link href="/signup" className="text-blue-600 dark:text-blue-400 font-bold hover:underline">
+          <Link
+            href={nextParam ? `/signup?next=${encodeURIComponent(nextParam)}` : '/signup'}
+            className="text-blue-600 dark:text-blue-400 font-bold hover:underline"
+          >
             Sign Up
           </Link>
         </p>
