@@ -36,7 +36,7 @@ export default function NotFound() {
     <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between selection:bg-blue-600 selection:text-white">
       {/* Top Header */}
       <header className="border-b border-gray-800 bg-slate-900/90 px-6 py-4 flex items-center justify-between">
-        <Link href="/feed" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           <SiteLogo variant="full" className="h-8 w-auto" />
         </Link>
         <Link
@@ -108,7 +108,7 @@ export default function NotFound() {
 
           {/* Global News Card */}
           <Link
-            href="/feed"
+            href="/news"
             className="p-5 rounded-2xl bg-slate-900 border border-gray-800 hover:border-purple-500/60 transition group flex flex-col justify-between"
           >
             <div>

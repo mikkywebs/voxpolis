@@ -161,7 +161,7 @@ export default function ProfilePage() {
             <span>Return to {countryObj.flag} {countryObj.name} Newsroom</span>
           </Link>
 
-          <Link href="/feed">
+          <Link href="/">
             <SiteLogo variant="full" className="h-8 w-auto" />
           </Link>
         </div>
@@ -199,7 +199,7 @@ export default function ProfilePage() {
             </p>
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[10px] font-bold text-blue-200">
-                <span>Progress to {badge.nextBadgeName || 'Master Statesman'}</span>
+                <span>Progress to {badge.nextBadgeName || 'Statesman'}</span>
                 <span>{progressPercent}%</span>
               </div>
               <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">

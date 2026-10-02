@@ -17,7 +17,7 @@ import { CommentInputForm, CommentList, CommentItem } from '@/components/article
 import OriginalSourceLink from '@/components/article/OriginalSourceLink';
 import AdSlot from '@/components/article/AdSlot';
 import { SUPPORTED_COUNTRIES, getCountryByCode, getCountrySlug } from '@/config/countries';
-import { fetchArticlesForCountry, ArticleData, expandToJournalisticArticle } from '@/lib/news';
+import { fetchArticlesForCountry, ArticleData, expandToJournalisticArticle, formatCleanSnippet } from '@/lib/news';
 import { getPipelineArticleBySlug } from '@/lib/pipeline';
 import { get301Redirect } from '@/lib/pipeline/redirects';
 import { PipelineArticleRecord } from '@/lib/pipeline/types';
@@ -347,7 +347,7 @@ export default function NewsDetailPage() {
 
               {pipelineArticle.dek && (
                 <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 font-medium leading-relaxed">
-                  {pipelineArticle.dek}
+                  {formatCleanSnippet(pipelineArticle.dek)}
                 </p>
               )}
 

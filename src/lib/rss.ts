@@ -1,5 +1,5 @@
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion } from './news';
+import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion, formatCleanSnippet } from './news';
 import { isValidContentImage } from './pipeline/extractor';
 
 export interface RssFeedConfig {
@@ -264,7 +264,7 @@ function parseRssXmlToArticles(
     if (!cleanSnippet || cleanSnippet.length < 15 || cleanSnippet.includes('<a href')) {
       cleanSnippet = `${titleText}. Verified political dispatch for ${countryName}.`;
     } else {
-      cleanSnippet = cleanSnippet.slice(0, 280);
+      cleanSnippet = formatCleanSnippet(cleanSnippet, 280);
     }
 
     // If real paragraphs exist (>250 chars), use real journalism directly.

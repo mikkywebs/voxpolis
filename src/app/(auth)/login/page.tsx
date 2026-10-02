@@ -231,7 +231,7 @@ export default function LoginPage() {
         </p>
 
         <div className="text-center pt-2">
-          <Link href="/feed" className="text-xs font-semibold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+          <Link href="/news" className="text-xs font-semibold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
             ← Continue as Guest
           </Link>
         </div>

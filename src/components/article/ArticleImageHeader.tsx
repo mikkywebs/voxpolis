@@ -1,7 +1,7 @@
 'use client';
 
 import { ExternalLink, AlertCircle, Clock, Eye } from 'lucide-react';
-import { formatExactTimestamp } from '@/lib/news';
+import { formatExactTimestamp, formatCleanSnippet } from '@/lib/news';
 
 interface ArticleImageHeaderProps {
   title: string;
@@ -76,7 +76,7 @@ export default function ArticleImageHeader({
       </h1>
 
       <p className="text-base sm:text-lg font-medium text-gray-600 dark:text-gray-300 leading-relaxed border-l-4 border-blue-600 pl-4 py-1">
-        {snippet}
+        {formatCleanSnippet(snippet)}
       </p>
 
       {/* Featured Image Treatment: Source Image or Site Default Asset */}

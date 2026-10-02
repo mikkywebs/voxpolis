@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { X, ChevronUp, Sparkles } from 'lucide-react';
 
@@ -15,21 +15,55 @@ const NON_NEWS_PATHS = [
   '/onboarding',
   '/admin',
   '/verify-email',
+  '/columnist',
 ];
 
 export default function StickyFooterAd() {
   const pathname = usePathname() || '';
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const [adClient, setAdClient] = useState<string | null>(null);
 
-  // Strictly block ads on all non-news pages (login, signup, trust/legal pages, etc.)
+  useEffect(() => {
+    const pubId = process.env.NEXT_PUBLIC_ADSENSE_PUB_ID || '';
+    if (pubId && pubId !== 'ca-pub-0000000000000000' && pubId.startsWith('ca-pub-')) {
+      setAdClient(pubId);
+    }
+
+    const handleScroll = () => {
+      if (window.scrollY > 350) {
+        setHasScrolled(true);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    // Check initial scroll in case user reloaded midway down page
+    if (typeof window !== 'undefined' && window.scrollY > 350) {
+      setHasScrolled(true);
+    }
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // 1. Strictly block placeholder ads if live AdSense is not configured
+  if (!adClient) {
+    return null;
+  }
+
+  // 2. Strictly do not pop immediately on page load: only appear when user scrolls down
+  if (!hasScrolled) {
+    return null;
+  }
+
+  // 3. Strictly block ads on non-news paths or if dismissed
   if (isDismissed || NON_NEWS_PATHS.some((p) => pathname.startsWith(p))) {
     return null;
   }
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-30 flex justify-center p-2 pointer-events-none">
-      <div className="pointer-events-auto bg-gray-900/90 dark:bg-black/90 text-white border border-gray-700/60 rounded-2xl shadow-2xl backdrop-blur-md max-w-2xl w-full transition-all duration-300">
+    <div className="fixed bottom-0 inset-x-0 z-30 flex justify-center p-2 pointer-events-none transition-all duration-500 animate-in fade-in slide-in-from-bottom-5">
+      <div className="pointer-events-auto bg-gray-900/95 dark:bg-black/95 text-white border border-gray-700/60 rounded-2xl shadow-2xl backdrop-blur-md max-w-2xl w-full transition-all duration-300">
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 text-[10px] text-gray-400 font-semibold tracking-wider uppercase">
           <span className="flex items-center gap-1 text-amber-400">
             <Sparkles className="w-3 h-3" /> SPONSORED ADVERTISEMENT
@@ -49,24 +83,15 @@ export default function StickyFooterAd() {
         </div>
 
         {!isCollapsed && (
-          <div className="p-3 text-center">
-            <div className="bg-gradient-to-r from-gray-800 via-gray-800 to-gray-800 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 border border-gray-700/50">
-              <div className="text-left">
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-500/30">
-                  FEATURED SPONSOR
-                </span>
-                <p className="text-xs font-bold text-white mt-1">Global Political Intelligence Digest</p>
-                <p className="text-[11px] text-gray-400">Stay informed on policy shifts and international trade updates.</p>
-              </div>
-              <a
-                href="https://voxpolis.app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow transition"
-              >
-                Learn More
-              </a>
-            </div>
+          <div className="p-3 text-center min-h-[90px] flex items-center justify-center">
+            <ins
+              className="adsbygoogle"
+              style={{ display: 'block', width: '100%', textAlign: 'center' }}
+              data-ad-client={adClient}
+              data-ad-slot="1000000004"
+              data-ad-format="horizontal"
+              data-full-width-responsive="true"
+            />
           </div>
         )}
       </div>

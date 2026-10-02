@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArticleData, formatExactTimestamp, getArticleImageUrl } from '@/lib/news';
+import { ArticleData, formatExactTimestamp, getArticleImageUrl, formatCleanSnippet } from '@/lib/news';
 import { ExternalLink, AlertCircle, Eye } from 'lucide-react';
 
 interface FeedCardProps {
@@ -63,7 +63,7 @@ export default function FeedCard({ article }: FeedCardProps) {
         </Link>
 
         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mt-2 line-clamp-3 leading-relaxed">
-          {article.snippet}
+          {formatCleanSnippet(article.snippet)}
         </p>
       </div>
 

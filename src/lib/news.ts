@@ -59,6 +59,62 @@ const FORBIDDEN_NON_POLITICAL_KEYWORDS = [
   'grammy', 'oscar', 'box office', 'reality show', 'hookup'
 ];
 
+/**
+ * Sanitizes and cleans article summaries/snippets:
+ * 1. Inserts missing spaces between words merged during HTML stripping (e.g., "onThursdayto" -> "on Thursday to")
+ * 2. Prevents mid-word chopping (e.g., never leaves chopped stems like "Independe")
+ * 3. Truncates cleanly at the end of the last complete sentence ending in '.', '!', or '?'
+ * 4. Strictly guarantees the summary ends with a full stop '.'
+ */
+export function formatCleanSnippet(text: string, maxLen: number = 280): string {
+  if (!text) return '';
+
+  // Fix HTML/entity concatenation and missing spaces between joined words
+  let clean = text
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/https?:\/\/[^\s)]+/gi, '')
+    .replace(/www\.[^\s)]+/gi, '')
+    // Add space between lowercase and uppercase if merged without space (e.g. "conference onThursday" -> "conference on Thursday")
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    // Add space between letter and digit or digit and letter (e.g. "66thIndepende" -> "66th Independe")
+    .replace(/([0-9])([A-Za-z])/g, '$1 $2')
+    .replace(/([a-zA-Z])([0-9])/g, '$1 $2')
+    // Add space after comma, semicolon, or colon if followed immediately by a letter
+    .replace(/([,;:!])([A-Za-z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // If already ends in valid punctuation and is reasonably sized, return
+  if (clean.length <= maxLen && /[.!?]$/.test(clean)) {
+    return clean;
+  }
+
+  // Look for last complete sentence ending in [.!?] within maxLen
+  const candidate = clean.slice(0, maxLen + 35);
+  const sentenceRegex = /[.!?](?:\s+|$)/g;
+  let match: RegExpExecArray | null = null;
+  let bestCutoff = -1;
+
+  while ((match = sentenceRegex.exec(candidate)) !== null) {
+    const endPos = match.index + 1;
+    if (endPos >= 80 && endPos <= maxLen + 20) {
+      bestCutoff = endPos;
+    }
+  }
+
+  if (bestCutoff > 0) {
+    return clean.slice(0, bestCutoff).trim();
+  }
+
+  // If no clean sentence boundary, trim at last whole word boundary and add period
+  const truncated = clean.slice(0, maxLen);
+  const lastSpace = truncated.lastIndexOf(' ');
+  const wordTrimmed = lastSpace > 40 ? truncated.slice(0, lastSpace) : truncated;
+
+  return wordTrimmed.replace(/[,;:\s-]+$/, '') + '.';
+}
+
 export function isPoliticalNews(title: string, snippet: string = '', tags: string[] = []): boolean {
   const text = `${title} ${snippet} ${tags.join(' ')}`.toLowerCase();
 

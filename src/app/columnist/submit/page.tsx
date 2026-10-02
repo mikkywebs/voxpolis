@@ -128,7 +128,7 @@ export default function ColumnistSubmitPage() {
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-10 space-y-8">
         <div>
           <Link
-            href="/feed"
+            href="/news"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 mb-4 transition"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -212,10 +212,10 @@ export default function ColumnistSubmitPage() {
             </p>
             <div className="pt-4 flex items-center justify-center gap-3">
               <Link
-                href="/feed"
+                href="/news"
                 className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow transition"
               >
-                Return to Live Feed
+                Return to Live News
               </Link>
               <button
                 onClick={() => {

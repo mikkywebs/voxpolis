@@ -72,10 +72,10 @@ export default function AboutPage() {
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              href="/feed"
+              href="/news"
               className="px-6 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-300 hover:text-white font-bold text-xs rounded-xl transition"
             >
-              Explore Country Feeds →
+              Explore Verified News →
             </Link>
           </div>
         </section>

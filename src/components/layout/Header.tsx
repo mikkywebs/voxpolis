@@ -122,7 +122,7 @@ export default function Header({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
         {/* Left: Branding Logo, About Link & Greeting */}
         <div className="flex items-center gap-3 shrink-0">
-          <Link href="/feed" className="flex items-center gap-2 group">
+          <Link href="/" className="flex items-center gap-2 group">
             <SiteLogo variant="full" className="h-8 sm:h-9 w-auto" />
           </Link>
           <nav className="hidden md:flex items-center gap-3 border-l border-gray-200 dark:border-gray-700 pl-3 py-1 text-xs font-semibold">

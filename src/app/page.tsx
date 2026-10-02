@@ -137,11 +137,11 @@ export default function LandingPage() {
             {user ? (
               <div className="flex items-center gap-3">
                 <Link
-                  href="/feed"
+                  href="/news"
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center gap-1.5"
                 >
                   <Newspaper className="w-4 h-4" />
-                  <span>My Member Feed</span>
+                  <span>Verified News</span>
                 </Link>
                 <div className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-400 font-semibold bg-emerald-950/60 border border-emerald-800/60 px-3 py-1.5 rounded-full">
                   <UserCheck className="w-3.5 h-3.5" />
@@ -334,17 +334,17 @@ export default function LandingPage() {
           ) : (
             <div className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {(gridArticles.length > 0 ? gridArticles : allArticles).map((art) => (
+                {(gridArticles.length > 0 ? gridArticles : allArticles).slice(0, 6).map((art) => (
                   <FeedCard key={art.id} article={art} />
                 ))}
               </div>
 
               <div className="text-center pt-4">
                 <Link
-                  href={`/${countrySlug}`}
+                  href="/news"
                   className="inline-flex items-center gap-2 px-8 py-3.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold rounded-2xl shadow-xl transition transform hover:scale-105"
                 >
-                  <span>Explore Full {selectedCountry.flag} {selectedCountry.name} Feed</span>
+                  <span>Read More News</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>

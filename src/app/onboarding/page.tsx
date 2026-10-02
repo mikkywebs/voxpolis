@@ -372,7 +372,7 @@ export default function OnboardingPage() {
                 Congratulations, {fullName || 'Citizen'}!
               </h2>
               <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                You are recognized as a verified Newbie Citizen (🌱)
+                You are recognized as a verified Newbie (🌱)
               </p>
             </div>
 

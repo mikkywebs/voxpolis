@@ -356,7 +356,9 @@ export default function AdminDashboardPage() {
       {/* Top Navigation */}
       <header className="bg-slate-900 border-b border-gray-800 px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <SiteLogo variant="full" className="h-8 w-auto" />
+          <Link href="/" title="Voxpolis Home">
+            <SiteLogo variant="full" className="h-8 w-auto hover:opacity-90 transition" />
+          </Link>
           <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-950/40 border border-amber-800/60 px-3 py-1 rounded-full">
             <Shield className="w-3.5 h-3.5" /> Executive Admin Portal
           </span>
@@ -365,8 +367,8 @@ export default function AdminDashboardPage() {
           <span className="text-xs text-gray-400 hidden sm:inline">
             Logged in as: <span className="text-white font-semibold">{currentUser?.email}</span>
           </span>
-          <Link href="/feed" className="text-xs font-semibold text-blue-400 hover:text-blue-300">
-            View Live Site →
+          <Link href="/news" className="text-xs font-semibold text-blue-400 hover:text-blue-300">
+            View Live News →
           </Link>
         </div>
       </header>
@@ -660,7 +662,7 @@ export default function AdminDashboardPage() {
                         },
                         {
                           title: 'Nigeria National Civic Feed & Intelligence',
-                          path: '/feed?country=NG',
+                          path: '/news?country=NG',
                           country: 'Nigeria',
                           flag: '🇳🇬',
                           code: 'NG',
@@ -672,7 +674,7 @@ export default function AdminDashboardPage() {
                         },
                         {
                           title: 'United States Congressional & Electoral Feed',
-                          path: '/feed?country=US',
+                          path: '/news?country=US',
                           country: 'United States',
                           flag: '🇺🇸',
                           code: 'US',
@@ -684,7 +686,7 @@ export default function AdminDashboardPage() {
                         },
                         {
                           title: 'United Kingdom Westminster & Policy Intelligence',
-                          path: '/feed?country=GB',
+                          path: '/news?country=GB',
                           country: 'United Kingdom',
                           flag: '🇬🇧',
                           code: 'GB',
@@ -696,7 +698,7 @@ export default function AdminDashboardPage() {
                         },
                         {
                           title: 'South Africa Parliamentary & Governance Feed',
-                          path: '/feed?country=ZA',
+                          path: '/news?country=ZA',
                           country: 'South Africa',
                           flag: '🇿🇦',
                           code: 'ZA',
@@ -708,7 +710,7 @@ export default function AdminDashboardPage() {
                         },
                         {
                           title: 'Kenya National Assembly & Devolution Monitor',
-                          path: '/feed?country=KE',
+                          path: '/news?country=KE',
                           country: 'Kenya',
                           flag: '🇰🇪',
                           code: 'KE',
@@ -720,7 +722,7 @@ export default function AdminDashboardPage() {
                         },
                         {
                           title: 'Ghana Governance & Constitutional Tracker',
-                          path: '/feed?country=GH',
+                          path: '/news?country=GH',
                           country: 'Ghana',
                           flag: '🇬🇭',
                           code: 'GH',

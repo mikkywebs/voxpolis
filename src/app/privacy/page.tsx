@@ -54,8 +54,8 @@ Public discussion submissions and columnist drafts are reviewed against communit
         </div>
 
         <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-          <Link href="/feed" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
-            ← Back to Voxpolis Feed
+          <Link href="/news" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
+            ← Back to News
           </Link>
         </div>
       </div>
