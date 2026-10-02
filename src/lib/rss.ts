@@ -1,5 +1,13 @@
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion, formatCleanSnippet } from './news';
+import {
+  ArticleData,
+  generateAiAnalysisSummary,
+  expandToJournalisticArticle,
+  generateCivicPollQuestion,
+  formatCleanSnippet,
+  isPoliticalNews,
+  isRelevantToCountry,
+} from './news';
 import { isValidContentImage } from './pipeline/extractor';
 
 export interface RssFeedConfig {
@@ -146,6 +154,10 @@ export async function fetchRssArticlesForCountry(
   for (const art of fetchedResults) {
     // Completely ignore articles without a valid content photograph
     if (!isValidContentImage(art.original_image_url)) continue;
+
+    // Strictly skip articles that are about another country or not political
+    if (!isPoliticalNews(art.title, art.snippet, art.tags)) continue;
+    if (!isRelevantToCountry(art.title, art.snippet, code)) continue;
 
     const titleKey = art.title.toLowerCase().slice(0, 40);
     if (!seenTitles.has(titleKey)) {

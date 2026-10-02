@@ -125,48 +125,86 @@ export function isPoliticalNews(title: string, snippet: string = '', tags: strin
   return POLITICAL_KEYWORDS.some((kw) => text.includes(kw));
 }
 
+const COUNTRY_SPECIFIC_IDENTIFIERS: Record<string, string[]> = {
+  NG: [
+    'nigeria', 'nigerian', 'abuja', 'lagos', 'tinubu', 'atiku', 'peter obi', 'amaechi',
+    'shettima', 'akpabio', 'sanwo-olu', 'sowore', 'buhari', 'wike', 'fubara', 'ganduje',
+    'naira', 'inec', 'nass', 'national assembly', 'senate', 'house of reps', 'efcc', 'icpc',
+    'dss', 'sss', 'cama', 'cac', 'apc', 'pdp', 'lp', 'nnpp', 'fct', 'asuu', 'nupeng',
+    'kano', 'rivers', 'kaduna', 'edo', 'ondo', 'anambra', 'enugu', 'delta', 'oyo', 'ogun',
+    'borno', 'plateau', 'taraba', 'benue', 'kwara', 'kogi', 'osun', 'ekiti', 'zamfara',
+    'sokoto', 'kebbi', 'katsina', 'jigawa', 'bauchi', 'gombe', 'yobe', 'adamawa', 'nasarawa',
+    'cross river', 'akwa ibom', 'bayelsa', 'ebonyi', 'imo', 'abia', 'federal government'
+  ],
+  US: ['united states', 'u.s.', 'usa', 'american', 'biden', 'trump', 'harris', 'congress', 'white house', 'capitol', 'senate', 'democrat', 'republican', 'pentagon', 'supreme court', 'fbi', 'gop'],
+  GB: ['united kingdom', 'u.k.', 'britain', 'british', 'london', 'downing street', 'parliament', 'starmer', 'sunak', 'labour', 'tory', 'conservative', 'westminster', 'holyrood', 'bank of england'],
+  GH: ['ghana', 'ghanaian', 'accra', 'akufo-addo', 'bawumia', 'mahama', 'cedi', 'parliament of ghana'],
+  ZA: ['south africa', 'south african', 'pretoria', 'cape town', 'johannesburg', 'ramaphosa', 'anc', 'da', 'eff', 'rand', 'parliament'],
+  KE: ['kenya', 'kenyan', 'nairobi', 'ruto', 'odinga', 'gachagua', 'shilling', 'parliament'],
+  CA: ['canada', 'canadian', 'ottawa', 'trudeau', 'poilievre', 'parliament'],
+  AU: ['australia', 'australian', 'canberra', 'albanese', 'dutton', 'parliament'],
+  IN: ['india', 'indian', 'delhi', 'new delhi', 'modi', 'rahul gandhi', 'bjp', 'congress party', 'lok sabha', 'rupee'],
+  CN: ['china', 'chinese', 'beijing', 'xi jinping', 'communist party', 'politburo'],
+  JP: ['japan', 'japanese', 'tokyo', 'kishida', 'diet'],
+  DE: ['germany', 'german', 'berlin', 'scholz', 'bundestag'],
+  FR: ['france', 'french', 'paris', 'macron', 'assemblee nationale', 'elysee'],
+};
+
+const FOREIGN_WIRE_PREFIXES = [
+  'saudi arabia', 'saudi', 'israel', 'gaza', 'palestine', 'palestinian', 'hamas',
+  'hezbollah', 'lebanon', 'beirut', 'ukraine', 'kyiv', 'russia', 'moscow', 'putin',
+  'sudan', 'khartoum', 'iran', 'tehran', 'syria', 'damascus', 'north korea', 'yemen',
+  'china', 'united states', 'us:', 'u.s.:', 'uk:', 'britain:', 'india:'
+];
+
 export function isRelevantToCountry(title: string, snippet: string = '', countryCode: string): boolean {
-  const country = getCountryByCode(countryCode);
-  const text = `${title} ${snippet}`.toLowerCase();
+  const code = countryCode.toUpperCase();
+  const country = getCountryByCode(code);
+  const cleanTitle = (title || '').toLowerCase().trim();
+  const cleanSnippet = (snippet || '').toLowerCase().trim();
+  const fullText = `${cleanTitle} ${cleanSnippet}`;
 
-  const cName = country.name.toLowerCase();
-  const cCapital = country.capital.toLowerCase();
-
-  const DEMONYM_MAP: Record<string, string[]> = {
-    NG: ['nigeria', 'nigerian', 'abuja', 'tinubu', 'naira', 'nass', 'inec', 'fct'],
-    US: ['united states', 'us', 'usa', 'american', 'biden', 'trump', 'congress', 'white house', 'washington', 'capitol', 'senate'],
-    GB: ['united kingdom', 'uk', 'britain', 'british', 'london', 'downing street', 'parliament', 'starmer', 'sunak'],
-    GH: ['ghana', 'ghanaian', 'accra', 'cedi'],
-    ZA: ['south africa', 'south african', 'pretoria', 'johannesburg', 'ramaphosa', 'rand'],
-    KE: ['kenya', 'kenyan', 'nairobi', 'ruto', 'shilling'],
-    CA: ['canada', 'canadian', 'ottawa', 'trudeau'],
-    AU: ['australia', 'australian', 'canberra', 'albanese'],
-    IN: ['india', 'indian', 'delhi', 'new delhi', 'modi', 'rupee'],
-    CN: ['china', 'chinese', 'beijing', 'xi jinping'],
-    JP: ['japan', 'japanese', 'tokyo', 'kishida'],
-    DE: ['germany', 'german', 'berlin', 'scholz'],
-    FR: ['france', 'french', 'paris', 'macron'],
-  };
-
-  const keywords = DEMONYM_MAP[country.code] || [cName, cCapital];
-
-  if (keywords.some((kw) => text.includes(kw))) {
-    return true;
+  // 1. Check if the headline starts with a foreign country tag/prefix (e.g. "Saudi Arabia: ...", "Israel: ...")
+  const prefixMatch = cleanTitle.match(/^([a-z\s]+)[:–—-]/);
+  if (prefixMatch) {
+    const prefix = prefixMatch[1].trim();
+    const isTargetCountry = prefix.includes(country.name.toLowerCase()) || prefix.includes(country.code.toLowerCase());
+    const isForeignWire = FOREIGN_WIRE_PREFIXES.some((f) => prefix.includes(f));
+    if (isForeignWire && !isTargetCountry) {
+      return false;
+    }
   }
 
-  const OTHER_COUNTRIES: Record<string, string[]> = {
-    US: ['united states', 'white house', 'joe biden', 'donald trump', 'washington d.c.'],
-    GB: ['united kingdom', 'downing street', 'keir starmer', 'rishi sunak'],
-    NG: ['nigeria', 'president tinubu', 'fct abuja'],
-    FR: ['france', 'emmanuel macron', 'elysee palace'],
-    DE: ['germany', 'olaf scholz', 'bundestag'],
-    CN: ['china', 'xi jinping', 'beijing politburo'],
-    RU: ['russia', 'vladimir putin', 'kremlin'],
-  };
+  // 2. Reject foreign topics if reported without direct target-country governance substance
+  const isForeignTopic = [
+    'khashoggi', 'netanyahu', 'tel aviv', 'zelensky', 'vladimir putin', 'ayatollah',
+    'kremlin', 'taliban', 'houthi', 'hezbollah', 'gaza strip', 'west bank'
+  ].some((foreignKeyword) => cleanTitle.includes(foreignKeyword));
 
-  for (const [otherCode, otherKeywords] of Object.entries(OTHER_COUNTRIES)) {
-    if (otherCode !== country.code) {
-      if (otherKeywords.some((kw) => text.includes(kw))) {
+  // 3. Target country identifier requirement
+  const targetKeywords = COUNTRY_SPECIFIC_IDENTIFIERS[code] || [
+    country.name.toLowerCase(),
+    country.capital.toLowerCase(),
+  ];
+
+  const hasTargetKeywordInTitle = targetKeywords.some((kw) => cleanTitle.includes(kw));
+  const hasTargetKeywordInSnippet = targetKeywords.some((kw) => cleanSnippet.includes(kw));
+
+  // If article title is about foreign topic and target country is not the primary subject in title, skip!
+  if (isForeignTopic && !hasTargetKeywordInTitle) {
+    return false;
+  }
+
+  // An article must contain target country identifiers in title or snippet to qualify for this desk
+  if (!hasTargetKeywordInTitle && !hasTargetKeywordInSnippet) {
+    return false;
+  }
+
+  // Check if article belongs primarily to another country
+  for (const [otherCode, otherKeywords] of Object.entries(COUNTRY_SPECIFIC_IDENTIFIERS)) {
+    if (otherCode !== code) {
+      const mentionsOtherCountryInTitle = otherKeywords.slice(0, 3).some((kw) => cleanTitle.includes(kw));
+      if (mentionsOtherCountryInTitle && !hasTargetKeywordInTitle) {
         return false;
       }
     }
@@ -297,13 +335,127 @@ export function generateAiAnalysisSummary(
 ): string {
   const cleanTitle = (title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').replace(/<[^>]+>/g, '').trim();
   const cleanSnippet = (snippet || '').replace(/<[^>]+>/g, '').trim();
+  const lowerText = `${cleanTitle} ${cleanSnippet}`.toLowerCase();
 
-  return `Independent Review & Core Facts:
-• This report details critical governance, institutional, and civic events reported by ${sourceName} regarding "${cleanTitle}".
-• Key Stakeholders: Public officials, institutions, and affected citizens whose daily lives and governance standards are directly influenced by these actions.
+  // 1. Economic Affordability, Fuel Subsidy, Petrol Pricing, Inflation & Living Costs
+  if (
+    lowerText.includes('petrol') ||
+    lowerText.includes('subsidy') ||
+    lowerText.includes('n600') ||
+    lowerText.includes('pump price') ||
+    lowerText.includes('fuel price') ||
+    lowerText.includes('inflation') ||
+    lowerText.includes('cost of living') ||
+    lowerText.includes('minimum wage') ||
+    lowerText.includes('tariff') ||
+    lowerText.includes('hardship')
+  ) {
+    return `Independent Review & Core Facts:
+• Core Economic Issue: The report addresses high-stakes economic hardship in ${countryName}, where petroleum pricing and public affordability remain the central drivers of national inflation.
+• Policy Realities: While political figures propose conditional support or price rollbacks, petroleum pricing in a deregulated market is governed by exchange rates, crude import costs, and local refining volume. Demanding price cuts without direct fiscal subventions or increased domestic refinery output is economically difficult to sustain.
+• Real-World Impact: Transport fares, food prices, and everyday household purchasing power across ${countryName} are directly anchored to the price of fuel.
 
 The Verdict:
-Public pronouncements and symbolic gestures must be measured against concrete delivery and constitutional standards. In ${countryName}, genuine democratic accountability requires that institutions operate with transparency and fair play, ensuring that public resources, legal processes, and governance decisions serve ordinary citizens without political favoritism.`;
+Fuel pricing is too vital to citizen survival to be used as a political bargaining chip or campaign sweetener. Promising lower pump prices to barter political loyalty sounds attractive to suffering citizens, but without a clear, costed fiscal blueprint and verifiable domestic refining, such pledges remain pure political theater. Citizens must demand structural economic solutions over populist campaign deals.`;
+  }
+
+  // 2. 2027 Election Realignment, Running Mates, Defections & Coalitions
+  if (
+    lowerText.includes('2027') ||
+    lowerText.includes('running mate') ||
+    lowerText.includes('withdraw') ||
+    lowerText.includes('back tinubu') ||
+    lowerText.includes('atiku') ||
+    lowerText.includes('defection') ||
+    lowerText.includes('coalition') ||
+    lowerText.includes('endorse') ||
+    lowerText.includes('presidential ticket') ||
+    lowerText.includes('party chairman') ||
+    lowerText.includes('apc') && lowerText.includes('pdp')
+  ) {
+    return `Independent Review & Core Facts:
+• Political Positioning: Contenders and party stakeholders are already maneuvering ahead of upcoming election cycles, testing loyalties, issuing public ultimatums, and trading running-mate endorsements.
+• Fragile Party Structures: Major political parties in ${countryName} continue to experience internal friction, where individual figures leverage public declarations to negotiate personal relevance or executive appointments.
+• Ideological Reality: Cross-party endorsements and conditional loyalty demonstrate that political alignments remain transactional and fluid rather than driven by shared ideological vision.
+
+The Verdict:
+Early campaign ultimatums and cross-party horse-trading reveal that partisan politics remains driven by personal ambition rather than institutional conviction. When prominent politicians barter endorsements under the guise of public interest, voters must look past theatrical declarations. Genuine leadership in ${countryName} requires coherent governance manifestos and policy consistency, not opportunism ahead of election seasons.`;
+  }
+
+  // 3. Judiciary, Regulatory Overreach, CAMA, CAC, Court Rulings & Injunctions
+  if (
+    lowerText.includes('appeal court') ||
+    lowerText.includes('supreme court') ||
+    lowerText.includes('nullification') ||
+    lowerText.includes('cama') ||
+    lowerText.includes('cac') ||
+    lowerText.includes('tribunal') ||
+    lowerText.includes('ruling') ||
+    lowerText.includes('judgment') ||
+    lowerText.includes('powers over') ||
+    lowerText.includes('court affirms') ||
+    lowerText.includes('high court')
+  ) {
+    return `Independent Review & Core Facts:
+• Judicial Check on Power: The court has stepped in to affirm constitutional limits on executive and regulatory bodies, striking down provisions that granted administrative agencies excessive unilateral control.
+• Institutional Protection: The judgment reinforces that state administrative bodies cannot arbitrarily usurp the leadership, operations, or assets of registered associations and private bodies without strict judicial due process.
+• Precedent for Due Process: This legal victory establishes that statutory regulations must operate within constitutional boundaries and respect institutional independence.
+
+The Verdict:
+The court's decision to curb excessive regulatory power is a vital triumph for the rule of law. Regulatory bodies exist to ensure lawful registration and statutory standards, not to act as administrative overlords over civic and corporate organizations. Limiting agency overreach protects civil society, businesses, and faith organizations in ${countryName} from politically motivated interference.`;
+  }
+
+  // 4. Security Agencies, DSS/SSS, Civil Liberties, Summons & Interrogations
+  if (
+    lowerText.includes('sowore') ||
+    lowerText.includes('sss') ||
+    lowerText.includes('dss') ||
+    lowerText.includes('summon') ||
+    lowerText.includes('police') ||
+    lowerText.includes('arrest') ||
+    lowerText.includes('detention') ||
+    lowerText.includes('testify') ||
+    lowerText.includes('interrogat') ||
+    lowerText.includes('human rights')
+  ) {
+    return `Independent Review & Core Facts:
+• Institutional Friction: The reported situation underscores persistent tension between civic activists and state security institutions over transparency, constitutional summons, and civil rights.
+• Constitutional Supremacy: Demands for top security chiefs to appear in open court or before legal inquiries affirm that state security agencies are not above the judicial process.
+• Public Accountability: Reluctance by security agencies to comply with open judicial summons deepens public skepticism regarding democratic policing and the protection of fundamental human rights.
+
+The Verdict:
+In a constitutional democracy, state security services must submit to the authority of the courts. No intelligence director, police commissioner, or state agent is above judicial summons. Complying with open legal proceedings is not a favor granted by the state—it is the baseline test of whether public security institutions serve the constitution or operate with impunity.`;
+  }
+
+  // 5. Anti-Corruption, Probes, EFCC, ICPC, Public Funds & Misconduct
+  if (
+    lowerText.includes('corruption') ||
+    lowerText.includes('arrest me') ||
+    lowerText.includes('efcc') ||
+    lowerText.includes('icpc') ||
+    lowerText.includes('graft') ||
+    lowerText.includes('probe') ||
+    lowerText.includes('divert') ||
+    lowerText.includes('misappropriat') ||
+    lowerText.includes('public funds')
+  ) {
+    return `Independent Review & Core Facts:
+• Anti-Graft Scrutiny: Public attention is focused on official conduct, financial accountability, and investigations into public procurement and treasury management.
+• Enforcement Scrutiny: Citizens frequently observe sensational corruption allegations that end in protracted delays, plea deals, or selective prosecution targeting perceived opponents.
+• Resource Drain: Financial leakages and systemic diversion of public funds directly starve ${countryName} of needed investment in infrastructure, public health, and basic social security.
+
+The Verdict:
+Anti-corruption enforcement must be measured by institutional independence, diligent court prosecution, and recovered stolen assets—not media grandstanding or public dares. True accountability begins when anti-graft agencies investigate and prosecute impartially, regardless of a politician's status, wealth, or proximity to power.`;
+  }
+
+  // 6. General Governance & Public Policy Action
+  return `Independent Review & Core Facts:
+• Reported Development: As reported by ${sourceName}, public interest centers on "${cleanTitle}", prompting active evaluation across policy and civic circles in ${countryName}.
+• Key Governance Dimensions: The matter touches on institutional transparency, executive decision-making, and how official actions affect everyday citizens.
+• Civic Vigilance: Observers and community leaders are tracking whether official rhetoric and policy statements translate into verifiable delivery and fair administration on the ground.
+
+The Verdict:
+Governance must always be evaluated by concrete delivery and constitutional standards rather than symbolic pronouncements. In ${countryName}, sustainable democratic progress requires that leadership actions serve the public interest with openness, accountability, and impartial institutional service to all citizens.`;
 }
 
 export function generateCivicPollQuestion(title: string, snippet?: string): string {

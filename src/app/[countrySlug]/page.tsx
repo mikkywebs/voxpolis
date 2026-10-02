@@ -120,10 +120,10 @@ export default function CountryFeedPage() {
               </div>
               <div className="text-left">
                 <div className="font-bold text-xs sm:text-sm text-blue-200">
-                  Viewing {selectedCountry.flag} {selectedCountry.name} Political Feed
+                  Viewing {selectedCountry.flag} {selectedCountry.name} | Politics
                 </div>
                 <div className="text-[11px] text-gray-300">
-                  Members get unlimited access to political feeds for all 230+ countries.
+                  Members get unlimited access to verified political coverage across 230+ countries.
                 </div>
               </div>
             </div>

@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import SiteLogo from '@/components/branding/SiteLogo';
 import FeedCard from '@/components/feed/FeedCard';
 import Footer from '@/components/layout/Footer';
@@ -27,6 +28,7 @@ import {
 } from 'lucide-react';
 
 export default function LandingPage() {
+  const router = useRouter();
   const supabase = createClient();
   const [user, setUser] = useState<any>(null);
 
@@ -128,11 +130,27 @@ export default function LandingPage() {
     <div className="min-h-screen bg-slate-950 text-white flex flex-col selection:bg-blue-600 selection:text-white">
       {/* Header Bar */}
       <header className="sticky top-0 z-40 w-full bg-slate-950/90 border-b border-gray-800 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <SiteLogo variant="full" className="h-8 sm:h-9 w-auto" />
-          </Link>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between relative gap-4">
+          {/* Mobile Logo (left) */}
+          <div className="flex md:hidden items-center">
+            <Link href="/" className="flex items-center hover:opacity-95 transition">
+              <SiteLogo variant="dark" className="h-9 w-auto" />
+            </Link>
+          </div>
 
+          {/* Desktop Left Tagline */}
+          <div className="hidden md:flex items-center gap-2 text-xs font-semibold text-gray-400">
+            <span>Global Civic Intelligence</span>
+          </div>
+
+          {/* Desktop Centered Logo (Crisp & Visible as in Footer) */}
+          <div className="hidden md:flex items-center justify-center absolute left-1/2 -translate-x-1/2 pointer-events-auto">
+            <Link href="/" className="flex items-center hover:opacity-95 transition">
+              <SiteLogo variant="dark" className="h-11 sm:h-12 w-auto" />
+            </Link>
+          </div>
+
+          {/* Right Actions */}
           <div className="flex items-center gap-3">
             {user ? (
               <div className="flex items-center gap-3">
@@ -180,7 +198,7 @@ export default function LandingPage() {
             <button
               onClick={() => {
                 if (!user) {
-                  setIsAuthPromptOpen(true);
+                  router.push('/signup');
                 } else {
                   setIsCountryModalOpen(true);
                 }
@@ -248,13 +266,6 @@ export default function LandingPage() {
                       <span className="hidden sm:inline">• {formatExactTimestamp(activeSlide.created_at)}</span>
                     )}
                   </div>
-                  <Link
-                    href={`/news/${activeSlide.slug}`}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1"
-                  >
-                    <span>Read Full Brief</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
                 </div>
               </div>
 
@@ -309,10 +320,10 @@ export default function LandingPage() {
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
                 <span>{selectedCountry.flag}</span>
-                <span>{selectedCountry.name} News Feed</span>
+                <span>{selectedCountry.name} News</span>
               </h2>
               <p className="text-xs text-gray-400">
-                Live, continuous political coverage and policy updates for {selectedCountry.name}.
+                Live, News on Politics in {selectedCountry.name}.
               </p>
             </div>
 
@@ -320,7 +331,7 @@ export default function LandingPage() {
               href={`/${countrySlug}`}
               className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1"
             >
-              <span>View Full Feed</span>
+              <span>Read More News</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -341,7 +352,7 @@ export default function LandingPage() {
 
               <div className="text-center pt-4">
                 <Link
-                  href="/news"
+                  href={`/${countrySlug}`}
                   className="inline-flex items-center gap-2 px-8 py-3.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold rounded-2xl shadow-xl transition transform hover:scale-105"
                 >
                   <span>Read More News</span>
