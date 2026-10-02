@@ -203,8 +203,8 @@ export default function CountryFeedPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {/* First 6 Articles Grid (2-Column 2x2 Layout) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* First 6 Articles Grid (Uniform 3-Column Layout) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {firstHalf.map((art) => (
                 <FeedCard key={art.id} article={art} />
               ))}
@@ -217,9 +217,9 @@ export default function CountryFeedPage() {
               </div>
             )}
 
-            {/* Remaining Articles Grid (2-Column 2x2 Layout) */}
+            {/* Remaining Articles Grid (Uniform 3-Column Layout) */}
             {secondHalf.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {secondHalf.map((art) => (
                   <FeedCard key={art.id} article={art} />
                 ))}

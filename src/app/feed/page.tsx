@@ -64,8 +64,8 @@ export default function FeedPage() {
   const startIndex = (currentPage - 1) * ARTICLES_PER_PAGE;
   const currentArticles = articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
 
-  const firstHalf = currentArticles.slice(0, 4);
-  const secondHalf = currentArticles.slice(4);
+  const firstHalf = currentArticles.slice(0, 6);
+  const secondHalf = currentArticles.slice(6);
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -123,6 +123,7 @@ export default function FeedPage() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Top Grid: Uniform 3-column rows (6 items = 2 complete rows, 0 empty gaps) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {firstHalf.map((art) => (
                 <FeedCard key={art.id} article={art} />
@@ -131,8 +132,9 @@ export default function FeedPage() {
 
             <FeedAdCard countryCode={selectedCountry.code} countryName={selectedCountry.name} />
 
+            {/* Bottom Grid: Uniform 3-column rows matching the top frame perfectly */}
             {secondHalf.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {secondHalf.map((art) => (
                   <FeedCard key={art.id} article={art} />
                 ))}

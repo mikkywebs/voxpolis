@@ -35,6 +35,8 @@ export default function ArticleImageHeader({
     ? originalImageUrl
     : '/breaking-news-banner.png';
 
+  const cleanTitle = (title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
+
   return (
     <div className="mb-6 space-y-4">
       {/* Breaking Badge & Meta Bar */}
@@ -70,7 +72,7 @@ export default function ArticleImageHeader({
       )}
 
       <h1 className="text-2xl sm:text-4xl font-extrabold text-gray-900 dark:text-white leading-tight tracking-tight">
-        {title}
+        {cleanTitle}
       </h1>
 
       <p className="text-base sm:text-lg font-medium text-gray-600 dark:text-gray-300 leading-relaxed border-l-4 border-blue-600 pl-4 py-1">

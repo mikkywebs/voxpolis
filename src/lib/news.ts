@@ -208,73 +208,27 @@ export function expandToJournalisticArticle(
   countryCapital?: string,
   category: string = 'politics'
 ): string {
-  const cleanTitle = (title || '').replace(/ - Voxpolis$/i, '').trim();
+  const cleanTitle = (title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
   const cleanSnippet = (snippet || '').trim();
   const dateline = countryCapital ? countryCapital.toUpperCase() : countryName.toUpperCase();
 
-  const text = `${cleanTitle} ${cleanSnippet}`.toLowerCase();
+  // 1. Natural lead paragraph stating the core news directly and simply
+  const p1 = `${dateline} — In a significant development, ${cleanTitle.charAt(0).toLowerCase() + cleanTitle.slice(1)}. According to verified reporting from ${sourceName}, the event has drawn wide public interest and reaction across political and civic circles in ${countryName}.`;
 
-  // Topic classification in plain, accessible language
-  let topicContext = {
-    domain: 'national governance and political developments',
-    civicAngle: 'citizens, civil society groups, and public interest advocates',
-    keyIssue: 'transparency, accountability, and the public interest',
-  };
+  // 2. Concrete specifics and context from snippet
+  const p2 =
+    cleanSnippet && cleanSnippet.length > 25
+      ? `${cleanSnippet} The reported facts outline the direct actions and statements made by the key parties involved, setting off immediate discussions among citizens, stakeholders, and community leaders.`
+      : `Key officials and stakeholders involved have made public statements outlining their stances. Observers are closely examining these developments to assess their immediate effects on governance and daily affairs.`;
 
-  if (text.includes('econ') || text.includes('budget') || text.includes('tax') || text.includes('finance') || text.includes('naira') || text.includes('dollar') || text.includes('trade') || text.includes('bank') || text.includes('inflation') || text.includes('price')) {
-    topicContext = {
-      domain: 'economic conditions, public finances, and living costs',
-      civicAngle: 'ordinary consumers, local businesses, and independent economists',
-      keyIssue: 'how financial policies directly affect household living standards and market stability',
-    };
-  } else if (text.includes('court') || text.includes('law') || text.includes('judge') || text.includes('police') || text.includes('justice') || text.includes('human rights') || text.includes('nhrc') || text.includes('suit') || text.includes('verdict')) {
-    topicContext = {
-      domain: 'judicial proceedings, legal standards, and the rule of law',
-      civicAngle: 'legal practitioners, human rights observers, and civic monitors',
-      keyIssue: 'equal justice, constitutional protections, and institutional fairness',
-    };
-  } else if (text.includes('elect') || text.includes('vote') || text.includes('ballot') || text.includes('inec') || text.includes('party') || text.includes('campaign') || text.includes('poll') || text.includes('candidate')) {
-    topicContext = {
-      domain: 'electoral politics, party activities, and democratic competition',
-      civicAngle: 'voters, democratic watchdogs, and independent analysts',
-      keyIssue: 'electoral credibility, fair representation, and public trust in political leadership',
-    };
-  } else if (text.includes('oil') || text.includes('gas') || text.includes('energy') || text.includes('power') || text.includes('theft') || text.includes('fuel') || text.includes('pipeline')) {
-    topicContext = {
-      domain: 'energy resources, fuel supply, and national infrastructure',
-      civicAngle: 'affected host communities, consumers, and energy sector monitors',
-      keyIssue: 'resource accountability, fair pricing, and reliable service delivery for the public',
-    };
-  } else if (text.includes('premiere') || text.includes('documentary') || text.includes('memorial') || text.includes('anniversary') || text.includes('mko') || text.includes('abiola') || text.includes('ceremony') || text.includes('event')) {
-    topicContext = {
-      domain: 'democratic history, public commemoration, and national political memory',
-      civicAngle: 'democratic advocates, citizens, and political historians',
-      keyIssue: 'how the lessons of past democratic struggles compare with contemporary political realities',
-    };
-  } else if (text.includes('health') || text.includes('hospital') || text.includes('medical') || text.includes('disease') || text.includes('doctor')) {
-    topicContext = {
-      domain: 'public healthcare, medical services, and citizen welfare',
-      civicAngle: 'patients, health workers, and public welfare advocates',
-      keyIssue: 'adequate medical resources, equitable access to treatment, and emergency readiness',
-    };
-  }
+  // 3. Plain-terms civic realities (no sugarcoating, no big grammar)
+  const p3 = `Beyond official statements and formal events, citizens and civic monitors are assessing how these actions affect real lives on the ground. Key questions focus on transparency, accountability, and whether leadership decisions align with public interest rather than political convenience.`;
 
-  // Paragraph 1: Direct Factual Lead (Who, What, Where)
-  const p1 = `${dateline} — Political developments in ${countryName} have placed attention on ${cleanTitle.toLowerCase()}, according to dispatches gathered by ${sourceName}. The situation has sparked active discussion across political circles, focusing attention on ${topicContext.domain}.`;
+  // 4. Impartial scrutiny and accountability
+  const p4 = `Independent analysts emphasize that in any functioning democracy, public figures and institutions must remain accountable to the people. Verifiable actions, fair institutional processes, and openness remain essential benchmarks for public trust.`;
 
-  // Paragraph 2: Core Details
-  const p2 = cleanSnippet && cleanSnippet.length > 25
-    ? `${cleanSnippet} The reported details outline the immediate actions and public positions taken by key figures involved, drawing keen scrutiny from both supporters and critics across the country.`
-    : `Reports emerging from ${countryName} highlight ongoing developments among key political figures and public institutions. Observers are closely following statements and steps taken by those involved, with reactions continuing to build across both official and public channels.`;
-
-  // Paragraph 3: Public Impact & Civic Reality
-  const p3 = `For ${topicContext.civicAngle}, the central concern remains ${topicContext.keyIssue}. In ${countryName}, public reactions to high-profile political events frequently reflect deep public scrutiny over whether political declarations match everyday realities on the ground, particularly regarding governance standards and citizen welfare.`;
-
-  // Paragraph 4: Democratic Scrutiny & Accountability
-  const p4 = `Independent political observers point out that in an open society, public gatherings, official announcements, and political maneuvers must be evaluated with neutrality and critical balance. Community stakeholders emphasize that holding leaders accountable—regardless of party affiliation—is vital for genuine democratic progress and fair representation.`;
-
-  // Paragraph 5: Independent News Desk Follow-up
-  const p5 = `Voxpolis continues to follow this story closely, monitoring verifiable facts, official statements, and community feedback across ${countryName} to provide straightforward, balanced reporting for the public.`;
+  // 5. Desk wrap-up
+  const p5 = `Voxpolis will continue tracking developments in this story, verifying claims, and reporting subsequent official moves and citizen reactions as they unfold.`;
 
   return [p1, p2, p3, p4, p5].join('\n\n');
 }
@@ -285,25 +239,15 @@ export function generateAiAnalysisSummary(
   sourceName: string = 'Press Outlet',
   countryName: string = 'National'
 ): string {
-  const cleanTitle = (title || '').replace(/<[^>]+>/g, '').trim();
+  const cleanTitle = (title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').replace(/<[^>]+>/g, '').trim();
   const cleanSnippet = (snippet || '').replace(/<[^>]+>/g, '').trim();
 
-  const text = `${cleanTitle} ${cleanSnippet}`.toLowerCase();
+  return `Independent Review & Core Facts:
+• This report details critical governance, institutional, and civic events reported by ${sourceName} regarding "${cleanTitle}".
+• Key Stakeholders: Public officials, institutions, and affected citizens whose daily lives and governance standards are directly influenced by these actions.
 
-  let impactArea = 'policy and public governance priorities';
-  if (text.includes('econ') || text.includes('budget') || text.includes('tax') || text.includes('finance') || text.includes('naira') || text.includes('dollar') || text.includes('trade')) {
-    impactArea = 'economic resilience and fiscal oversight';
-  } else if (text.includes('health') || text.includes('hospital') || text.includes('disease') || text.includes('medical')) {
-    impactArea = 'public healthcare administration and safety infrastructure';
-  } else if (text.includes('elect') || text.includes('vote') || text.includes('ballot') || text.includes('party') || text.includes('campaign')) {
-    impactArea = 'electoral oversight and democratic accountability';
-  } else if (text.includes('court') || text.includes('law') || text.includes('judge') || text.includes('police') || text.includes('security')) {
-    impactArea = 'judicial proceedings and institutional standards';
-  } else if (text.includes('energy') || text.includes('power') || text.includes('oil') || text.includes('gas') || text.includes('climate')) {
-    impactArea = 'energy security and critical infrastructure governance';
-  }
-
-  return `This reporting centers on ${impactArea} in ${countryName}. Independent dispatches by ${sourceName} reflect ongoing civic scrutiny and public debate surrounding transparency, institutional actions, and the broader impact on citizens.`;
+The Verdict:
+Public pronouncements and symbolic gestures must be measured against concrete delivery and constitutional standards. In ${countryName}, genuine democratic accountability requires that institutions operate with transparency and fair play, ensuring that public resources, legal processes, and governance decisions serve ordinary citizens without political favoritism.`;
 }
 
 export function cleanNewsText(raw: string): string {

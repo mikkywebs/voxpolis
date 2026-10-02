@@ -22,17 +22,37 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
   const [disagree, setDisagree] = useState(initialDisagree);
   const [userVote, setUserVote] = useState<'agree' | 'disagree' | null>(null);
 
-  const rawQuestion = poll?.question || 'Do you support the policy developments reported in this executive summary?';
+  const rawQuestion = poll?.question || '';
 
-  // Normalize open-ended questions into binary agreement questions if needed
-  let displayQuestion = rawQuestion;
-  if (rawQuestion.toLowerCase().startsWith('what is your perspective on')) {
-    const topic = rawQuestion.replace(/what is your perspective on\s*/i, '').replace(/\?$/, '');
-    displayQuestion = `Do you agree with the position regarding ${topic}?`;
-  } else if (rawQuestion.toLowerCase().startsWith('what ') || rawQuestion.toLowerCase().startsWith('how ') || rawQuestion.toLowerCase().startsWith('why ')) {
-    const topic = rawQuestion.replace(/^(what|how|why)\s+(is|are|do|does|did|would)\s*/i, '').replace(/\?$/, '');
-    displayQuestion = `Do you agree with the reported stance on ${topic}?`;
-  }
+  // Determine if this news story has a genuine binary policy proposal / debate
+  const lq = rawQuestion.toLowerCase();
+  const isNonDebate =
+    !rawQuestion ||
+    lq.includes('premiere') ||
+    lq.includes('documentary') ||
+    lq.includes('memorial') ||
+    lq.includes('anniversary') ||
+    lq.includes('condolence') ||
+    lq.includes('mourn') ||
+    lq.includes('adjourn') ||
+    lq.includes('rejects application') ||
+    lq.includes('trial') ||
+    lq.includes('court') ||
+    lq.includes('arrest') ||
+    lq.includes('death') ||
+    lq.includes('crash');
+
+  const isPolicyDebate =
+    !isNonDebate &&
+    (lq.startsWith('do you support') ||
+      lq.startsWith('do you agree') ||
+      lq.startsWith('should ') ||
+      lq.includes('support the policy') ||
+      lq.includes('agree with the decision') ||
+      lq.includes('subsidy') ||
+      lq.includes('tax') ||
+      lq.includes('bill') ||
+      lq.includes('reform'));
 
   const total = agree + disagree;
   const agreePercent = total > 0 ? Math.round((agree / total) * 100) : 0;
@@ -60,8 +80,55 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
     const commentEl = document.getElementById('comments-section') || document.querySelector('form');
     if (commentEl) {
       commentEl.scrollIntoView({ behavior: 'smooth' });
+      const textarea = commentEl.querySelector('textarea');
+      if (textarea) textarea.focus();
     }
   };
+
+  // If the news content doesn't provide a binary policy debate, invite readers to comment
+  if (!isPolicyDebate) {
+    let cleanPrompt = rawQuestion
+      ? rawQuestion
+          .replace(/Do you agree with the stance regarding /i, 'What are your thoughts on ')
+          .replace(/Do you support the policy developments reported in this executive summary\?/i, 'What are your thoughts on this political development?')
+          .replace(/["']/g, '')
+      : 'What is your perspective on this political development?';
+
+    if (!cleanPrompt.endsWith('?')) {
+      cleanPrompt += '?';
+    }
+
+    return (
+      <div className="my-6 p-6 rounded-2xl bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 shadow-md space-y-4">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Community Perspective
+          </span>
+        </div>
+
+        <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-relaxed">
+          {cleanPrompt}
+        </h4>
+
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+          This report covers ongoing events and civic developments. We welcome independent citizen viewpoints, analysis, and civil discussion in the public forum below.
+        </p>
+
+        <button
+          type="button"
+          onClick={scrollToComments}
+          className="w-full py-3 px-4 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>Share Your Thoughts in the Comments ↓</span>
+        </button>
+      </div>
+    );
+  }
+
+  // Binary Policy Poll (for genuine policy disputes and reform proposals)
+  const displayQuestion = rawQuestion || 'Do you support the policy developments reported in this briefing?';
 
   return (
     <div className="my-6 p-6 rounded-2xl bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 shadow-md space-y-4">
@@ -72,7 +139,6 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
             Public Opinion Poll
           </span>
         </div>
-        <span className="text-[11px] font-semibold text-gray-400">Binary Policy Stance</span>
       </div>
 
       <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-relaxed">

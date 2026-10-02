@@ -17,9 +17,10 @@ export default function FeedCard({ article }: FeedCardProps) {
   const imageUrl = getArticleImageUrl(article);
 
   const formattedTime = formatExactTimestamp(article.created_at);
+  const displayTitle = (article.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
 
   return (
-    <article className="group bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/70 rounded-2xl overflow-hidden p-5 sm:p-6 shadow-sm hover:shadow-lg transition duration-200 flex flex-col justify-between">
+    <article className="group bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/70 rounded-2xl overflow-hidden p-5 sm:p-6 shadow-sm hover:shadow-lg transition duration-200 flex flex-col justify-between h-full">
       <div>
         {/* News Featured Image Thumbnail */}
         <Link href={`/news/${article.slug}`} className="block mb-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900">
@@ -30,7 +31,7 @@ export default function FeedCard({ article }: FeedCardProps) {
             onError={(e) => {
               (e.target as HTMLImageElement).src = '/breaking-news-banner.png';
             }}
-            className="w-full h-44 sm:h-48 object-cover group-hover:scale-105 transition duration-300"
+            className="w-full h-48 object-cover group-hover:scale-105 transition duration-300"
           />
         </Link>
 
@@ -56,8 +57,8 @@ export default function FeedCard({ article }: FeedCardProps) {
         )}
 
         <Link href={`/news/${article.slug}`}>
-          <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-snug">
-            {article.title}
+          <h2 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-snug line-clamp-2">
+            {displayTitle}
           </h2>
         </Link>
 

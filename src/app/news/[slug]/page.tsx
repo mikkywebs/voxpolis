@@ -123,16 +123,27 @@ export default function NewsDetailPage() {
         setRealViews(nextViews);
 
         // Background extraction of authentic journalist text from source URL
-        if (
+        const isSyntheticTemplate =
+          !found.content ||
+          found.content.length < 500 ||
+          found.content.includes('Political developments in') ||
+          found.content.includes('dispatches gathered by') ||
+          found.content.includes('In a significant development,');
+
+        const cachedContent = localStorage.getItem(`voxpolis_content_${found.id}`);
+        if (cachedContent && cachedContent.length > 250) {
+          setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: cachedContent } : prev));
+        } else if (
           found.source_url &&
           found.source_url.startsWith('http') &&
           !found.source_url.includes('voxpolis.app') &&
-          (!found.content || found.content.length < 500)
+          isSyntheticTemplate
         ) {
           fetch(`/api/news/extract?url=${encodeURIComponent(found.source_url)}`)
             .then((r) => r.json())
             .then((extracted) => {
               if (extracted?.success && extracted.content && extracted.content.length > 250) {
+                localStorage.setItem(`voxpolis_content_${found.id}`, extracted.content);
                 setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: extracted.content } : prev));
               }
             })
@@ -316,6 +327,13 @@ export default function NewsDetailPage() {
               </div>
             </div>
 
+            {/* Community Pulse immediately after header as requested */}
+            <EmojiReactions
+              articleId={pipelineArticle.id}
+              onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
+              isLoggedIn={isLoggedIn}
+            />
+
             <SocialShareButtons title={pipelineArticle.headline} slug={pipelineArticle.slug} />
 
             <AdSlot slotLocation="below_dek" isAllowed={true} />
@@ -408,8 +426,8 @@ export default function NewsDetailPage() {
               </div>
             )}
 
-            {/* Main Body Content (350+ words of real journalism) */}
-            <div className="prose dark:prose-invert max-w-none text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-relaxed space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+            {/* Main Body Content (neat, professional editorial font size) */}
+            <div className="prose dark:prose-invert max-w-none text-base sm:text-[17px] leading-relaxed sm:leading-8 text-gray-800 dark:text-gray-200 space-y-5 pt-4 border-t border-gray-200 dark:border-gray-800">
               {paragraphs.slice(0, midPoint).map((para, i) => (
                 <p key={i}>{para}</p>
               ))}
@@ -577,12 +595,19 @@ export default function NewsDetailPage() {
             createdAt={article!.created_at}
           />
 
+          {/* Community Pulse immediately after header as requested */}
+          <EmojiReactions
+            articleId={article!.id}
+            onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
+            isLoggedIn={isLoggedIn}
+          />
+
           <SocialShareButtons title={article!.title} slug={article!.slug} />
 
           <AdSlot slotLocation="below_dek" isAllowed={true} />
 
-          {/* Full Rich Journalistic Story (350+ words) */}
-          <div className="prose dark:prose-invert max-w-none text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-relaxed space-y-4 my-6">
+          {/* Full Rich Journalistic Story (neat, professional editorial font size) */}
+          <div className="prose dark:prose-invert max-w-none text-base sm:text-[17px] leading-relaxed sm:leading-8 text-gray-800 dark:text-gray-200 space-y-5 my-6">
             {fallbackParagraphs.slice(0, fbMidPoint).map((paragraph, i) => (
               <p key={i}>{paragraph}</p>
             ))}
@@ -604,15 +629,6 @@ export default function NewsDetailPage() {
           />
 
           <AffiliateSection label={article!.affiliate_link_label} url={article!.affiliate_link_url} />
-
-          {/* Community Reactions & Sentiment */}
-          <div className="pt-2">
-            <EmojiReactions
-              articleId={article!.id}
-              onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
-              isLoggedIn={isLoggedIn}
-            />
-          </div>
 
           <PollSection
             poll={article!.poll}
