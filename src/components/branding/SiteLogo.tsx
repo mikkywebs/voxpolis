@@ -37,9 +37,16 @@ export default function SiteLogo({
     loadLogos();
   }, []);
 
-  const defaultLight = settings.light_logo_url || '/voxpolis-logo-light.png';
-  const defaultDark = settings.dark_logo_url || '/voxpolis-logo-dark.png';
-  const defaultIcon = settings.icon_url || '/voxpolis-icon.png';
+  const sanitizeLogoUrl = (url?: string, fallback: string = ''): string => {
+    if (!url || url.includes('/voxpolis-logo-kit/') || url.endsWith('.jpg')) {
+      return fallback;
+    }
+    return url;
+  };
+
+  const defaultLight = sanitizeLogoUrl(settings.light_logo_url, '/voxpolis-logo-light.png');
+  const defaultDark = sanitizeLogoUrl(settings.dark_logo_url, '/voxpolis-logo-dark.png');
+  const defaultIcon = sanitizeLogoUrl(settings.icon_url, '/voxpolis-icon.png');
 
   if (variant === 'icon') {
     return (

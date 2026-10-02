@@ -114,13 +114,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto w-full space-y-6 bg-white dark:bg-gray-900 p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl">
         <div className="text-center">
-          <Link href="/">
-            {/* eslint-disable-next-html-element-suppression */}
-            <img
-              src="/footer-logo.png"
-              alt="Voxpolis Logo"
-              className="h-12 sm:h-14 w-auto mx-auto object-contain mb-3"
-            />
+          <Link href="/" className="inline-block hover:opacity-90 transition mb-3">
+            <SiteLogo variant="full" className="h-12 sm:h-14 w-auto mx-auto" />
           </Link>
           <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">Sign In to Voxpolis</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Access personalized global political intelligence</p>

@@ -13,7 +13,13 @@ export async function GET() {
     }
 
     if (data) {
-      return NextResponse.json(data);
+      return NextResponse.json({
+        ...data,
+        full_logo_url: data.full_logo_url?.includes('/voxpolis-logo-kit/') ? '/voxpolis-logo-light.png' : (data.full_logo_url || '/voxpolis-logo-light.png'),
+        light_logo_url: data.light_logo_url?.includes('/voxpolis-logo-kit/') ? '/voxpolis-logo-light.png' : (data.light_logo_url || '/voxpolis-logo-light.png'),
+        dark_logo_url: (data.dark_logo_url?.includes('/voxpolis-logo-kit/') || data.dark_logo_url?.endsWith('.jpg')) ? '/voxpolis-logo-dark.png' : (data.dark_logo_url || '/voxpolis-logo-dark.png'),
+        icon_url: data.icon_url?.includes('/voxpolis-logo-kit/') ? '/voxpolis-icon.png' : (data.icon_url || '/voxpolis-icon.png'),
+      });
     }
   } catch (e) {
     console.error('Site settings endpoint error:', e);

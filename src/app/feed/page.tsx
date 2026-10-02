@@ -91,14 +91,11 @@ export default function FeedPage() {
           <div className="flex items-center gap-3">
             <span className="text-2xl sm:text-3xl">{selectedCountry.flag}</span>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                <span>{selectedCountry.name} Political Feed</span>
-                <span className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full font-bold">
-                  {selectedLanguage.toUpperCase()}
-                </span>
+              <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
+                {selectedCountry.name} | Politics
               </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Verified regional political updates, policy briefs, and civic sentiment polls.
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Verified Political Updates
               </p>
             </div>
           </div>

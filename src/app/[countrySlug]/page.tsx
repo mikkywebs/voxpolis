@@ -154,9 +154,6 @@ export default function CountryFeedPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800">
-              {selectedLanguage.toUpperCase()}
-            </span>
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-800 px-2.5 py-1 rounded-full">
               {activeArticles.length} Active Reports
             </span>
