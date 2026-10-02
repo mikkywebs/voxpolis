@@ -212,45 +212,69 @@ export function expandToJournalisticArticle(
   const cleanSnippet = (snippet || '').trim();
   const dateline = countryCapital ? countryCapital.toUpperCase() : countryName.toUpperCase();
 
-  // Topic classification for domain-specific journalistic context
   const text = `${cleanTitle} ${cleanSnippet}`.toLowerCase();
-  let policyDomain = 'public policy and constitutional governance';
-  let civicPerspective = 'citizens, legal observers, and civic advocacy groups';
-  let oversightBody = 'relevant ministries, statutory commissions, and legislative committees';
 
-  if (text.includes('econ') || text.includes('budget') || text.includes('tax') || text.includes('finance') || text.includes('naira') || text.includes('dollar') || text.includes('trade') || text.includes('bank')) {
-    policyDomain = 'fiscal discipline, economic stabilization, and monetary oversight';
-    civicPerspective = 'market participants, commercial stakeholders, and economic analysts';
-    oversightBody = 'fiscal authorities, monetary policy regulators, and parliamentary finance committees';
-  } else if (text.includes('court') || text.includes('law') || text.includes('judge') || text.includes('police') || text.includes('justice') || text.includes('human rights') || text.includes('nhrc')) {
-    policyDomain = 'judicial integrity, human rights safeguards, and the rule of law';
-    civicPerspective = 'constitutional attorneys, human rights defenders, and civil liberties organizations';
-    oversightBody = 'the judiciary, statutory human rights bodies, and justice reform panels';
-  } else if (text.includes('elect') || text.includes('vote') || text.includes('ballot') || text.includes('inec') || text.includes('party') || text.includes('campaign') || text.includes('poll')) {
-    policyDomain = 'electoral accountability, voter franchise, and democratic governance';
-    civicPerspective = 'electoral watchdogs, political commentators, and democratic institutions';
-    oversightBody = 'electoral oversight commissions and multiparty consultative assemblies';
-  } else if (text.includes('oil') || text.includes('gas') || text.includes('energy') || text.includes('power') || text.includes('theft') || text.includes('pipeline')) {
-    policyDomain = 'resource management, energy infrastructure security, and revenue transparency';
-    civicPerspective = 'energy sector analysts, host community representatives, and environmental observers';
-    oversightBody = 'energy regulatory commissions and national infrastructure task forces';
-  } else if (text.includes('health') || text.includes('hospital') || text.includes('medical') || text.includes('disease')) {
-    policyDomain = 'public healthcare administration, emergency preparedness, and social safety nets';
-    civicPerspective = 'public health professionals, patient advocacy networks, and civic researchers';
-    oversightBody = 'healthcare authorities and intergovernmental public wellness panels';
+  // Topic classification in plain, accessible language
+  let topicContext = {
+    domain: 'national governance and political developments',
+    civicAngle: 'citizens, civil society groups, and public interest advocates',
+    keyIssue: 'transparency, accountability, and the public interest',
+  };
+
+  if (text.includes('econ') || text.includes('budget') || text.includes('tax') || text.includes('finance') || text.includes('naira') || text.includes('dollar') || text.includes('trade') || text.includes('bank') || text.includes('inflation') || text.includes('price')) {
+    topicContext = {
+      domain: 'economic conditions, public finances, and living costs',
+      civicAngle: 'ordinary consumers, local businesses, and independent economists',
+      keyIssue: 'how financial policies directly affect household living standards and market stability',
+    };
+  } else if (text.includes('court') || text.includes('law') || text.includes('judge') || text.includes('police') || text.includes('justice') || text.includes('human rights') || text.includes('nhrc') || text.includes('suit') || text.includes('verdict')) {
+    topicContext = {
+      domain: 'judicial proceedings, legal standards, and the rule of law',
+      civicAngle: 'legal practitioners, human rights observers, and civic monitors',
+      keyIssue: 'equal justice, constitutional protections, and institutional fairness',
+    };
+  } else if (text.includes('elect') || text.includes('vote') || text.includes('ballot') || text.includes('inec') || text.includes('party') || text.includes('campaign') || text.includes('poll') || text.includes('candidate')) {
+    topicContext = {
+      domain: 'electoral politics, party activities, and democratic competition',
+      civicAngle: 'voters, democratic watchdogs, and independent analysts',
+      keyIssue: 'electoral credibility, fair representation, and public trust in political leadership',
+    };
+  } else if (text.includes('oil') || text.includes('gas') || text.includes('energy') || text.includes('power') || text.includes('theft') || text.includes('fuel') || text.includes('pipeline')) {
+    topicContext = {
+      domain: 'energy resources, fuel supply, and national infrastructure',
+      civicAngle: 'affected host communities, consumers, and energy sector monitors',
+      keyIssue: 'resource accountability, fair pricing, and reliable service delivery for the public',
+    };
+  } else if (text.includes('premiere') || text.includes('documentary') || text.includes('memorial') || text.includes('anniversary') || text.includes('mko') || text.includes('abiola') || text.includes('ceremony') || text.includes('event')) {
+    topicContext = {
+      domain: 'democratic history, public commemoration, and national political memory',
+      civicAngle: 'democratic advocates, citizens, and political historians',
+      keyIssue: 'how the lessons of past democratic struggles compare with contemporary political realities',
+    };
+  } else if (text.includes('health') || text.includes('hospital') || text.includes('medical') || text.includes('disease') || text.includes('doctor')) {
+    topicContext = {
+      domain: 'public healthcare, medical services, and citizen welfare',
+      civicAngle: 'patients, health workers, and public welfare advocates',
+      keyIssue: 'adequate medical resources, equitable access to treatment, and emergency readiness',
+    };
   }
 
-  const p1 = `${dateline} — In an essential political development carrying significant implications for ${countryName}, state leadership and administrative stakeholders have prioritized action regarding ${cleanTitle.toLowerCase()}. As confirmed through official press dispatches monitored by ${sourceName}, the initiative centers directly on critical benchmarks in ${policyDomain}.`;
+  // Paragraph 1: Direct Factual Lead (Who, What, Where)
+  const p1 = `${dateline} — Political developments in ${countryName} have placed attention on ${cleanTitle.toLowerCase()}, according to dispatches gathered by ${sourceName}. The situation has sparked active discussion across political circles, focusing attention on ${topicContext.domain}.`;
 
-  const p2 = cleanSnippet && cleanSnippet.length > 30
-    ? `${cleanSnippet} The briefing highlights pivotal administrative decisions and institutional directives that address ongoing systemic considerations across the jurisdiction.`
-    : `Official proceedings emphasize a concerted effort by administrative authorities in ${countryName} to address structural challenges and enhance public service delivery. Government spokespersons indicated that the strategic focus is aligned with established statutory mandates and broader socioeconomic stability goals.`;
+  // Paragraph 2: Core Details
+  const p2 = cleanSnippet && cleanSnippet.length > 25
+    ? `${cleanSnippet} The reported details outline the immediate actions and public positions taken by key figures involved, drawing keen scrutiny from both supporters and critics across the country.`
+    : `Reports emerging from ${countryName} highlight ongoing developments among key political figures and public institutions. Observers are closely following statements and steps taken by those involved, with reactions continuing to build across both official and public channels.`;
 
-  const p3 = `The development has generated active engagement among ${civicPerspective}. Analysts note that sustainable progress will hinge upon consistent regulatory enforcement, transparent execution mechanisms, and cross-sector institutional coordination. Civic groups have maintained that policy implementation must remain responsive to public needs and institutional accountability standards.`;
+  // Paragraph 3: Public Impact & Civic Reality
+  const p3 = `For ${topicContext.civicAngle}, the central concern remains ${topicContext.keyIssue}. In ${countryName}, public reactions to high-profile political events frequently reflect deep public scrutiny over whether political declarations match everyday realities on the ground, particularly regarding governance standards and citizen welfare.`;
 
-  const p4 = `According to administrative sources, ${oversightBody} are slated to conduct routine reviews to evaluate implementation benchmarks. Stakeholder consultations and procedural notifications will be published through official gazettes as implementation advances.`;
+  // Paragraph 4: Democratic Scrutiny & Accountability
+  const p4 = `Independent political observers point out that in an open society, public gatherings, official announcements, and political maneuvers must be evaluated with neutrality and critical balance. Community stakeholders emphasize that holding leaders accountable—regardless of party affiliation—is vital for genuine democratic progress and fair representation.`;
 
-  const p5 = `Voxpolis will continue to monitor policy outcomes, legislative debates, and citizen sentiment surrounding this issue, providing regular verified dispatches as further official statements are released in ${countryName}.`;
+  // Paragraph 5: Independent News Desk Follow-up
+  const p5 = `Voxpolis continues to follow this story closely, monitoring verifiable facts, official statements, and community feedback across ${countryName} to provide straightforward, balanced reporting for the public.`;
 
   return [p1, p2, p3, p4, p5].join('\n\n');
 }
@@ -279,7 +303,7 @@ export function generateAiAnalysisSummary(
     impactArea = 'energy security and critical infrastructure governance';
   }
 
-  return `This reporting relates directly to ${impactArea} within ${countryName}. Independent press coverage and institutional dispatches by ${sourceName} continue to observe regulatory benchmarks as administrative directives unfold.`;
+  return `This reporting centers on ${impactArea} in ${countryName}. Independent dispatches by ${sourceName} reflect ongoing civic scrutiny and public debate surrounding transparency, institutional actions, and the broader impact on citizens.`;
 }
 
 export function cleanNewsText(raw: string): string {

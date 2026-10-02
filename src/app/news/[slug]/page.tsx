@@ -121,6 +121,23 @@ export default function NewsDetailPage() {
         const nextViews = prevViews + 1;
         localStorage.setItem(storedKey, nextViews.toString());
         setRealViews(nextViews);
+
+        // Background extraction of authentic journalist text from source URL
+        if (
+          found.source_url &&
+          found.source_url.startsWith('http') &&
+          !found.source_url.includes('voxpolis.app') &&
+          (!found.content || found.content.length < 500)
+        ) {
+          fetch(`/api/news/extract?url=${encodeURIComponent(found.source_url)}`)
+            .then((r) => r.json())
+            .then((extracted) => {
+              if (extracted?.success && extracted.content && extracted.content.length > 250) {
+                setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: extracted.content } : prev));
+              }
+            })
+            .catch(() => {});
+        }
       } else if (pipeArt) {
         setRelatedArticles(list.slice(0, 6));
       } else {

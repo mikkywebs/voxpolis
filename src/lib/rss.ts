@@ -159,6 +159,36 @@ export async function fetchRssArticlesForCountry(
   );
 }
 
+function extractArticleParagraphs(htmlOrText: string): string {
+  if (!htmlOrText) return '';
+  const decoded = decodeHtmlEntities(decodeHtmlEntities(htmlOrText));
+
+  // Extract <p> tags
+  const pMatches = decoded.match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
+  if (pMatches && pMatches.length > 0) {
+    const cleanedParas = pMatches
+      .map((p) => cleanRssText(p))
+      .filter(
+        (p) =>
+          p.length > 30 &&
+          !p.match(/^(read also|also read|click here|source:|copyright|all rights reserved|advertisement|follow us|join our|subscribe|download our)/i)
+      );
+
+    if (cleanedParas.length >= 2) {
+      return cleanedParas.join('\n\n');
+    }
+  }
+
+  // If no <p> tags, check for newline-separated paragraphs
+  const cleanAll = cleanRssText(decoded);
+  const splitParas = cleanAll.split(/\n\s*\n/).map((p) => p.trim()).filter((p) => p.length > 30);
+  if (splitParas.length >= 2) {
+    return splitParas.join('\n\n');
+  }
+
+  return cleanAll;
+}
+
 function parseRssXmlToArticles(
   xmlString: string,
   defaultSource: string,
@@ -181,7 +211,8 @@ function parseRssXmlToArticles(
       if (linkHrefMatch) link = linkHrefMatch[1];
     }
 
-    let description = getTag('content:encoded') || getTag('description') || getTag('summary');
+    const rawEncoded = getTag('content:encoded');
+    const rawDesc = getTag('description') || getTag('summary');
     const pubDateStr = getTag('pubDate') || getTag('dc:date') || getTag('updated');
     const pubDate = pubDateStr ? new Date(pubDateStr).toISOString() : new Date().toISOString();
 
@@ -209,7 +240,7 @@ function parseRssXmlToArticles(
     if (enclosureMatch && enclosureMatch[1].match(/https?:\/\//i)) {
       imageUrl = enclosureMatch[1];
     } else {
-      const imgMatch = description.match(/<img[^>]+src=["']([^"']+)["']/i);
+      const imgMatch = (rawEncoded || rawDesc).match(/<img[^>]+src=["']([^"']+)["']/i);
       if (imgMatch && imgMatch[1].match(/^https?:\/\//i)) {
         imageUrl = imgMatch[1];
       }
@@ -220,12 +251,27 @@ function parseRssXmlToArticles(
       return;
     }
 
-    let cleanSnippet = cleanRssText(description);
+    // Extract full real article paragraphs
+    let fullArticleText = extractArticleParagraphs(rawEncoded);
+    if (!fullArticleText || fullArticleText.length < 200) {
+      const descParas = extractArticleParagraphs(rawDesc);
+      if (descParas && descParas.length > 200) {
+        fullArticleText = descParas;
+      }
+    }
+
+    let cleanSnippet = cleanRssText(rawDesc || rawEncoded);
     if (!cleanSnippet || cleanSnippet.length < 15 || cleanSnippet.includes('<a href')) {
-      cleanSnippet = `${titleText}. Official administrative reporting for ${countryName}.`;
+      cleanSnippet = `${titleText}. Verified political dispatch for ${countryName}.`;
     } else {
       cleanSnippet = cleanSnippet.slice(0, 280);
     }
+
+    // If real paragraphs exist (>250 chars), use real journalism directly.
+    // Otherwise fallback to our neutral, plain-English synthesis.
+    const finalContent = (fullArticleText && fullArticleText.length > 250)
+      ? fullArticleText
+      : expandToJournalisticArticle(titleText, cleanSnippet, sourceName, countryName, undefined, 'politics');
 
     const articleId = `rss-${countryCode.toLowerCase()}-${Date.now()}-${idx}`;
     const slug = generateSlug(titleText);
@@ -236,7 +282,7 @@ function parseRssXmlToArticles(
       slug,
       title: displayTitle,
       snippet: cleanSnippet,
-      content: expandToJournalisticArticle(titleText, cleanSnippet, sourceName, countryName, undefined, 'politics'),
+      content: finalContent,
       ai_analysis: generateAiAnalysisSummary(titleText, cleanSnippet, sourceName, countryName),
       country_code: countryCode,
       language: 'en',
