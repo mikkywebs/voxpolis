@@ -19,7 +19,7 @@ export default function RelatedArticlesSection({ articles }: RelatedArticlesSect
         {articles.slice(0, 4).map((art) => (
           <Link
             key={art.id}
-            href={`/article/${art.slug}`}
+            href={`/news/${art.slug}`}
             className="group p-4 bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/60 rounded-xl shadow-sm hover:shadow-md transition flex flex-col justify-between"
           >
             <div>

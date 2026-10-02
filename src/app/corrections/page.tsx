@@ -109,7 +109,7 @@ export default function CorrectionsPage() {
                   required
                   value={articleUrl}
                   onChange={(e) => setArticleUrl(e.target.value)}
-                  placeholder="https://voxpolis.app/article/..."
+                  placeholder="https://voxpolis.app/news/..."
                   className="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
               </div>

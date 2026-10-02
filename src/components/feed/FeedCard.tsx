@@ -22,7 +22,7 @@ export default function FeedCard({ article }: FeedCardProps) {
     <article className="group bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/70 rounded-2xl overflow-hidden p-5 sm:p-6 shadow-sm hover:shadow-lg transition duration-200 flex flex-col justify-between">
       <div>
         {/* News Featured Image Thumbnail */}
-        <Link href={`/article/${article.slug}`} className="block mb-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900">
+        <Link href={`/news/${article.slug}`} className="block mb-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900">
           {/* eslint-disable-next-html-element-suppression */}
           <img
             src={imageUrl}
@@ -55,7 +55,7 @@ export default function FeedCard({ article }: FeedCardProps) {
           </div>
         )}
 
-        <Link href={`/article/${article.slug}`}>
+        <Link href={`/news/${article.slug}`}>
           <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-snug">
             {article.title}
           </h2>
@@ -76,10 +76,10 @@ export default function FeedCard({ article }: FeedCardProps) {
         </div>
 
         <Link
-          href={`/article/${article.slug}`}
+          href={`/news/${article.slug}`}
           className="font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-0.5 transition inline-flex items-center gap-1"
         >
-          <span>Read Full Summary</span>
+          <span>Read Full Report</span>
           <ExternalLink className="w-3.5 h-3.5" />
         </Link>
       </div>

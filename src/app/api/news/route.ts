@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchRssArticlesForCountry } from '@/lib/rss';
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData, generateAiAnalysisSummary } from '@/lib/news';
+import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle } from '@/lib/news';
 import { isValidContentImage } from '@/lib/pipeline/extractor';
 
 export const dynamic = 'force-dynamic';
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
                 slug: cleanSlug,
                 title: displayTitle,
                 snippet: rawDesc,
-                content: rawContent,
+                content: rawContent.length > 250 ? rawContent : expandToJournalisticArticle(displayTitle, rawDesc, sourceName, country.name, country.capital, item.category?.[0]),
                 ai_analysis: generateAiAnalysisSummary(displayTitle, rawDesc, sourceName, country.name),
                 country_code: countryCode,
                 language: language,

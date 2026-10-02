@@ -69,7 +69,7 @@ export default function PollSection({ poll, onRequireAuth, isLoggedIn = false }:
         <div className="flex items-center gap-2">
           <Vote className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Public Opinion Poll (Members Only)
+            Public Opinion Poll
           </span>
         </div>
         <span className="text-[11px] font-semibold text-gray-400">Binary Policy Stance</span>

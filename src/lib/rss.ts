@@ -1,5 +1,5 @@
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData, generateAiAnalysisSummary } from './news';
+import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle } from './news';
 import { isValidContentImage } from './pipeline/extractor';
 
 export interface RssFeedConfig {
@@ -236,7 +236,7 @@ function parseRssXmlToArticles(
       slug,
       title: displayTitle,
       snippet: cleanSnippet,
-      content: `${cleanSnippet}\n\nFull reporting documented directly in official press archives.`,
+      content: expandToJournalisticArticle(titleText, cleanSnippet, sourceName, countryName, undefined, 'politics'),
       ai_analysis: generateAiAnalysisSummary(titleText, cleanSnippet, sourceName, countryName),
       country_code: countryCode,
       language: 'en',

@@ -12,8 +12,8 @@ export default function SocialShareButtons({ title, slug }: SocialShareButtonsPr
   const [copied, setCopied] = useState(false);
 
   const fullUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/article/${slug}`
-    : `https://voxpolis.app/article/${slug}`;
+    ? `${window.location.origin}/news/${slug}`
+    : `https://voxpolis.app/news/${slug}`;
 
   const encodedUrl = encodeURIComponent(fullUrl);
   const encodedTitle = encodeURIComponent(title);

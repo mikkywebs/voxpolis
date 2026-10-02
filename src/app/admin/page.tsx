@@ -254,7 +254,7 @@ export default function AdminDashboardPage() {
           image_mode: 'original',
           original_image_url: item.featured_image_url,
           source_name: `Voxpolis Columnist (${item.author_name})`,
-          source_url: `https://voxpolis.app/article/${item.slug}`,
+          source_url: `https://voxpolis.app/news/${item.slug}`,
           is_breaking: false,
           tags: ['Op-Ed', 'Column', item.country_code],
           views_count: 0,
@@ -302,7 +302,7 @@ export default function AdminDashboardPage() {
         image_mode: 'original',
         original_image_url: pubImage || '/breaking-news-banner.png',
         source_name: 'Voxpolis Editorial Desk',
-        source_url: `https://voxpolis.app/article/${slug}`,
+        source_url: `https://voxpolis.app/news/${slug}`,
         is_breaking: true,
         tags: ['Breaking', 'Politics', country?.name || pubCountry],
         views_count: 0,
@@ -636,7 +636,7 @@ export default function AdminDashboardPage() {
                       {[
                         {
                           title: 'Oil Theft Has Reduced Dramatically, Tinubu Asserts',
-                          path: '/article/oil-theft-has-reduced-tinubu-says-7',
+                          path: '/news/oil-theft-has-reduced-tinubu-says-7',
                           country: 'Nigeria',
                           flag: '🇳🇬',
                           code: 'NG',
@@ -648,7 +648,7 @@ export default function AdminDashboardPage() {
                         },
                         {
                           title: 'Call Your Edo Chairman to Order, ADC Tells APC',
-                          path: '/article/call-your-edo-chairman-to-order-adc-tells-apc',
+                          path: '/news/call-your-edo-chairman-to-order-adc-tells-apc',
                           country: 'Nigeria',
                           flag: '🇳🇬',
                           code: 'NG',

@@ -42,6 +42,12 @@ export default function AdSlot({ slotLocation, isAllowed = true }: AdSlotProps) 
     return null;
   }
 
+  // Completely collapse and hide ad slots until live active AdSense or Monetag ID is configured
+  const isRealAdConfigured = !!(adClient && adClient !== 'ca-pub-0000000000000000' && adClient.startsWith('ca-pub-'));
+  if (!isRealAdConfigured) {
+    return null;
+  }
+
   // 160x600 Wide Skyscraper vertical format for desktop margins
   if (slotLocation === 'skyscraper_left' || slotLocation === 'skyscraper_right') {
     return (
@@ -50,21 +56,13 @@ export default function AdSlot({ slotLocation, isAllowed = true }: AdSlotProps) 
           ADVERTISEMENT
         </div>
         <div className="flex-1 flex items-center justify-center overflow-hidden">
-          {adClient && adClient !== 'ca-pub-0000000000000000' ? (
-            <ins
-              className="adsbygoogle"
-              style={{ display: 'inline-block', width: '160px', height: '560px' }}
-              data-ad-client={adClient}
-              data-ad-slot={slotLocation === 'skyscraper_left' ? '1600000001' : '1600000002'}
-              data-ad-format="vertical"
-            />
-          ) : (
-            <div className="text-[10px] text-gray-400 font-semibold flex flex-col items-center justify-center p-3 text-center">
-              <span className="font-bold text-gray-500 dark:text-gray-400">Wide Skyscraper</span>
-              <span className="text-[9px] text-blue-500 font-mono mt-1">160 × 600 px</span>
-              <span className="text-[9px] text-gray-400 mt-2 leading-tight">Google AdSense Partner Unit</span>
-            </div>
-          )}
+          <ins
+            className="adsbygoogle"
+            style={{ display: 'inline-block', width: '160px', height: '560px' }}
+            data-ad-client={adClient}
+            data-ad-slot={slotLocation === 'skyscraper_left' ? '1600000001' : '1600000002'}
+            data-ad-format="vertical"
+          />
         </div>
       </div>
     );
@@ -77,26 +75,20 @@ export default function AdSlot({ slotLocation, isAllowed = true }: AdSlotProps) 
       </div>
       {/* Responsive Google AdSense Container */}
       <div className="min-h-[90px] flex items-center justify-center overflow-hidden">
-        {adClient && adClient !== 'ca-pub-0000000000000000' ? (
-          <ins
-            className="adsbygoogle"
-            style={{ display: 'block', width: '100%', textAlign: 'center' }}
-            data-ad-client={adClient}
-            data-ad-slot={
-              slotLocation === 'below_dek'
-                ? '1000000001'
-                : slotLocation === 'mid_article'
-                ? '1000000002'
-                : '1000000003'
-            }
-            data-ad-format="auto"
-            data-full-width-responsive="true"
-          />
-        ) : (
-          <div className="text-[10px] text-gray-400 font-semibold">
-            Google AdSense Responsive Unit ({slotLocation})
-          </div>
-        )}
+        <ins
+          className="adsbygoogle"
+          style={{ display: 'block', width: '100%', textAlign: 'center' }}
+          data-ad-client={adClient}
+          data-ad-slot={
+            slotLocation === 'below_dek'
+              ? '1000000001'
+              : slotLocation === 'mid_article'
+              ? '1000000002'
+              : '1000000003'
+          }
+          data-ad-format="auto"
+          data-full-width-responsive="true"
+        />
       </div>
     </div>
   );

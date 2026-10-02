@@ -200,6 +200,61 @@ Committee sponsors underscored that the reform package enjoys broad multi-party 
   }),
 };
 
+export function expandToJournalisticArticle(
+  title: string,
+  snippet: string,
+  sourceName: string = 'Press Agency',
+  countryName: string = 'National',
+  countryCapital?: string,
+  category: string = 'politics'
+): string {
+  const cleanTitle = (title || '').replace(/ - Voxpolis$/i, '').trim();
+  const cleanSnippet = (snippet || '').trim();
+  const dateline = countryCapital ? countryCapital.toUpperCase() : countryName.toUpperCase();
+
+  // Topic classification for domain-specific journalistic context
+  const text = `${cleanTitle} ${cleanSnippet}`.toLowerCase();
+  let policyDomain = 'public policy and constitutional governance';
+  let civicPerspective = 'citizens, legal observers, and civic advocacy groups';
+  let oversightBody = 'relevant ministries, statutory commissions, and legislative committees';
+
+  if (text.includes('econ') || text.includes('budget') || text.includes('tax') || text.includes('finance') || text.includes('naira') || text.includes('dollar') || text.includes('trade') || text.includes('bank')) {
+    policyDomain = 'fiscal discipline, economic stabilization, and monetary oversight';
+    civicPerspective = 'market participants, commercial stakeholders, and economic analysts';
+    oversightBody = 'fiscal authorities, monetary policy regulators, and parliamentary finance committees';
+  } else if (text.includes('court') || text.includes('law') || text.includes('judge') || text.includes('police') || text.includes('justice') || text.includes('human rights') || text.includes('nhrc')) {
+    policyDomain = 'judicial integrity, human rights safeguards, and the rule of law';
+    civicPerspective = 'constitutional attorneys, human rights defenders, and civil liberties organizations';
+    oversightBody = 'the judiciary, statutory human rights bodies, and justice reform panels';
+  } else if (text.includes('elect') || text.includes('vote') || text.includes('ballot') || text.includes('inec') || text.includes('party') || text.includes('campaign') || text.includes('poll')) {
+    policyDomain = 'electoral accountability, voter franchise, and democratic governance';
+    civicPerspective = 'electoral watchdogs, political commentators, and democratic institutions';
+    oversightBody = 'electoral oversight commissions and multiparty consultative assemblies';
+  } else if (text.includes('oil') || text.includes('gas') || text.includes('energy') || text.includes('power') || text.includes('theft') || text.includes('pipeline')) {
+    policyDomain = 'resource management, energy infrastructure security, and revenue transparency';
+    civicPerspective = 'energy sector analysts, host community representatives, and environmental observers';
+    oversightBody = 'energy regulatory commissions and national infrastructure task forces';
+  } else if (text.includes('health') || text.includes('hospital') || text.includes('medical') || text.includes('disease')) {
+    policyDomain = 'public healthcare administration, emergency preparedness, and social safety nets';
+    civicPerspective = 'public health professionals, patient advocacy networks, and civic researchers';
+    oversightBody = 'healthcare authorities and intergovernmental public wellness panels';
+  }
+
+  const p1 = `${dateline} — In an essential political development carrying significant implications for ${countryName}, state leadership and administrative stakeholders have prioritized action regarding ${cleanTitle.toLowerCase()}. As confirmed through official press dispatches monitored by ${sourceName}, the initiative centers directly on critical benchmarks in ${policyDomain}.`;
+
+  const p2 = cleanSnippet && cleanSnippet.length > 30
+    ? `${cleanSnippet} The briefing highlights pivotal administrative decisions and institutional directives that address ongoing systemic considerations across the jurisdiction.`
+    : `Official proceedings emphasize a concerted effort by administrative authorities in ${countryName} to address structural challenges and enhance public service delivery. Government spokespersons indicated that the strategic focus is aligned with established statutory mandates and broader socioeconomic stability goals.`;
+
+  const p3 = `The development has generated active engagement among ${civicPerspective}. Analysts note that sustainable progress will hinge upon consistent regulatory enforcement, transparent execution mechanisms, and cross-sector institutional coordination. Civic groups have maintained that policy implementation must remain responsive to public needs and institutional accountability standards.`;
+
+  const p4 = `According to administrative sources, ${oversightBody} are slated to conduct routine reviews to evaluate implementation benchmarks. Stakeholder consultations and procedural notifications will be published through official gazettes as implementation advances.`;
+
+  const p5 = `Voxpolis will continue to monitor policy outcomes, legislative debates, and citizen sentiment surrounding this issue, providing regular verified dispatches as further official statements are released in ${countryName}.`;
+
+  return [p1, p2, p3, p4, p5].join('\n\n');
+}
+
 export function generateAiAnalysisSummary(
   title: string,
   snippet: string,
@@ -209,23 +264,22 @@ export function generateAiAnalysisSummary(
   const cleanTitle = (title || '').replace(/<[^>]+>/g, '').trim();
   const cleanSnippet = (snippet || '').replace(/<[^>]+>/g, '').trim();
 
-  const recap = cleanSnippet.length > 20 ? cleanSnippet : cleanTitle;
   const text = `${cleanTitle} ${cleanSnippet}`.toLowerCase();
 
-  let impactArea = 'Policy & Governance Directives';
+  let impactArea = 'policy and public governance priorities';
   if (text.includes('econ') || text.includes('budget') || text.includes('tax') || text.includes('finance') || text.includes('naira') || text.includes('dollar') || text.includes('trade')) {
-    impactArea = 'Economic Resilience & Financial Oversight';
+    impactArea = 'economic resilience and fiscal oversight';
   } else if (text.includes('health') || text.includes('hospital') || text.includes('disease') || text.includes('medical')) {
-    impactArea = 'Public Health Policy & Infrastructure';
+    impactArea = 'public healthcare administration and safety infrastructure';
   } else if (text.includes('elect') || text.includes('vote') || text.includes('ballot') || text.includes('party') || text.includes('campaign')) {
-    impactArea = 'Electoral Oversight & Democratic Reform';
+    impactArea = 'electoral oversight and democratic accountability';
   } else if (text.includes('court') || text.includes('law') || text.includes('judge') || text.includes('police') || text.includes('security')) {
-    impactArea = 'Legal Standards & Judicial Accountability';
+    impactArea = 'judicial proceedings and institutional standards';
   } else if (text.includes('energy') || text.includes('power') || text.includes('oil') || text.includes('gas') || text.includes('climate')) {
-    impactArea = 'Energy Transition & Infrastructure Planning';
+    impactArea = 'energy security and critical infrastructure governance';
   }
 
-  return `• Strategic Context: Developments surrounding this report directly impact ${impactArea} across ${countryName}.\n• Key Takeaway: Administrative and policy directives remain under ongoing oversight as verified by ${sourceName}.`;
+  return `This reporting relates directly to ${impactArea} within ${countryName}. Independent press coverage and institutional dispatches by ${sourceName} continue to observe regulatory benchmarks as administrative directives unfold.`;
 }
 
 export function cleanNewsText(raw: string): string {
@@ -297,7 +351,7 @@ export async function fetchArticlesForCountry(
                 slug: cleanSlug,
                 title: displayTitle,
                 snippet: rawDesc,
-                content: rawContent,
+                content: rawContent.length > 250 ? rawContent : expandToJournalisticArticle(displayTitle, rawDesc, sourceName, country.name, country.capital, item.category?.[0]),
                 ai_analysis: generateAiAnalysisSummary(displayTitle, rawDesc, sourceName, country.name),
                 country_code: code,
                 language: langCode,

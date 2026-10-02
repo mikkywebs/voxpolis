@@ -229,7 +229,7 @@ export default function LandingPage() {
                 </div>
 
                 <Link
-                  href={`/article/${activeSlide.slug}`}
+                  href={`/news/${activeSlide.slug}`}
                   className="group hover:opacity-95 transition"
                 >
                   <h2 className="text-xl sm:text-3xl font-black text-white leading-tight max-w-4xl group-hover:text-blue-300 transition">
@@ -249,7 +249,7 @@ export default function LandingPage() {
                     )}
                   </div>
                   <Link
-                    href={`/article/${activeSlide.slug}`}
+                    href={`/news/${activeSlide.slug}`}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1"
                   >
                     <span>Read Full Brief</span>

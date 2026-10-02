@@ -65,7 +65,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (art.slug && !addedSlugs.has(art.slug) && !art.content.includes('[...]')) {
         addedSlugs.add(art.slug);
         dynamicRoutes.push({
-          url: `${baseUrl}/article/${art.slug}`,
+          url: `${baseUrl}/news/${art.slug}`,
           lastModified: new Date(art.created_at || Date.now()),
           changeFrequency: 'weekly',
           priority: 0.8,
@@ -80,7 +80,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (pArt.slug && pArt.status === 'published' && !addedSlugs.has(pArt.slug)) {
       addedSlugs.add(pArt.slug);
       dynamicRoutes.push({
-        url: `${baseUrl}/article/${pArt.slug}`,
+        url: `${baseUrl}/news/${pArt.slug}`,
         lastModified: new Date(pArt.created_at || Date.now()),
         changeFrequency: 'weekly',
         priority: 0.8,

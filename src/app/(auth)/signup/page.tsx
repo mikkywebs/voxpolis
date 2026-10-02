@@ -13,6 +13,7 @@ export default function SignupPage() {
   const supabase = createClient();
 
   const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -86,6 +87,7 @@ export default function SignupPage() {
           emailRedirectTo: redirectUrl,
           data: {
             full_name: fullName,
+            username: username.replace(/^@/, '').trim().toLowerCase(),
             primary_country: detectedCountry.code,
             country_name: detectedCountry.name,
           },
@@ -98,7 +100,11 @@ export default function SignupPage() {
         return;
       }
 
-      // Save user primary country to localStorage
+      // Save user primary country and profile info to localStorage
+      localStorage.setItem('voxpolis_user_name', fullName);
+      if (username) {
+        localStorage.setItem('voxpolis_username', username.replace(/^@/, '').trim().toLowerCase());
+      }
       localStorage.setItem('voxpolis_primary_country', detectedCountry.code);
       localStorage.setItem('voxpolis_preferred_language', 'en');
 
@@ -257,6 +263,26 @@ export default function SignupPage() {
               />
               <User className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1">
+              Preferred Username (Civic Handle)
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                placeholder="e.g. tunde_law"
+                className="w-full text-xs p-3 pl-10 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+              />
+              <span className="text-gray-400 font-bold text-sm absolute left-3.5 top-3">@</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">
+              Shows alongside your country flag when you comment. No phone number required.
+            </p>
           </div>
 
           <div>
