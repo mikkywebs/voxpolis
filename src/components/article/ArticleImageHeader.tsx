@@ -14,6 +14,7 @@ interface ArticleImageHeaderProps {
   viewsCount?: number;
   totalReadingTimeSeconds?: number;
   createdAt?: string;
+  author?: string;
 }
 
 export default function ArticleImageHeader({
@@ -27,6 +28,7 @@ export default function ArticleImageHeader({
   viewsCount = 0,
   totalReadingTimeSeconds = 180,
   createdAt,
+  author,
 }: ArticleImageHeaderProps) {
   const readingTimeMin = Math.max(1, Math.ceil(totalReadingTimeSeconds / 60));
   const formattedTimestamp = formatExactTimestamp(createdAt);
@@ -65,11 +67,15 @@ export default function ArticleImageHeader({
         </div>
       </div>
 
-      {formattedTimestamp && (
-        <div className="text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wide uppercase">
-          Published: {formattedTimestamp}
-        </div>
-      )}
+      <div className="flex items-center gap-2 flex-wrap text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wide uppercase">
+        {formattedTimestamp && <span>Published: {formattedTimestamp}</span>}
+        {author && (
+          <>
+            <span>•</span>
+            <span className="text-blue-600 dark:text-blue-400 font-semibold normal-case">By {author}</span>
+          </>
+        )}
+      </div>
 
       <h1 className="text-2xl sm:text-4xl font-extrabold text-gray-900 dark:text-white leading-tight tracking-tight">
         {cleanTitle}

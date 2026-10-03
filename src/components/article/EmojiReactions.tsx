@@ -88,15 +88,9 @@ export default function EmojiReactions({ articleId, onRequireAuth, isLoggedIn = 
   ];
 
   return (
-    <section className="my-6 p-4 sm:p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm">
-      <div className="text-center mb-3">
-        <span className="text-[11px] font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
-          Community Pulse
-        </span>
-      </div>
-
-      {/* Centered Large Emojis in a Single Row (matching user screenshot) */}
-      <div className="flex items-center justify-center gap-3 sm:gap-6 flex-wrap">
+    <section className="my-2 sm:my-4 py-2 px-1 sm:px-4 rounded-xl sm:rounded-2xl bg-white/70 dark:bg-gray-900/70 border border-gray-150 dark:border-gray-800 shadow-xs">
+      {/* 6 Reaction Emojis in a Single Responsive Row on Mobile and Desktop */}
+      <div className="grid grid-cols-6 items-center justify-items-center w-full max-w-xl mx-auto gap-0.5 sm:gap-3">
         {reactions.map((r) => {
           const isSelected = userReaction === r.type;
           const count = counts[r.type] || 0;
@@ -106,22 +100,22 @@ export default function EmojiReactions({ articleId, onRequireAuth, isLoggedIn = 
               key={r.type}
               type="button"
               onClick={() => handleReact(r.type)}
-              className={`group flex flex-col items-center justify-center py-2 px-2.5 sm:px-3.5 rounded-2xl transition-all duration-200 transform cursor-pointer ${
+              className={`group flex flex-col items-center justify-center w-full py-1 px-0.5 sm:px-2 rounded-xl transition-all duration-150 cursor-pointer ${
                 isSelected
-                  ? 'bg-blue-50 dark:bg-blue-950/60 border border-blue-400 dark:border-blue-600 scale-105 shadow-sm'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-800/80 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:scale-105'
+                  ? 'bg-blue-50 dark:bg-blue-950/60 border border-blue-400 dark:border-blue-600 scale-105 shadow-xs'
+                  : 'hover:bg-gray-100/80 dark:hover:bg-gray-800/80 border border-transparent'
               }`}
             >
-              {/* Big, Crisp Emoji */}
-              <span className="text-3xl sm:text-4xl filter group-hover:scale-110 transition-transform select-none drop-shadow-sm">
+              {/* Emoji */}
+              <span className="text-2xl sm:text-3xl filter group-hover:scale-110 transition-transform select-none drop-shadow-xs">
                 {r.emoji}
               </span>
 
-              {/* Label below emoji */}
+              {/* Label */}
               <span
-                className={`text-[11px] sm:text-xs font-bold mt-1.5 transition-colors ${
+                className={`text-[10px] sm:text-xs font-semibold mt-1 transition-colors truncate max-w-full text-center ${
                   isSelected
-                    ? 'text-blue-600 dark:text-blue-400 font-extrabold'
+                    ? 'text-blue-600 dark:text-blue-400 font-bold'
                     : 'text-gray-700 dark:text-gray-300'
                 }`}
               >
@@ -130,12 +124,12 @@ export default function EmojiReactions({ articleId, onRequireAuth, isLoggedIn = 
 
               {/* Real count pill */}
               <span
-                className={`text-[10px] font-semibold mt-0.5 px-2 py-0.5 rounded-full transition-colors ${
+                className={`text-[9px] sm:text-[10px] font-semibold mt-0.5 px-1.5 py-0.2 rounded-full transition-colors ${
                   count > 0
                     ? isSelected
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                    : 'text-transparent opacity-0'
+                    : 'text-transparent opacity-0 pointer-events-none'
                 }`}
               >
                 {count > 0 ? count : '0'}

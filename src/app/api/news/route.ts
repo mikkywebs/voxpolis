@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchRssArticlesForCountry } from '@/lib/rss';
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion } from '@/lib/news';
+import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion, isColumnistOrOpinion } from '@/lib/news';
 import { isValidContentImage } from '@/lib/pipeline/extractor';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
         const data = await res.json();
         if (data.results && Array.isArray(data.results)) {
           newsDataArticles = data.results
-            .filter((item: any) => isValidContentImage(item.image_url))
+            .filter((item: any) => isValidContentImage(item.image_url) && !isColumnistOrOpinion(item.title, item.description, item.keywords || item.category, item.link))
             .map((item: any, idx: number) => {
               const cleanTitle = (item.title || 'Political Update')
                 .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')

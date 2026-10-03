@@ -18,7 +18,7 @@ import OriginalSourceLink from '@/components/article/OriginalSourceLink';
 import AdSlot from '@/components/article/AdSlot';
 import DesktopVignetteAd from '@/components/ads/DesktopVignetteAd';
 import { SUPPORTED_COUNTRIES, getCountryByCode, getCountrySlug } from '@/config/countries';
-import { fetchArticlesForCountry, ArticleData, expandToJournalisticArticle, formatCleanSnippet } from '@/lib/news';
+import { fetchArticlesForCountry, ArticleData, expandToJournalisticArticle, formatCleanSnippet, isColumnistOrOpinion } from '@/lib/news';
 import { getPipelineArticleBySlug } from '@/lib/pipeline';
 import { get301Redirect } from '@/lib/pipeline/redirects';
 import { PipelineArticleRecord } from '@/lib/pipeline/types';
@@ -42,6 +42,9 @@ export default function NewsDetailPage() {
   const [realViews, setRealViews] = useState(0);
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [userNameDisplay, setUserNameDisplay] = useState<string | undefined>(undefined);
+  const [isColumnist, setIsColumnist] = useState(false);
+  const [requiresReview, setRequiresReview] = useState(false);
+  const [extractedAuthor, setExtractedAuthor] = useState<string | undefined>(undefined);
 
   // Active ads check
   const hasActiveAds = !!(
@@ -153,34 +156,71 @@ export default function NewsDetailPage() {
         localStorage.setItem(storedKey, nextViews.toString());
         setRealViews(nextViews);
 
-        // Background extraction of authentic journalist text from source URL
-        const isSyntheticTemplate =
-          !found.content ||
-          found.content.length < 500 ||
-          found.content.includes('Political developments in') ||
-          found.content.includes('dispatches gathered by') ||
-          found.content.includes('In a significant development,');
-
-        // Purge legacy verbatim cache so duplicate text is removed immediately
+        // Purge legacy verbatim & v2 cache so duplicate or robotic text is removed immediately
         try {
           localStorage.removeItem(`voxpolis_content_${found.id}`);
+          localStorage.removeItem(`voxpolis_content_v2_${found.id}`);
         } catch {}
 
-        const cachedContent = localStorage.getItem(`voxpolis_content_v2_${found.id}`);
-        if (cachedContent && cachedContent.length > 250) {
-          setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: cachedContent } : prev));
+        // Check if article is flagged as columnist/opinion from metadata/url
+        const flaggedAsColumnist = isColumnistOrOpinion(found.title, found.snippet, found.tags, found.source_url);
+        if (flaggedAsColumnist) {
+          setIsColumnist(true);
+        }
+
+        const cachedMetaStr = localStorage.getItem(`voxpolis_content_v3_${found.id}`);
+        if (cachedMetaStr) {
+          try {
+            const cachedMeta = JSON.parse(cachedMetaStr);
+            if (cachedMeta.isColumnist) {
+              setIsColumnist(true);
+            }
+            if (cachedMeta.author) {
+              setExtractedAuthor(cachedMeta.author);
+            }
+            if (cachedMeta.content && cachedMeta.content.length > 200) {
+              setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: cachedMeta.content, author: cachedMeta.author || prev.author } : prev));
+            }
+          } catch {
+            if (cachedMetaStr.length > 200) {
+              setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: cachedMetaStr } : prev));
+            }
+          }
         } else if (
           found.source_url &&
           found.source_url.startsWith('http') &&
-          !found.source_url.includes('voxpolis.app') &&
-          isSyntheticTemplate
+          !found.source_url.includes('voxpolis.app')
         ) {
           fetch(`/api/news/extract?url=${encodeURIComponent(found.source_url)}`)
             .then((r) => r.json())
             .then((extracted) => {
-              if (extracted?.success && extracted.content && extracted.content.length > 250) {
-                localStorage.setItem(`voxpolis_content_v2_${found.id}`, extracted.content);
-                setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: extracted.content } : prev));
+              if (extracted?.success) {
+                if (extracted.isColumnist) {
+                  setIsColumnist(true);
+                  try {
+                    localStorage.setItem(
+                      `voxpolis_content_v3_${found.id}`,
+                      JSON.stringify({ isColumnist: true, author: extracted.author, sourceName: extracted.sourceName, sourceUrl: extracted.sourceUrl })
+                    );
+                  } catch {}
+                  return;
+                }
+                if (extracted.author) {
+                  setExtractedAuthor(extracted.author);
+                }
+                if (extracted.content && extracted.content.length > 200) {
+                  try {
+                    localStorage.setItem(
+                      `voxpolis_content_v3_${found.id}`,
+                      JSON.stringify({ content: extracted.content, author: extracted.author, isColumnist: false })
+                    );
+                  } catch {}
+                  setArticle((prev) =>
+                    prev && prev.id === found.id ? { ...prev, content: extracted.content, author: extracted.author || prev.author } : prev
+                  );
+                }
+              } else if (extracted?.requiresReview) {
+                setRequiresReview(true);
               }
             })
             .catch(() => {});
@@ -725,6 +765,7 @@ export default function NewsDetailPage() {
             isBreaking={article!.is_breaking}
             viewsCount={realViews}
             createdAt={article!.created_at}
+            author={extractedAuthor || article!.author}
           />
 
           {/* Community Pulse immediately after header as requested */}
@@ -738,27 +779,90 @@ export default function NewsDetailPage() {
 
           <AdSlot slotLocation="below_dek" isAllowed={true} />
 
-          {/* Full Rich Journalistic Story (neat, professional editorial font size) */}
-          <div className="prose dark:prose-invert max-w-none text-base sm:text-[17px] leading-relaxed sm:leading-8 text-gray-800 dark:text-gray-200 space-y-5 my-6">
-            {fallbackParagraphs.slice(0, fbMidPoint).map((paragraph, i) => (
-              <p key={i}>{paragraph}</p>
-            ))}
+          {/* Content Rendering: Columnist Card OR Review Card OR Authentic Story */}
+          {isColumnist ? (
+            <div className="p-6 sm:p-8 rounded-2xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-center space-y-4 my-6 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center mx-auto">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div className="space-y-2">
+                <span className="px-3 py-1 bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200 text-[11px] font-extrabold rounded-full uppercase tracking-wider">
+                  Independent Column / Op-Ed
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white pt-1">
+                  Columnist Perspective
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 max-w-lg mx-auto leading-relaxed">
+                  This piece is an independent opinion or columnist contribution{extractedAuthor ? ` by ${extractedAuthor}` : ''} originally published by <strong>{article!.source_name}</strong>. Voxpolis automated feeds focus strictly on verified news dispatches and governance facts. You can read the original column directly on {article!.source_name}.
+                </p>
+              </div>
+              <div className="pt-2">
+                <a
+                  href={article!.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-500 text-white text-xs sm:text-sm font-bold rounded-xl shadow transition"
+                >
+                  <span>Read Full Column on {article!.source_name}</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+          ) : requiresReview && fallbackParagraphs.length < 2 ? (
+            <div className="p-6 sm:p-8 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-center space-y-4 my-6 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex items-center justify-center mx-auto">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div className="space-y-2">
+                <span className="px-3 py-1 bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-[11px] font-extrabold rounded-full uppercase tracking-wider">
+                  Source Dispatch Awaiting Review
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white pt-1">
+                  Primary Reporting Available on Source
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 max-w-lg mx-auto leading-relaxed">
+                  This briefing was reported by <strong>{article!.source_name}</strong>. The primary source report cannot be directly rendered at this moment. You can review the full reporting directly on the publisher&apos;s website.
+                </p>
+              </div>
+              <div className="pt-2">
+                <a
+                  href={article!.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold rounded-xl shadow transition"
+                >
+                  <span>Read Primary Reporting on {article!.source_name}</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="prose dark:prose-invert max-w-none text-base sm:text-[17px] leading-relaxed sm:leading-8 text-gray-800 dark:text-gray-200 space-y-5 my-6">
+              {fallbackParagraphs.slice(0, fbMidPoint).map((paragraph, i) => (
+                <p key={i}>{paragraph}</p>
+              ))}
 
-            <AdSlot slotLocation="mid_article" isAllowed={true} />
+              <AdSlot slotLocation="mid_article" isAllowed={true} />
 
-            {fallbackParagraphs.slice(fbMidPoint).map((paragraph, i) => (
-              <p key={i + fbMidPoint}>{paragraph}</p>
-            ))}
-          </div>
+              {fallbackParagraphs.slice(fbMidPoint).map((paragraph, i) => (
+                <p key={i + fbMidPoint}>{paragraph}</p>
+              ))}
+            </div>
+          )}
 
-          <AIAnalysisSection
-            analysisText={article!.ai_analysis}
-            readAlsoArticle={
-              relatedArticles[0]
-                ? { title: relatedArticles[0].title, slug: relatedArticles[0].slug }
-                : undefined
-            }
-          />
+          {/* Prominent Footer Source Citation Card */}
+          <OriginalSourceLink sourceName={article!.source_name} sourceUrl={article!.source_url} />
+
+          {!isColumnist && (
+            <AIAnalysisSection
+              analysisText={article!.ai_analysis}
+              readAlsoArticle={
+                relatedArticles[0]
+                  ? { title: relatedArticles[0].title, slug: relatedArticles[0].slug }
+                  : undefined
+              }
+            />
+          )}
 
           <AffiliateSection label={article!.affiliate_link_label} url={article!.affiliate_link_url} />
 
@@ -791,8 +895,6 @@ export default function NewsDetailPage() {
             onAddReply={handleAddReply}
             onReact={handleReact}
           />
-
-          <OriginalSourceLink sourceName={article!.source_name} sourceUrl={article!.source_url} />
 
           <AdSlot slotLocation="below_sources" isAllowed={true} />
         </main>

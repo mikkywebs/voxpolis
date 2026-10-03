@@ -21,6 +21,7 @@ export interface ArticleData {
   ai_image_url?: string;
   source_name: string;
   source_url: string;
+  author?: string;
   is_breaking: boolean;
   tags: string[];
   views_count: number;
@@ -122,9 +123,89 @@ export function formatCleanSnippet(text: string, maxLen: number = 280): string {
   return wordTrimmed.replace(/[,;:\s-]+$/, '') + '.';
 }
 
-export function isPoliticalNews(title: string, snippet: string = '', tags: string[] = []): boolean {
+export function isColumnistOrOpinion(
+  title: string = '',
+  snippet: string = '',
+  tags: string[] = [],
+  url: string = ''
+): boolean {
+  const cleanTitle = (title || '').toLowerCase().trim();
+  const cleanSnippet = (snippet || '').toLowerCase().trim();
+  const cleanUrl = (url || '').toLowerCase().trim();
+  const tagsStr = (tags || []).join(' ').toLowerCase();
+  const text = `${cleanTitle} ${cleanSnippet} ${tagsStr}`;
+
+  // 1. URL Path markers
+  if (
+    cleanUrl.includes('/columns/') ||
+    cleanUrl.includes('/column/') ||
+    cleanUrl.includes('/opinion/') ||
+    cleanUrl.includes('/opinions/') ||
+    cleanUrl.includes('/editorial/') ||
+    cleanUrl.includes('/editorials/') ||
+    cleanUrl.includes('/op-ed/') ||
+    cleanUrl.includes('/columnists/') ||
+    cleanUrl.includes('/columnist/') ||
+    cleanUrl.includes('/perspective/') ||
+    cleanUrl.includes('/commentary/')
+  ) {
+    return true;
+  }
+
+  // 2. Title indicators
+  if (
+    cleanTitle.startsWith('column:') ||
+    cleanTitle.startsWith('[column]') ||
+    cleanTitle.startsWith('(column)') ||
+    cleanTitle.startsWith('opinion:') ||
+    cleanTitle.startsWith('[opinion]') ||
+    cleanTitle.startsWith('(opinion)') ||
+    cleanTitle.startsWith('editorial:') ||
+    cleanTitle.startsWith('[editorial]') ||
+    cleanTitle.startsWith('op-ed:') ||
+    cleanTitle.startsWith('[op-ed]') ||
+    cleanTitle.startsWith('commentary:') ||
+    cleanTitle.includes('column by ') ||
+    cleanTitle.includes('column every ') ||
+    cleanTitle.includes('saturday column') ||
+    cleanTitle.includes('monday column') ||
+    cleanTitle.includes('tuesday column') ||
+    cleanTitle.includes('wednesday column') ||
+    cleanTitle.includes('thursday column') ||
+    cleanTitle.includes('friday column') ||
+    cleanTitle.includes('sunday column')
+  ) {
+    return true;
+  }
+
+  // 3. Category / Tag indicators
+  const columnistKeywords = ['column', 'columns', 'columnist', 'columnists', 'opinion', 'opinions', 'editorial', 'editorials', 'op-ed', 'op-eds', 'commentary'];
+  if (tags && tags.some((t) => columnistKeywords.includes(t.toLowerCase().trim()))) {
+    return true;
+  }
+
+  // 4. Content / Snippet indicators
+  if (
+    text.includes('columnist every') ||
+    text.includes('weekly column') ||
+    text.includes('op-ed contributor') ||
+    text.includes('is a commentator on national issues') ||
+    text.includes('commentator on national issues')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function isPoliticalNews(title: string, snippet: string = '', tags: string[] = [], url: string = ''): boolean {
   const cleanTitle = (title || '').toLowerCase().trim();
   const text = `${cleanTitle} ${snippet} ${tags.join(' ')}`.toLowerCase();
+
+  // Decline columnist / opinion articles for now
+  if (isColumnistOrOpinion(title, snippet, tags, url)) {
+    return false;
+  }
 
   // Strictly exclude photo-gallery and image-dump posts (e.g. "[PHOTOS] Tinubu Hosts...", "PHOTOS: ...", "[PICTURES]")
   if (
@@ -338,26 +419,14 @@ export function expandToJournalisticArticle(
   const cleanSnippet = (snippet || '').trim();
   const dateline = countryCapital ? countryCapital.toUpperCase() : countryName.toUpperCase();
 
-  // 1. Direct Executive Lead (natural active voice)
-  const cleanLowerLead = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
-  const p1 = `${dateline} — ${cleanLowerLead}. According to verified reports gathered and monitored through ${sourceName}, the matter has drawn immediate scrutiny across official, civic, and public circles in ${countryName}.`;
-
-  // 2. Concrete specifics and factual synthesis
+  const p1 = `${dateline} — ${cleanTitle}.`;
   const p2 =
     cleanSnippet && cleanSnippet.length > 25
-      ? `${cleanSnippet} Official records and on-the-record statements outline the primary actions, declarations, and proceedings undertaken by the key figures involved, sparking active deliberations regarding near-term administrative and political consequences.`
-      : `Key stakeholders and government officials have issued public statements outlining their administrative positions. Observers across ${countryName} are monitoring these proceedings to assess their direct consequences on public policy and regional governance.`;
+      ? cleanSnippet
+      : `Primary political reporting and verified dispatches monitored through ${sourceName}.`;
+  const p3 = `Dispatches for this report were monitored through coverage by ${sourceName}. Voxpolis independently tracks policy developments and public accountability across ${countryName}.`;
 
-  // 3. Strategic, Institutional & Policy Ramifications
-  const p3 = `Beyond executive announcements and political declarations, policy observers note that developments of this nature test administrative efficiency, regulatory compliance, and institutional integrity. In ${countryName}, genuine democratic stability depends on whether governance decisions operate with transparency, due process, and equal protection under statutory laws.`;
-
-  // 4. Civic & Public Interest Reality (plain terms, citizen impact)
-  const p4 = `For citizens and community watchdogs, the central test remains whether official actions deliver measurable public benefits or merely serve partisan convenience. Independent analysts underscore that sustainable civic progress requires public officials to remain directly accountable to the electorate and uphold institutional openness at all times.`;
-
-  // 5. Verification & Desk Follow-Up
-  const p5 = `Dispatches and foundational facts for this report were monitored and verified through coverage by ${sourceName}. Voxpolis will continue tracking subsequent regulatory steps, legal motions, and public reactions across ${countryName} as events progress.`;
-
-  return [p1, p2, p3, p4, p5].join('\n\n');
+  return [p1, p2, p3].join('\n\n');
 }
 
 export function generateAiAnalysisSummary(

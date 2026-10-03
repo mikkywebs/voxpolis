@@ -4,90 +4,79 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * Universal Journalistic Synthesizer:
- * Takes raw extracted dispatches from any source globally (Nigeria, US, UK, Kenya, etc.)
- * and transforms them into an original, 100% unique, search-indexed Voxpolis briefing.
- * Never copies sentences verbatim, preventing duplicate content penalties and AdSense rejections.
+ * Faithful Editorial Rewriter powered by Anthropic Claude:
+ * Ingests raw extracted news dispatches, preserving 100% of facts, names, figures,
+ * dates, and direct quotes, while producing clean, original, search-optimized Voxpolis prose.
  */
-function synthesizeJournalisticBriefing(
+async function rewriteWithAnthropicClaude(
   paragraphs: string[],
-  sourceUrl: string
-): { content: string; paragraphs: string[]; wordCount: number } {
-  let sourceHost = 'News Wire';
+  sourceUrl: string,
+  headline: string,
+  sourceName: string
+): Promise<{ content: string; paragraphs: string[] } | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey.trim() === '') {
+    return null;
+  }
+
+  const rawText = paragraphs.join('\n\n').slice(0, 9000);
+
+  const systemPrompt = `You are the Voxpolis senior editorial desk rewrite engine. You are provided with the raw extracted text of a verified political news report. Your task is to produce a 100% faithful, search-indexed, original news article for Voxpolis readers.
+
+STRICT EDITORIAL RULES:
+1. RETAIN 100% OF THE FACTUAL MEANING: Every single person named, institution, political party, bill, monetary figure, percentage, location, date, and core incident must be accurately preserved. Do not invent any new facts or speculate.
+2. NO GENERIC ROBOTIC FILLER: Never write vague filler paragraphs like "Beyond executive announcements...", "For citizens and community watchdogs...", "Strategic considerations continue to emerge...", or "In a significant development...".
+3. PRESERVE DIRECT QUOTATIONS: Keep key direct quotes accurate, attributing the speaker properly (e.g. As told to ${sourceName}, the official stated: "...").
+4. IN-LINE ATTRIBUTION: Attribute the primary reporting to ${sourceName} naturally in the lead or body (e.g. "According to verified reports monitored through ${sourceName}...").
+5. PROSE STYLE: Clean, authoritative, engaging, objective news journalism in active voice.
+6. OUTPUT FORMAT: Output 3 to 6 substantial paragraphs separated by double line breaks (\\n\\n). No markdown headings, no bullet points, no commentary, no intro greetings. Output only the news article paragraphs.`;
+
   try {
-    const u = new URL(sourceUrl);
-    sourceHost = u.hostname.replace(/^www\./, '');
-  } catch {}
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 14000);
 
-  const sourceNameMap: Record<string, string> = {
-    'channelstv.com': 'Channels Television',
-    'premiumtimesng.com': 'Premium Times',
-    'vanguardngr.com': 'Vanguard News',
-    'punchng.com': 'The Punch',
-    'thenationonlineng.net': 'The Nation',
-    'dailytrust.com': 'Daily Trust',
-    'thecable.ng': 'TheCable',
-    'reuters.com': 'Reuters',
-    'apnews.com': 'Associated Press',
-    'bbc.com': 'BBC News',
-    'aljazeera.com': 'Al Jazeera',
-    'edition.cnn.com': 'CNN',
-    'guardian.ng': 'The Guardian',
-    'businessday.ng': 'BusinessDay',
-  };
-
-  const detectedSource = sourceNameMap[sourceHost] || sourceHost;
-
-  // Clean raw sentences and extract key factual points
-  const allSentences: string[] = [];
-  paragraphs.forEach((p) => {
-    const rawMatches = p.match(/[^.!?]+[.!?]+/g) || [p];
-    rawMatches.forEach((s) => {
-      const trimmed = s.trim();
-      if (
-        trimmed.length > 30 &&
-        !trimmed.toLowerCase().includes('click here') &&
-        !trimmed.toLowerCase().includes('read also') &&
-        !trimmed.toLowerCase().includes('advertisement') &&
-        !trimmed.toLowerCase().includes('follow us')
-      ) {
-        allSentences.push(trimmed);
-      }
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 1500,
+        temperature: 0.2,
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: `Headline: ${headline}\nPublisher: ${sourceName}\nURL: ${sourceUrl}\n\nRaw Source Text:\n${rawText}`,
+          },
+        ],
+      }),
     });
-  });
 
-  // Extract core facts while rephrasing into independent editorial prose
-  const leadFact = allSentences[0] || 'Official proceedings and political engagements were reported today.';
-  const secondaryFacts = allSentences.slice(1, 4).join(' ');
-  const additionalContext = allSentences.slice(4, 7).join(' ');
+    clearTimeout(timeoutId);
 
-  // 1. Executive Lead (synthesizing who, what, and the occasion)
-  const p1 = `According to verified political dispatches monitored from ${detectedSource}, public attention is focused on recent key developments and official statements. ${leadFact.replace(/^["'“]|["'”]$/g, '').trim()} The situation has stimulated active debate across institutional, civic, and policy circles.`;
+    if (response.ok) {
+      const data = await response.json();
+      const text = data.content?.[0]?.text?.trim();
+      if (text && text.length > 200) {
+        const rewrittenParas = text.split('\n\n').map((p: string) => p.trim()).filter((p: string) => p.length > 30);
+        if (rewrittenParas.length >= 2) {
+          return {
+            content: rewrittenParas.join('\n\n'),
+            paragraphs: rewrittenParas,
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Anthropic rewrite request error or timeout:', e);
+  }
 
-  // 2. Core Developments & Factual Synthesis (rephrasing the substance)
-  const p2 = secondaryFacts.length > 50
-    ? `Verified accounts outline the primary actions, declarations, and engagements involving principal stakeholders. Specifically, reported records confirm that ${secondaryFacts.replace(/according to [^,.]+/gi, '').replace(/\s+/g, ' ').trim()} These verified proceedings represent notable maneuvers within the current administrative landscape.`
-    : `Principal stakeholders and relevant authorities have taken direct positions on the matter, outlining their operational stances and policy rationale before the public and relevant regulatory bodies.`;
-
-  // 3. Institutional, Policy & Governance Analysis
-  const p3 = additionalContext.length > 50
-    ? `Strategic considerations continue to emerge as policy observers evaluate the broader ramifications. Reports indicate that ${additionalContext.replace(/\s+/g, ' ').trim()} Independent policy monitors note that these actions carry direct significance for institutional governance, administrative transparency, and statutory compliance.`
-    : `Policy analysts underscore that developments of this nature test institutional transparency and the rule of law. Beyond public rhetoric, constitutional standards and statutory guidelines remain the fundamental benchmarks against which official decisions must be judged.`;
-
-  // 4. Civic Impact & Public Accountability Reality
-  const p4 = `Across civic communities, citizens and independent watchdogs are observing whether official promises and administrative moves result in tangible public interest outcomes. The primary standard for leadership remains consistent: measurable public service, economic accountability, and fair institutional processes for ordinary citizens.`;
-
-  // 5. Source Attribution and Editorial Verification
-  const p5 = `Dispatches and primary facts for this briefing were gathered and verified through reporting by ${detectedSource}. Voxpolis independently synthesizes, verifies, and analyzes regional political intelligence to uphold public accountability and democratic awareness.`;
-
-  const synthesizedParas = [p1, p2, p3, p4, p5];
-  const fullText = synthesizedParas.join('\n\n');
-
-  return {
-    content: fullText,
-    paragraphs: synthesizedParas,
-    wordCount: fullText.split(/\s+/).length,
-  };
+  return null;
 }
 
 export async function GET(request: NextRequest) {
@@ -107,9 +96,36 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Malformed URL' }, { status: 400 });
   }
 
+  let sourceHost = 'News Wire';
+  try {
+    const u = new URL(sourceUrl);
+    sourceHost = u.hostname.replace(/^www\./, '');
+  } catch {}
+
+  const sourceNameMap: Record<string, string> = {
+    'channelstv.com': 'Channels Television',
+    'premiumtimesng.com': 'Premium Times',
+    'vanguardngr.com': 'Vanguard News',
+    'punchng.com': 'The Punch',
+    'thenationonlineng.net': 'The Nation',
+    'dailytrust.com': 'Daily Trust',
+    'thecable.ng': 'TheCable',
+    'thenews-chronicle.com': 'The News Chronicle',
+    'dailypost.ng': 'Daily Post',
+    'reuters.com': 'Reuters',
+    'apnews.com': 'Associated Press',
+    'bbc.com': 'BBC News',
+    'aljazeera.com': 'Al Jazeera',
+    'edition.cnn.com': 'CNN',
+    'guardian.ng': 'The Guardian',
+    'businessday.ng': 'BusinessDay',
+  };
+
+  const detectedSource = sourceNameMap[sourceHost] || sourceHost;
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
 
     const res = await fetch(sourceUrl, {
       signal: controller.signal,
@@ -123,7 +139,7 @@ export async function GET(request: NextRequest) {
     clearTimeout(timeoutId);
 
     if (!res.ok) {
-      return NextResponse.json({ success: false, status: res.status });
+      return NextResponse.json({ success: false, status: res.status, requiresReview: true, sourceUrl, sourceName: detectedSource });
     }
 
     let html = await res.text();
@@ -153,10 +169,10 @@ export async function GET(request: NextRequest) {
                 set cookie(val: string) {
                   setCookie = val;
                 },
-                location: {
-                  set href(val: string) {
-                    targetHref = val;
-                  },
+              },
+              location: {
+                set href(val: string) {
+                  targetHref = val;
                 },
               },
             };
@@ -179,9 +195,60 @@ export async function GET(request: NextRequest) {
             }
           }
         }
-      } catch (bypassErr) {
+      } catch {
         // Silently continue with original html if challenge solver fails
       }
+    }
+
+    // 1. Columnist & Opinion Detection: Articles identified as columnist are declined
+    const lowerUrl = sourceUrl.toLowerCase();
+    const isColumnistUrl =
+      lowerUrl.includes('/columns/') ||
+      lowerUrl.includes('/column/') ||
+      lowerUrl.includes('/opinion/') ||
+      lowerUrl.includes('/opinions/') ||
+      lowerUrl.includes('/editorial/') ||
+      lowerUrl.includes('/editorials/') ||
+      lowerUrl.includes('/op-ed/') ||
+      lowerUrl.includes('/columnists/') ||
+      lowerUrl.includes('/columnist/');
+
+    const lowerHtml = html.toLowerCase();
+    const isColumnistHtml =
+      lowerHtml.includes('class="tdb-entry-category">columns</a>') ||
+      lowerHtml.includes('class="tdb-entry-category">saturday</a>') ||
+      lowerHtml.includes('category-columns') ||
+      lowerHtml.includes('category-opinion') ||
+      lowerHtml.includes('itemprop="articlesection" content="columns"') ||
+      lowerHtml.includes('itemprop="articlesection" content="opinion"');
+
+    // Extract Author
+    let extractedAuthor = '';
+    const authorMetaMatch =
+      html.match(/itemprop=["']author["'][^>]*>[\s\S]*?content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+name=["']author["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/class=["'][^"']*(?:author-name|entry-author|byline|tdb-author-name)[^"']*["'][^>]*>([^<]+)</i);
+    if (authorMetaMatch) {
+      extractedAuthor = authorMetaMatch[1].replace(/^[—–-]\s*by:\s*/i, '').replace(/^by\s+/i, '').trim();
+    }
+
+    // Extract Headline from title tag or h1
+    let extractedHeadline = '';
+    const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+    if (h1Match) {
+      extractedHeadline = h1Match[1].replace(/<[^>]+>/g, '').trim();
+    }
+
+    if (isColumnistUrl || isColumnistHtml) {
+      return NextResponse.json({
+        success: true,
+        isColumnist: true,
+        author: extractedAuthor || 'Guest Columnist',
+        sourceName: detectedSource,
+        sourceUrl,
+        headline: extractedHeadline,
+        message: 'This article is a columnist contribution or op-ed. Columnist articles are reserved for direct publisher reading.',
+      });
     }
 
     // Locate article content container
@@ -236,18 +303,57 @@ export async function GET(request: NextRequest) {
       );
 
     if (cleanedParas.length >= 2) {
-      // Synthesize into 100% original, unique editorial briefing (never verbatim!)
-      const synthesized = synthesizeJournalisticBriefing(cleanedParas, sourceUrl);
+      // 2. Perform faithful Anthropic Claude rewrite retaining 100% facts and direct quotes
+      const aiResult = await rewriteWithAnthropicClaude(
+        cleanedParas,
+        sourceUrl,
+        extractedHeadline || 'Political Report',
+        detectedSource
+      );
+
+      if (aiResult) {
+        return NextResponse.json({
+          success: true,
+          isColumnist: false,
+          isAiRewritten: true,
+          content: aiResult.content,
+          paragraphs: aiResult.paragraphs,
+          wordCount: aiResult.content.split(/\s+/).length,
+          author: extractedAuthor,
+          sourceName: detectedSource,
+          sourceUrl,
+        });
+      }
+
+      // Fallback: If Anthropic call fails/times out, use the clean extracted source paragraphs directly!
+      const directContent = cleanedParas.join('\n\n');
       return NextResponse.json({
         success: true,
-        content: synthesized.content,
-        paragraphs: synthesized.paragraphs,
-        wordCount: synthesized.wordCount,
+        isColumnist: false,
+        isAiRewritten: false,
+        content: directContent,
+        paragraphs: cleanedParas,
+        wordCount: directContent.split(/\s+/).length,
+        author: extractedAuthor,
+        sourceName: detectedSource,
+        sourceUrl,
       });
     }
 
-    return NextResponse.json({ success: false, reason: 'Insufficient paragraphs extracted' });
+    return NextResponse.json({
+      success: false,
+      requiresReview: true,
+      reason: 'Insufficient paragraphs extracted',
+      sourceName: detectedSource,
+      sourceUrl,
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message || 'Extract failed' });
+    return NextResponse.json({
+      success: false,
+      requiresReview: true,
+      error: err.message || 'Extract failed',
+      sourceName: detectedSource,
+      sourceUrl,
+    });
   }
 }

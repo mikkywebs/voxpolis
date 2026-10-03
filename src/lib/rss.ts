@@ -7,6 +7,7 @@ import {
   formatCleanSnippet,
   isPoliticalNews,
   isRelevantToCountry,
+  isColumnistOrOpinion,
 } from './news';
 import { isValidContentImage } from './pipeline/extractor';
 
@@ -260,6 +261,11 @@ function parseRssXmlToArticles(
       lowerTitle.includes('[pictures]') ||
       lowerTitle.includes('photo gallery')
     ) {
+      return;
+    }
+
+    // Decline columnist / opinion / editorial articles for now
+    if (isColumnistOrOpinion(titleText, rawDesc, [], link)) {
       return;
     }
 
