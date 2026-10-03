@@ -246,6 +246,23 @@ function parseRssXmlToArticles(
 
     if (!titleText || titleText.length < 10 || titleText.includes('<a href')) return;
 
+    const lowerTitle = titleText.toLowerCase();
+    if (
+      lowerTitle.startsWith('[photos]') ||
+      lowerTitle.startsWith('photos:') ||
+      lowerTitle.startsWith('photo:') ||
+      lowerTitle.startsWith('[photo]') ||
+      lowerTitle.startsWith('[pictures]') ||
+      lowerTitle.startsWith('pictures:') ||
+      lowerTitle.startsWith('[images]') ||
+      lowerTitle.includes('[photos]') ||
+      lowerTitle.includes('(photos)') ||
+      lowerTitle.includes('[pictures]') ||
+      lowerTitle.includes('photo gallery')
+    ) {
+      return;
+    }
+
     // Direct content image extraction
     let imageUrl: string | undefined = undefined;
     const enclosureMatch = itemXml.match(/<(?:enclosure|media:content)[^>]+url=["']([^"']+)["']/i);

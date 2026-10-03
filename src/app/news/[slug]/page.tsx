@@ -191,17 +191,98 @@ export default function NewsDetailPage() {
     loadArticle();
   }, [slug, selectedCountry.code]);
 
+  // Load comments with dual persistence (localStorage + API)
+  useEffect(() => {
+    if (!slug) return;
+    const commentStorageKey = `voxpolis_comments_${slug}`;
+
+    // 1. Immediately restore local comments from localStorage
+    try {
+      const localCommentsStr = localStorage.getItem(commentStorageKey);
+      if (localCommentsStr) {
+        const parsed = JSON.parse(localCommentsStr);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setComments(parsed);
+        }
+      }
+    } catch {}
+
+    // 2. Fetch from backend API and merge
+    fetch(`/api/comments?slug=${encodeURIComponent(slug)}${article?.id ? `&articleId=${encodeURIComponent(article.id)}` : ''}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.comments && Array.isArray(data.comments) && data.comments.length > 0) {
+          setComments((prev) => {
+            const seen = new Set(prev.map((c) => c.id));
+            const newFromApi = data.comments.filter((c: CommentItem) => !seen.has(c.id));
+            const merged = [...prev, ...newFromApi];
+            try {
+              localStorage.setItem(commentStorageKey, JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
+  }, [slug, article?.id]);
+
   const handleAddComment = (newC: CommentItem) => {
-    setComments((prev) => [newC, ...prev]);
+    setComments((prev) => {
+      const updated = [newC, ...prev];
+      if (typeof window !== 'undefined' && slug) {
+        try {
+          localStorage.setItem(`voxpolis_comments_${slug}`, JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+
+    // Background POST to API
+    fetch('/api/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        articleId: article?.id,
+        articleSlug: slug,
+        userId: currentUser?.id,
+        userName: newC.user_name,
+        userCountryFlag: newC.country_flag,
+        content: newC.content,
+        parentId: null,
+      }),
+    }).catch(() => {});
   };
 
   const handleAddReply = (reply: CommentItem) => {
-    setComments((prev) => [...prev, reply]);
+    setComments((prev) => {
+      const updated = [...prev, reply];
+      if (typeof window !== 'undefined' && slug) {
+        try {
+          localStorage.setItem(`voxpolis_comments_${slug}`, JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+
+    // Background POST to API
+    fetch('/api/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        articleId: article?.id,
+        articleSlug: slug,
+        userId: currentUser?.id,
+        userName: reply.user_name,
+        userCountryFlag: reply.country_flag,
+        content: reply.content,
+        parentId: reply.parentId,
+      }),
+    }).catch(() => {});
   };
 
   const handleReact = (commentId: string, type: 'agree' | 'disagree' | 'angry' | 'insightful') => {
-    setComments((prev) =>
-      prev.map((c) => {
+    setComments((prev) => {
+      const updated = prev.map((c) => {
         if (c.id === commentId) {
           return {
             ...c,
@@ -212,8 +293,14 @@ export default function NewsDetailPage() {
           };
         }
         return c;
-      })
-    );
+      });
+      if (typeof window !== 'undefined' && slug) {
+        try {
+          localStorage.setItem(`voxpolis_comments_${slug}`, JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
   };
 
   if (loading) {
@@ -604,6 +691,9 @@ export default function NewsDetailPage() {
 
   const fbMidPoint = Math.min(2, Math.floor(fallbackParagraphs.length / 2));
 
+  const userCountryCode = (currentUser?.primaryCountry || (typeof window !== 'undefined' ? localStorage.getItem('voxpolis_primary_country') : null) || selectedCountry.code).toUpperCase();
+  const userCountryFlag = getCountryByCode(userCountryCode)?.flag || selectedCountry.flag;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
       <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
@@ -668,6 +758,8 @@ export default function NewsDetailPage() {
 
           <PollSection
             poll={article!.poll}
+            articleSlug={article!.slug || slug}
+            articleId={article!.id}
             articleTitle={article!.title}
             articleSnippet={article!.snippet}
             onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
@@ -676,7 +768,7 @@ export default function NewsDetailPage() {
 
           <CommentInputForm
             userName={userNameDisplay}
-            userCountryFlag={selectedCountry.flag}
+            userCountryFlag={userCountryFlag}
             onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
             isLoggedIn={isLoggedIn}
             onCommentSubmitted={handleAddComment}
@@ -687,7 +779,7 @@ export default function NewsDetailPage() {
           <CommentList
             comments={comments}
             userName={userNameDisplay}
-            userCountryFlag={selectedCountry.flag}
+            userCountryFlag={userCountryFlag}
             onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
             isLoggedIn={isLoggedIn}
             onAddReply={handleAddReply}

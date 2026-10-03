@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Vote, CheckCircle2, MessageSquare } from 'lucide-react';
 
 interface PollSectionProps {
@@ -10,6 +10,8 @@ interface PollSectionProps {
     agree_count: number;
     disagree_count: number;
   };
+  articleSlug?: string;
+  articleId?: string;
   articleTitle?: string;
   articleSnippet?: string;
   onRequireAuth?: () => void;
@@ -134,17 +136,40 @@ function humanizeQuestion(raw: string, title?: string, snippet?: string): {
 
 export default function PollSection({
   poll,
+  articleSlug,
+  articleId,
   articleTitle,
   articleSnippet,
   onRequireAuth,
   isLoggedIn = false,
 }: PollSectionProps) {
+  const pollKey = articleSlug || articleId || poll?.id || 'voxpolis_poll';
   const initialAgree = poll?.agree_count || 0;
   const initialDisagree = poll?.disagree_count || 0;
 
   const [agree, setAgree] = useState(initialAgree);
   const [disagree, setDisagree] = useState(initialDisagree);
   const [userVote, setUserVote] = useState<'agree' | 'disagree' | null>(null);
+
+  // Restore saved poll vote and counts from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedVote = localStorage.getItem(`voxpolis_poll_vote_${pollKey}`);
+      if (savedVote === 'agree' || savedVote === 'disagree') {
+        setUserVote(savedVote);
+      }
+
+      const savedCountsStr = localStorage.getItem(`voxpolis_poll_counts_${pollKey}`);
+      if (savedCountsStr) {
+        const parsed = JSON.parse(savedCountsStr);
+        if (typeof parsed.agree === 'number' && typeof parsed.disagree === 'number') {
+          setAgree(parsed.agree);
+          setDisagree(parsed.disagree);
+        }
+      }
+    } catch {}
+  }, [pollKey]);
 
   const rawQuestion = poll?.question || '';
   const { isPolicyDebate, questionText, discussionPrompt } = humanizeQuestion(rawQuestion, articleTitle, articleSnippet);
@@ -161,14 +186,44 @@ export default function PollSection({
 
     if (userVote === type) return;
 
+    let newAgree = agree;
+    let newDisagree = disagree;
+
     if (type === 'agree') {
-      setAgree(agree + 1);
-      if (userVote === 'disagree') setDisagree(Math.max(0, disagree - 1));
+      newAgree = agree + 1;
+      if (userVote === 'disagree') newDisagree = Math.max(0, disagree - 1);
     } else {
-      setDisagree(disagree + 1);
-      if (userVote === 'agree') setAgree(Math.max(0, agree - 1));
+      newDisagree = disagree + 1;
+      if (userVote === 'agree') newAgree = Math.max(0, agree - 1);
     }
+
+    setAgree(newAgree);
+    setDisagree(newDisagree);
     setUserVote(type);
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`voxpolis_poll_vote_${pollKey}`, type);
+        localStorage.setItem(
+          `voxpolis_poll_counts_${pollKey}`,
+          JSON.stringify({ agree: newAgree, disagree: newDisagree })
+        );
+      } catch {}
+    }
+
+    // Background sync to API if available
+    try {
+      fetch('/api/polls/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pollId: poll?.id || pollKey,
+          articleSlug,
+          articleId,
+          vote: type,
+        }),
+      }).catch(() => {});
+    } catch {}
   };
 
   const scrollToComments = () => {

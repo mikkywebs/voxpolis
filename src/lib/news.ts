@@ -90,15 +90,16 @@ export function formatCleanSnippet(text: string, maxLen: number = 280): string {
     return clean;
   }
 
-  // Look for last complete sentence ending in [.!?] within maxLen
-  const candidate = clean.slice(0, maxLen + 35);
+  // Look for last complete sentence ending in [.!?] within maxLen + 30
+  const candidate = clean.slice(0, maxLen + 30);
   const sentenceRegex = /[.!?](?:\s+|$)/g;
   let match: RegExpExecArray | null = null;
   let bestCutoff = -1;
 
   while ((match = sentenceRegex.exec(candidate)) !== null) {
     const endPos = match.index + 1;
-    if (endPos >= 80 && endPos <= maxLen + 20) {
+    // As long as the sentence is at least 35 characters and does not exceed maxLen + 25
+    if (endPos >= 35 && endPos <= maxLen + 25) {
       bestCutoff = endPos;
     }
   }
@@ -107,16 +108,47 @@ export function formatCleanSnippet(text: string, maxLen: number = 280): string {
     return clean.slice(0, bestCutoff).trim();
   }
 
-  // If no clean sentence boundary, trim at last whole word boundary and add period
+  // If no clean sentence boundary, trim at last whole word boundary
   const truncated = clean.slice(0, maxLen);
   const lastSpace = truncated.lastIndexOf(' ');
-  const wordTrimmed = lastSpace > 40 ? truncated.slice(0, lastSpace) : truncated;
+  let wordTrimmed = lastSpace > 35 ? truncated.slice(0, lastSpace) : truncated;
+
+  // Crucial: strip any dangling stop words/articles/prepositions/conjunctions before period
+  const danglingPattern = /\s+(and|the|a|an|of|to|in|with|for|on|at|by|from|that|which|as|or|but|is|are|was|were|its|their|his|her|this|these|those)$/i;
+  while (danglingPattern.test(wordTrimmed)) {
+    wordTrimmed = wordTrimmed.replace(danglingPattern, '');
+  }
 
   return wordTrimmed.replace(/[,;:\s-]+$/, '') + '.';
 }
 
 export function isPoliticalNews(title: string, snippet: string = '', tags: string[] = []): boolean {
-  const text = `${title} ${snippet} ${tags.join(' ')}`.toLowerCase();
+  const cleanTitle = (title || '').toLowerCase().trim();
+  const text = `${cleanTitle} ${snippet} ${tags.join(' ')}`.toLowerCase();
+
+  // Strictly exclude photo-gallery and image-dump posts (e.g. "[PHOTOS] Tinubu Hosts...", "PHOTOS: ...", "[PICTURES]")
+  if (
+    cleanTitle.startsWith('[photos]') ||
+    cleanTitle.startsWith('photos:') ||
+    cleanTitle.startsWith('photo:') ||
+    cleanTitle.startsWith('[photo]') ||
+    cleanTitle.startsWith('[pictures]') ||
+    cleanTitle.startsWith('pictures:') ||
+    cleanTitle.startsWith('picture:') ||
+    cleanTitle.startsWith('[images]') ||
+    cleanTitle.startsWith('images:') ||
+    cleanTitle.includes('[photos]') ||
+    cleanTitle.includes('(photos)') ||
+    cleanTitle.includes('[pictures]') ||
+    cleanTitle.includes('(pictures)') ||
+    cleanTitle.includes('photo gallery') ||
+    cleanTitle.includes('in pictures:') ||
+    cleanTitle.includes('in photos:') ||
+    cleanTitle.includes('photo news:') ||
+    cleanTitle.includes('[photo news]')
+  ) {
+    return false;
+  }
 
   for (const forbidden of FORBIDDEN_NON_POLITICAL_KEYWORDS) {
     if (text.includes(forbidden)) return false;
