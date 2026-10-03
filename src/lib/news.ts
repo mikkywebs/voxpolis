@@ -338,23 +338,24 @@ export function expandToJournalisticArticle(
   const cleanSnippet = (snippet || '').trim();
   const dateline = countryCapital ? countryCapital.toUpperCase() : countryName.toUpperCase();
 
-  // 1. Natural lead paragraph stating the core news directly and simply
-  const p1 = `${dateline} — In a significant development, ${cleanTitle.charAt(0).toLowerCase() + cleanTitle.slice(1)}. According to verified reporting from ${sourceName}, the event has drawn wide public interest and reaction across political and civic circles in ${countryName}.`;
+  // 1. Direct Executive Lead (natural active voice)
+  const cleanLowerLead = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
+  const p1 = `${dateline} — ${cleanLowerLead}. According to verified reports gathered and monitored through ${sourceName}, the matter has drawn immediate scrutiny across official, civic, and public circles in ${countryName}.`;
 
-  // 2. Concrete specifics and context from snippet
+  // 2. Concrete specifics and factual synthesis
   const p2 =
     cleanSnippet && cleanSnippet.length > 25
-      ? `${cleanSnippet} The reported facts outline the direct actions and statements made by the key parties involved, setting off immediate discussions among citizens, stakeholders, and community leaders.`
-      : `Key officials and stakeholders involved have made public statements outlining their stances. Observers are closely examining these developments to assess their immediate effects on governance and daily affairs.`;
+      ? `${cleanSnippet} Official records and on-the-record statements outline the primary actions, declarations, and proceedings undertaken by the key figures involved, sparking active deliberations regarding near-term administrative and political consequences.`
+      : `Key stakeholders and government officials have issued public statements outlining their administrative positions. Observers across ${countryName} are monitoring these proceedings to assess their direct consequences on public policy and regional governance.`;
 
-  // 3. Plain-terms civic realities (no sugarcoating, no big grammar)
-  const p3 = `Beyond official statements and formal events, citizens and civic monitors are assessing how these actions affect real lives on the ground. Key questions focus on transparency, accountability, and whether leadership decisions align with public interest rather than political convenience.`;
+  // 3. Strategic, Institutional & Policy Ramifications
+  const p3 = `Beyond executive announcements and political declarations, policy observers note that developments of this nature test administrative efficiency, regulatory compliance, and institutional integrity. In ${countryName}, genuine democratic stability depends on whether governance decisions operate with transparency, due process, and equal protection under statutory laws.`;
 
-  // 4. Impartial scrutiny and accountability
-  const p4 = `Independent analysts emphasize that in any functioning democracy, public figures and institutions must remain accountable to the people. Verifiable actions, fair institutional processes, and openness remain essential benchmarks for public trust.`;
+  // 4. Civic & Public Interest Reality (plain terms, citizen impact)
+  const p4 = `For citizens and community watchdogs, the central test remains whether official actions deliver measurable public benefits or merely serve partisan convenience. Independent analysts underscore that sustainable civic progress requires public officials to remain directly accountable to the electorate and uphold institutional openness at all times.`;
 
-  // 5. Desk wrap-up
-  const p5 = `Voxpolis will continue tracking developments in this story, verifying claims, and reporting subsequent official moves and citizen reactions as they unfold.`;
+  // 5. Verification & Desk Follow-Up
+  const p5 = `Dispatches and foundational facts for this report were monitored and verified through coverage by ${sourceName}. Voxpolis will continue tracking subsequent regulatory steps, legal motions, and public reactions across ${countryName} as events progress.`;
 
   return [p1, p2, p3, p4, p5].join('\n\n');
 }

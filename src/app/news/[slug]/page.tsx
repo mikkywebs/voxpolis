@@ -16,6 +16,7 @@ import RelatedArticlesSection from '@/components/article/RelatedArticlesSection'
 import { CommentInputForm, CommentList, CommentItem } from '@/components/article/CommentSection';
 import OriginalSourceLink from '@/components/article/OriginalSourceLink';
 import AdSlot from '@/components/article/AdSlot';
+import DesktopVignetteAd from '@/components/ads/DesktopVignetteAd';
 import { SUPPORTED_COUNTRIES, getCountryByCode, getCountrySlug } from '@/config/countries';
 import { fetchArticlesForCountry, ArticleData, expandToJournalisticArticle, formatCleanSnippet } from '@/lib/news';
 import { getPipelineArticleBySlug } from '@/lib/pipeline';
@@ -160,7 +161,12 @@ export default function NewsDetailPage() {
           found.content.includes('dispatches gathered by') ||
           found.content.includes('In a significant development,');
 
-        const cachedContent = localStorage.getItem(`voxpolis_content_${found.id}`);
+        // Purge legacy verbatim cache so duplicate text is removed immediately
+        try {
+          localStorage.removeItem(`voxpolis_content_${found.id}`);
+        } catch {}
+
+        const cachedContent = localStorage.getItem(`voxpolis_content_v2_${found.id}`);
         if (cachedContent && cachedContent.length > 250) {
           setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: cachedContent } : prev));
         } else if (
@@ -173,7 +179,7 @@ export default function NewsDetailPage() {
             .then((r) => r.json())
             .then((extracted) => {
               if (extracted?.success && extracted.content && extracted.content.length > 250) {
-                localStorage.setItem(`voxpolis_content_${found.id}`, extracted.content);
+                localStorage.setItem(`voxpolis_content_v2_${found.id}`, extracted.content);
                 setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: extracted.content } : prev));
               }
             })
@@ -800,6 +806,9 @@ export default function NewsDetailPage() {
           </aside>
         )}
       </div>
+
+      {/* Desktop Interstitial / Vignette Ad provision (strictly desktop & dormant until active) */}
+      <DesktopVignetteAd isAllowed={hasActiveAds} />
 
       <Footer />
     </div>
