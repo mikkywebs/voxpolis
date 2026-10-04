@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArticleData, formatExactTimestamp, getArticleImageUrl, formatCleanSnippet } from '@/lib/news';
 import { ExternalLink, AlertCircle, Eye } from 'lucide-react';
@@ -9,13 +10,39 @@ interface FeedCardProps {
 }
 
 export default function FeedCard({ article }: FeedCardProps) {
-  const viewsFormatted =
-    article.views_count >= 1000
-      ? `${(article.views_count / 1000).toFixed(1)}k`
-      : article.views_count.toString();
+  const [effectiveViews, setEffectiveViews] = useState<number>(article.views_count || 0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = localStorage.getItem(`voxpolis_views_${article.id}`);
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          setEffectiveViews(Math.max(parsed, article.views_count || 0));
+        }
+      }
+    } catch {}
+  }, [article.id, article.views_count]);
+
+  const handleRecordClick = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const key = `voxpolis_views_${article.id}`;
+      const prev = parseInt(localStorage.getItem(key) || '0', 10);
+      const next = prev + 1;
+      localStorage.setItem(key, next.toString());
+      setEffectiveViews(next);
+
+      fetch('/api/views', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleId: article.id }),
+      }).catch(() => {});
+    } catch {}
+  };
 
   const imageUrl = getArticleImageUrl(article);
-
   const formattedTime = formatExactTimestamp(article.created_at);
   const displayTitle = (article.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
 
@@ -23,7 +50,11 @@ export default function FeedCard({ article }: FeedCardProps) {
     <article className="group bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/70 rounded-2xl overflow-hidden p-5 sm:p-6 shadow-sm hover:shadow-lg transition duration-200 flex flex-col justify-between h-full">
       <div>
         {/* News Featured Image Thumbnail */}
-        <Link href={`/news/${article.slug}`} className="block mb-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900">
+        <Link
+          href={`/news/${article.slug}`}
+          onClick={handleRecordClick}
+          className="block mb-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900"
+        >
           {/* eslint-disable-next-html-element-suppression */}
           <img
             src={imageUrl}
@@ -40,11 +71,18 @@ export default function FeedCard({ article }: FeedCardProps) {
             {article.source_name}
           </span>
           <div className="flex items-center gap-2 text-gray-400 text-[11px]">
-            {/* Viewer counter badge */}
-            <span className="flex items-center gap-1 font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/60 px-2 py-0.5 rounded-full">
-              <Eye className="w-3 h-3 text-blue-500" />
-              <span>{viewsFormatted} views</span>
-            </span>
+            {/* Viewer counter badge: Hidden at 0 views, displayed only when real visitors click */}
+            {effectiveViews > 0 && (
+              <span className="flex items-center gap-1 font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/60 px-2 py-0.5 rounded-full">
+                <Eye className="w-3 h-3 text-blue-500" />
+                <span>
+                  {effectiveViews >= 1000
+                    ? `${(effectiveViews / 1000).toFixed(1)}k`
+                    : effectiveViews.toLocaleString()}{' '}
+                  {effectiveViews === 1 ? 'view' : 'views'}
+                </span>
+              </span>
+            )}
             <span className="font-medium text-gray-400">{formattedTime}</span>
           </div>
         </div>
@@ -56,7 +94,7 @@ export default function FeedCard({ article }: FeedCardProps) {
           </div>
         )}
 
-        <Link href={`/news/${article.slug}`}>
+        <Link href={`/news/${article.slug}`} onClick={handleRecordClick}>
           <h2 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-snug line-clamp-2">
             {displayTitle}
           </h2>
@@ -78,6 +116,7 @@ export default function FeedCard({ article }: FeedCardProps) {
 
         <Link
           href={`/news/${article.slug}`}
+          onClick={handleRecordClick}
           className="font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-0.5 transition inline-flex items-center gap-1"
         >
           <span>Read Full Report</span>

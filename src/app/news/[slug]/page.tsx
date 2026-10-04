@@ -9,7 +9,6 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ArticleImageHeader from '@/components/article/ArticleImageHeader';
 import EmojiReactions from '@/components/article/EmojiReactions';
-import AIAnalysisSection from '@/components/article/AIAnalysisSection';
 import AffiliateSection from '@/components/article/AffiliateSection';
 import PollSection from '@/components/article/PollSection';
 import RelatedArticlesSection from '@/components/article/RelatedArticlesSection';
@@ -141,6 +140,16 @@ export default function NewsDetailPage() {
         setPipelineArticle(pipeArt);
         const pipeCountry = getCountryByCode(pipeArt.country_code);
         if (pipeCountry) setSelectedCountry(pipeCountry);
+        const storedKey = `voxpolis_views_${pipeArt.id}`;
+        const prevViews = parseInt(localStorage.getItem(storedKey) || '0', 10);
+        const nextViews = prevViews + 1;
+        localStorage.setItem(storedKey, nextViews.toString());
+        setRealViews(nextViews);
+        fetch('/api/views', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ articleId: pipeArt.id }),
+        }).catch(() => {});
       }
 
       const list = await fetchArticlesForCountry(selectedCountry.code);
@@ -155,6 +164,21 @@ export default function NewsDetailPage() {
         const nextViews = prevViews + 1;
         localStorage.setItem(storedKey, nextViews.toString());
         setRealViews(nextViews);
+
+        // Sync view with views API
+        fetch('/api/views', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ articleId: found.id }),
+        })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d?.views && d.views > nextViews) {
+              setRealViews(d.views);
+              localStorage.setItem(storedKey, d.views.toString());
+            }
+          })
+          .catch(() => {});
 
         // Purge legacy verbatim & v2 cache so duplicate or robotic text is removed immediately
         try {
@@ -490,12 +514,8 @@ export default function NewsDetailPage() {
               </div>
             </div>
 
-            {/* Community Pulse immediately after header as requested */}
-            <EmojiReactions
-              articleId={pipelineArticle.id}
-              onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
-              isLoggedIn={isLoggedIn}
-            />
+            {/* Community Pulse immediately after header (guests and members can react) */}
+            <EmojiReactions articleId={pipelineArticle.id} />
 
             <SocialShareButtons title={pipelineArticle.headline} slug={pipelineArticle.slug} />
 
@@ -768,12 +788,8 @@ export default function NewsDetailPage() {
             author={extractedAuthor || article!.author}
           />
 
-          {/* Community Pulse immediately after header as requested */}
-          <EmojiReactions
-            articleId={article!.id}
-            onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
-            isLoggedIn={isLoggedIn}
-          />
+          {/* Community Pulse immediately after header (guests and members can react) */}
+          <EmojiReactions articleId={article!.id} />
 
           <SocialShareButtons title={article!.title} slug={article!.slug} />
 
@@ -850,20 +866,6 @@ export default function NewsDetailPage() {
             </div>
           )}
 
-          {/* Prominent Footer Source Citation Card */}
-          <OriginalSourceLink sourceName={article!.source_name} sourceUrl={article!.source_url} />
-
-          {!isColumnist && (
-            <AIAnalysisSection
-              analysisText={article!.ai_analysis}
-              readAlsoArticle={
-                relatedArticles[0]
-                  ? { title: relatedArticles[0].title, slug: relatedArticles[0].slug }
-                  : undefined
-              }
-            />
-          )}
-
           <AffiliateSection label={article!.affiliate_link_label} url={article!.affiliate_link_url} />
 
           <PollSection
@@ -895,6 +897,9 @@ export default function NewsDetailPage() {
             onAddReply={handleAddReply}
             onReact={handleReact}
           />
+
+          {/* Tiny original source link at footer with no button as originally designed */}
+          <OriginalSourceLink sourceName={article!.source_name} sourceUrl={article!.source_url} />
 
           <AdSlot slotLocation="below_sources" isAllowed={true} />
         </main>

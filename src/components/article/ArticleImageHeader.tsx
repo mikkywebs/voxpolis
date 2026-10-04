@@ -51,11 +51,13 @@ export default function ArticleImageHeader({
         )}
 
         <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800/80 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">
-          {viewsCount >= 100 && (
+          {viewsCount > 0 && (
             <>
               <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                 <Eye className="w-3.5 h-3.5" />
-                <span>{viewsCount.toLocaleString()} Readers</span>
+                <span>
+                  {viewsCount.toLocaleString()} {viewsCount === 1 ? 'view' : 'views'}
+                </span>
               </span>
               <span className="text-gray-300 dark:text-gray-600">•</span>
             </>

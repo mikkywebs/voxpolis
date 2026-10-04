@@ -10,8 +10,8 @@ interface EmojiReactionsProps {
 
 export type ReactionType = 'upvote' | 'funny' | 'love' | 'surprised' | 'angry' | 'sad';
 
-export default function EmojiReactions({ articleId, onRequireAuth, isLoggedIn = true }: EmojiReactionsProps) {
-  // Reaction counts stored locally per article ID (with initial values)
+export default function EmojiReactions({ articleId }: EmojiReactionsProps) {
+  // Reaction counts stored locally & synced with community tally
   const [counts, setCounts] = useState<{ [key in ReactionType]: number }>({
     upvote: 0,
     funny: 0,
@@ -23,9 +23,11 @@ export default function EmojiReactions({ articleId, onRequireAuth, isLoggedIn = 
 
   const [userReaction, setUserReaction] = useState<ReactionType | null>(null);
 
-  // Restore counts and active reaction from localStorage
+  // Restore counts and active reaction from localStorage + sync with community API
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !articleId) return;
+
+    // 1. Immediate restore from localStorage
     try {
       const savedCounts = localStorage.getItem(`voxpolis_reactions_${articleId}`);
       if (savedCounts) {
@@ -40,12 +42,30 @@ export default function EmojiReactions({ articleId, onRequireAuth, isLoggedIn = 
       if (savedUserReaction) {
         setUserReaction(savedUserReaction);
       }
-    } catch (e) {
-      console.warn('Failed to load reactions from local storage', e);
-    }
+    } catch {}
+
+    // 2. Fetch server-aggregated community reactions (works for both guests & members)
+    fetch(`/api/reactions?articleId=${encodeURIComponent(articleId)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.reactions) {
+          setCounts((prev) => {
+            const merged = { ...prev };
+            (Object.keys(data.reactions) as ReactionType[]).forEach((key) => {
+              merged[key] = Math.max(merged[key] || 0, data.reactions[key] || 0);
+            });
+            try {
+              localStorage.setItem(`voxpolis_reactions_${articleId}`, JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
   }, [articleId]);
 
   const handleReact = (type: ReactionType) => {
+    const prevType = userReaction;
     let nextCounts = { ...counts };
     let nextReaction: ReactionType | null = type;
 
@@ -72,10 +92,26 @@ export default function EmojiReactions({ articleId, onRequireAuth, isLoggedIn = 
         } else {
           localStorage.removeItem(`voxpolis_my_reaction_${articleId}`);
         }
-      } catch (e) {
-        console.warn('Failed to save reaction', e);
-      }
+      } catch {}
     }
+
+    // Fire background POST to API (guests and members can both react freely)
+    fetch('/api/reactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        articleId,
+        type: nextReaction,
+        previousType: prevType,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.reactions) {
+          setCounts((prev) => ({ ...prev, ...data.reactions }));
+        }
+      })
+      .catch(() => {});
   };
 
   const reactions: { type: ReactionType; emoji: string; label: string }[] = [
