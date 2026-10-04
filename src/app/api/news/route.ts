@@ -9,8 +9,45 @@ export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+  const slugParam = searchParams.get('slug');
   const countryCode = (searchParams.get('country') || 'NG').toUpperCase();
   const language = (searchParams.get('language') || 'en').toLowerCase();
+
+  // If a specific slug is requested, first check permanent database
+  if (slugParam) {
+    try {
+      const { supabaseAdmin } = await import('@/lib/supabase/admin');
+      const { data: dbArticle } = await supabaseAdmin
+        .from('articles')
+        .select('*')
+        .eq('slug', slugParam)
+        .maybeSingle();
+
+      if (dbArticle) {
+        return NextResponse.json({
+          success: true,
+          article: {
+            id: dbArticle.id || `db-${dbArticle.slug}`,
+            slug: dbArticle.slug,
+            title: dbArticle.title,
+            snippet: dbArticle.snippet,
+            content: dbArticle.content,
+            country_code: dbArticle.country_code || 'NG',
+            source_name: dbArticle.source_name || 'Voxpolis Desk',
+            source_url: dbArticle.source_url || 'https://voxpolis.app',
+            original_image_url: dbArticle.original_image_url,
+            image_mode: 'original' as const,
+            is_breaking: false,
+            tags: dbArticle.tags || ['Politics'],
+            views_count: 0,
+            total_reading_time_seconds: 180,
+            created_at: dbArticle.created_at || new Date().toISOString(),
+            author: dbArticle.author,
+          },
+        });
+      }
+    } catch {}
+  }
 
   const country = getCountryByCode(countryCode);
   const apiKey = process.env.NEWSDATA_API_KEY;
@@ -117,6 +154,17 @@ export async function GET(request: NextRequest) {
       seenStoryKeys.add(normKey);
       seenStoryKeys.add(art.slug);
       uniqueArticles.push(art);
+    }
+  }
+
+  // If specific slug was requested, check collected feed articles
+  if (slugParam) {
+    const foundInFeeds = uniqueArticles.find((a) => a.slug === slugParam);
+    if (foundInFeeds) {
+      return NextResponse.json({
+        success: true,
+        article: foundInFeeds,
+      });
     }
   }
 

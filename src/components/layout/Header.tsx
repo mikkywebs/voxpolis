@@ -31,6 +31,7 @@ export default function Header({
   selectedLanguage = 'en',
   onSelectLanguage,
 }: HeaderProps) {
+  const [currentUser, setCurrentUser] = useState(user || null);
   const [greeting, setGreeting] = useState<string>('');
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,6 +45,76 @@ export default function Header({
 
   const countryDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Auto-resolve user session if not passed as prop or on session change
+  useEffect(() => {
+    if (user) {
+      setCurrentUser(user);
+    }
+
+    let authListener: any = null;
+    async function resolveAuth() {
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        const { data } = await supabase.auth.getSession();
+        const sessionUser = data?.session?.user;
+
+        const localName = localStorage.getItem('voxpolis_user_name');
+        const localEmail = localStorage.getItem('voxpolis_user_email');
+        const localActive = localStorage.getItem('voxpolis_session_active') === 'true';
+
+        if (sessionUser) {
+          const name = sessionUser.user_metadata?.full_name || localName || sessionUser.email?.split('@')[0] || 'Citizen';
+          setCurrentUser({
+            id: sessionUser.id,
+            email: sessionUser.email,
+            fullName: name,
+            primaryCountry: sessionUser.user_metadata?.primary_country || 'NG',
+            isAdmin: sessionUser.email?.toLowerCase() === 'michael.eboh@gmail.com',
+          });
+        } else if (localActive || localName) {
+          setCurrentUser({
+            id: 'local-member',
+            fullName: localName || 'Citizen',
+            email: localEmail || undefined,
+            primaryCountry: localStorage.getItem('voxpolis_primary_country') || 'NG',
+          });
+        }
+
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+          const u = session?.user;
+          if (u) {
+            const name = u.user_metadata?.full_name || localStorage.getItem('voxpolis_user_name') || u.email?.split('@')[0] || 'Citizen';
+            setCurrentUser({
+              id: u.id,
+              email: u.email,
+              fullName: name,
+              primaryCountry: u.user_metadata?.primary_country || 'NG',
+              isAdmin: u.email?.toLowerCase() === 'michael.eboh@gmail.com',
+            });
+          } else if (!localStorage.getItem('voxpolis_session_active')) {
+            setCurrentUser(null);
+          }
+        });
+        authListener = sub?.subscription;
+      } catch (e) {
+        const localName = localStorage.getItem('voxpolis_user_name');
+        if (localName) {
+          setCurrentUser({
+            id: 'local-member',
+            fullName: localName,
+            primaryCountry: 'NG',
+          });
+        }
+      }
+    }
+    resolveAuth();
+
+    return () => {
+      if (authListener) authListener.unsubscribe();
+    };
+  }, [user]);
+
   // Compute time-of-day greeting and load member registration date
   useEffect(() => {
     const hour = new Date().getHours();
@@ -52,14 +123,14 @@ export default function Header({
     else if (hour < 18) timeOfDay = 'afternoon';
     else timeOfDay = 'evening';
 
-    const name = user?.fullName || (user?.email ? user.email.split('@')[0] : 'Guest');
+    const name = currentUser?.fullName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Guest');
     setGreeting(`Good ${timeOfDay}, ${name}`);
 
     const storedSince = localStorage.getItem('voxpolis_member_since');
     if (storedSince) {
       setMemberSince(storedSince);
     }
-  }, [user]);
+  }, [currentUser]);
 
   // Fetch weather for selected country capital
   useEffect(() => {
@@ -149,7 +220,7 @@ export default function Header({
           <div className="relative shrink-0" ref={countryDropdownRef}>
             <button
               onClick={() => {
-                if (!user) {
+                if (!currentUser) {
                   setIsAuthPromptOpen(true);
                 } else {
                   setIsCountryDropdownOpen(!isCountryDropdownOpen);
@@ -278,24 +349,24 @@ export default function Header({
           </button>
 
           {/* User Profile / Auth Links */}
-          {user ? (
+          {currentUser ? (
             <div className="relative shrink-0">
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 className="flex items-center gap-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
               >
                 <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow">
-                  {user.fullName ? user.fullName[0].toUpperCase() : 'U'}
+                  {currentUser.fullName ? currentUser.fullName[0].toUpperCase() : 'U'}
                 </div>
               </button>
 
               {isUserMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 py-1 text-xs">
                   <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
-                    <p className="font-semibold text-gray-800 dark:text-gray-100 truncate">{user.fullName || 'User'}</p>
-                    <p className="text-[10px] text-gray-400 truncate">{user.email}</p>
+                    <p className="font-semibold text-gray-800 dark:text-gray-100 truncate">{currentUser.fullName || 'User'}</p>
+                    <p className="text-[10px] text-gray-400 truncate">{currentUser.email}</p>
                   </div>
-                  {(user.isAdmin || (user.email && user.email.toLowerCase() === 'michael.eboh@gmail.com')) && (
+                  {(currentUser.isAdmin || (currentUser.email && currentUser.email.toLowerCase() === 'michael.eboh@gmail.com')) && (
                     <Link
                       href="/admin"
                       className="flex items-center gap-2 px-4 py-2 text-amber-600 dark:text-amber-400 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -319,8 +390,20 @@ export default function Header({
                     <span>Country Preferences</span>
                   </Link>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setIsUserMenuOpen(false);
+                      try {
+                        const { createClient } = await import('@/lib/supabase/client');
+                        const supabase = createClient();
+                        await supabase.auth.signOut();
+                      } catch {}
+                      try {
+                        localStorage.removeItem('voxpolis_session_active');
+                        localStorage.removeItem('voxpolis_user_name');
+                        localStorage.removeItem('voxpolis_username');
+                        localStorage.removeItem('voxpolis_user_email');
+                      } catch {}
+                      setCurrentUser(null);
                       window.location.href = '/login';
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-left"

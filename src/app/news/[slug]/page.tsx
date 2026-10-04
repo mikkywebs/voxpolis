@@ -135,6 +135,23 @@ export default function NewsDetailPage() {
     async function loadArticle() {
       setLoading(true);
 
+      let found: ArticleData | null = null;
+
+      // 1. FAST LOCAL STORAGE CHECK: If article was previously viewed or loaded, restore immediately!
+      try {
+        const cachedArticleJson = localStorage.getItem(`voxpolis_article_${slug}`);
+        if (cachedArticleJson) {
+          const parsed = JSON.parse(cachedArticleJson);
+          if (parsed && (parsed.slug === slug || parsed.id)) {
+            found = parsed;
+            setArticle(parsed);
+            const artCountry = getCountryByCode(parsed.country_code || 'NG');
+            if (artCountry) setSelectedCountry(artCountry);
+          }
+        }
+      } catch {}
+
+      // 2. Check Pipeline article
       const pipeArt = getPipelineArticleBySlug(slug);
       if (pipeArt && pipeArt.status === 'published') {
         setPipelineArticle(pipeArt);
@@ -152,13 +169,34 @@ export default function NewsDetailPage() {
         }).catch(() => {});
       }
 
+      // 3. Fetch from country feed
       const list = await fetchArticlesForCountry(selectedCountry.code);
-      const found = list.find((a) => a.slug === slug);
+      const feedFound = list.find((a) => a.slug === slug);
+      if (feedFound) {
+        found = feedFound;
+      }
+
+      // 4. If not found in current country feed, query backend /api/news?slug=...
+      if (!found && !pipeArt) {
+        try {
+          const res = await fetch(`/api/news?slug=${encodeURIComponent(slug)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.article) {
+              found = data.article;
+            }
+          }
+        } catch {}
+      }
+
       if (found) {
         setArticle(found);
+        try {
+          localStorage.setItem(`voxpolis_article_${slug}`, JSON.stringify(found));
+        } catch {}
         const artCountry = getCountryByCode(found.country_code);
         if (artCountry) setSelectedCountry(artCountry);
-        setRelatedArticles(list.filter((a) => a.slug !== found.slug));
+        setRelatedArticles(list.filter((a) => a.slug !== found!.slug));
         const storedKey = `voxpolis_views_${found.id}`;
         const prevViews = parseInt(localStorage.getItem(storedKey) || '0', 10);
         const nextViews = prevViews + 1;
@@ -203,11 +241,11 @@ export default function NewsDetailPage() {
               setExtractedAuthor(cachedMeta.author);
             }
             if (cachedMeta.content && cachedMeta.content.length > 200) {
-              setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: cachedMeta.content, author: cachedMeta.author || prev.author } : prev));
+              setArticle((prev) => (prev && prev.id === found!.id ? { ...prev, content: cachedMeta.content, author: cachedMeta.author || prev.author } : prev));
             }
           } catch {
             if (cachedMetaStr.length > 200) {
-              setArticle((prev) => (prev && prev.id === found.id ? { ...prev, content: cachedMetaStr } : prev));
+              setArticle((prev) => (prev && prev.id === found!.id ? { ...prev, content: cachedMetaStr } : prev));
             }
           }
         } else if (
@@ -223,7 +261,7 @@ export default function NewsDetailPage() {
                   setIsColumnist(true);
                   try {
                     localStorage.setItem(
-                      `voxpolis_content_v3_${found.id}`,
+                      `voxpolis_content_v3_${found!.id}`,
                       JSON.stringify({ isColumnist: true, author: extracted.author, sourceName: extracted.sourceName, sourceUrl: extracted.sourceUrl })
                     );
                   } catch {}
@@ -235,13 +273,20 @@ export default function NewsDetailPage() {
                 if (extracted.content && extracted.content.length > 200) {
                   try {
                     localStorage.setItem(
-                      `voxpolis_content_v3_${found.id}`,
+                      `voxpolis_content_v3_${found!.id}`,
                       JSON.stringify({ content: extracted.content, author: extracted.author, isColumnist: false })
                     );
                   } catch {}
-                  setArticle((prev) =>
-                    prev && prev.id === found.id ? { ...prev, content: extracted.content, author: extracted.author || prev.author } : prev
-                  );
+                  setArticle((prev) => {
+                    if (prev && prev.id === found!.id) {
+                      const updated = { ...prev, content: extracted.content, author: extracted.author || prev.author };
+                      try {
+                        localStorage.setItem(`voxpolis_article_${slug}`, JSON.stringify(updated));
+                      } catch {}
+                      return updated;
+                    }
+                    return prev;
+                  });
                 }
               } else if (extracted?.requiresReview) {
                 setRequiresReview(true);
@@ -674,7 +719,7 @@ export default function NewsDetailPage() {
           <meta name="robots" content="noindex, follow" />
           <title>Report Not Found | Voxpolis</title>
         </head>
-        <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+        <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
         <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-16 text-center space-y-6">
           <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
             <ShieldAlert className="w-6 h-6" />
