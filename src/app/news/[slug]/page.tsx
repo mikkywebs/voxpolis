@@ -263,25 +263,52 @@ export default function NewsDetailPage() {
           setIsColumnist(true);
         }
 
-        const cachedMetaStr = localStorage.getItem(`voxpolis_content_v3_${found.id}`);
+        const canonicalArtKey = found.slug || found.id;
+        const cachedMetaStr =
+          localStorage.getItem(`voxpolis_content_v3_${canonicalArtKey}`) ||
+          localStorage.getItem(`voxpolis_content_v3_${found.id}`);
+
+        let isAlreadyAiRewritten = false;
+
         if (cachedMetaStr) {
           try {
             const cachedMeta = JSON.parse(cachedMetaStr);
             if (cachedMeta.isColumnist) {
               setIsColumnist(true);
+              isAlreadyAiRewritten = true;
             }
             if (cachedMeta.author) {
               setExtractedAuthor(cachedMeta.author);
             }
             if (cachedMeta.content && cachedMeta.content.length > 200) {
-              setArticle((prev) => (prev && prev.id === found!.id ? { ...prev, content: cachedMeta.content, author: cachedMeta.author || prev.author } : prev));
+              setArticle((prev) =>
+                prev && (prev.id === found!.id || prev.slug === found!.slug)
+                  ? {
+                      ...prev,
+                      content: cachedMeta.content,
+                      author: cachedMeta.author || prev.author,
+                      title: cachedMeta.headline ? `${cachedMeta.headline} - Voxpolis` : prev.title,
+                    }
+                  : prev
+              );
+            }
+            if (cachedMeta.isAiRewritten) {
+              isAlreadyAiRewritten = true;
             }
           } catch {
             if (cachedMetaStr.length > 200) {
-              setArticle((prev) => (prev && prev.id === found!.id ? { ...prev, content: cachedMetaStr } : prev));
+              setArticle((prev) =>
+                prev && (prev.id === found!.id || prev.slug === found!.slug)
+                  ? { ...prev, content: cachedMetaStr }
+                  : prev
+              );
             }
           }
-        } else if (
+        }
+
+        // If not yet AI-rewritten, trigger Multi-AI extraction (Gemini / Kimi / DeepSeek)
+        if (
+          !isAlreadyAiRewritten &&
           found.source_url &&
           found.source_url.startsWith('http') &&
           !found.source_url.includes('voxpolis.app')
@@ -293,10 +320,14 @@ export default function NewsDetailPage() {
                 if (extracted.isColumnist) {
                   setIsColumnist(true);
                   try {
-                    localStorage.setItem(
-                      `voxpolis_content_v3_${found!.id}`,
-                      JSON.stringify({ isColumnist: true, author: extracted.author, sourceName: extracted.sourceName, sourceUrl: extracted.sourceUrl })
-                    );
+                    const colJson = JSON.stringify({
+                      isColumnist: true,
+                      author: extracted.author,
+                      sourceName: extracted.sourceName,
+                      sourceUrl: extracted.sourceUrl,
+                    });
+                    localStorage.setItem(`voxpolis_content_v3_${found!.id}`, colJson);
+                    localStorage.setItem(`voxpolis_content_v3_${canonicalArtKey}`, colJson);
                   } catch {}
                   return;
                 }
@@ -304,15 +335,26 @@ export default function NewsDetailPage() {
                   setExtractedAuthor(extracted.author);
                 }
                 if (extracted.content && extracted.content.length > 200) {
+                  const metaPayload = JSON.stringify({
+                    content: extracted.content,
+                    author: extracted.author,
+                    isColumnist: false,
+                    isAiRewritten: Boolean(extracted.isAiRewritten),
+                    headline: extracted.headline,
+                    provider: extracted.provider,
+                  });
                   try {
-                    localStorage.setItem(
-                      `voxpolis_content_v3_${found!.id}`,
-                      JSON.stringify({ content: extracted.content, author: extracted.author, isColumnist: false })
-                    );
+                    localStorage.setItem(`voxpolis_content_v3_${found!.id}`, metaPayload);
+                    localStorage.setItem(`voxpolis_content_v3_${canonicalArtKey}`, metaPayload);
                   } catch {}
                   setArticle((prev) => {
-                    if (prev && prev.id === found!.id) {
-                      const updated = { ...prev, content: extracted.content, author: extracted.author || prev.author };
+                    if (prev && (prev.id === found!.id || prev.slug === found!.slug)) {
+                      const updated = {
+                        ...prev,
+                        content: extracted.content,
+                        author: extracted.author || prev.author,
+                        title: extracted.headline ? `${extracted.headline} - Voxpolis` : prev.title,
+                      };
                       try {
                         localStorage.setItem(`voxpolis_article_${slug}`, JSON.stringify(updated));
                       } catch {}
@@ -885,7 +927,7 @@ export default function NewsDetailPage() {
           />
 
           {/* Community Pulse immediately after header (guests and members can react) */}
-          <EmojiReactions articleId={article!.id} />
+          <EmojiReactions articleId={article!.id} slug={article!.slug || slug} />
 
           <SocialShareButtons title={article!.title} slug={article!.slug} />
 

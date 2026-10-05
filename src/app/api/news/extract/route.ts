@@ -16,29 +16,35 @@ async function callGemini(systemPrompt: string, userText: string): Promise<strin
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.trim() === '') return null;
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const models = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+  for (const model of models) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
 
-    const res = await fetch(url, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `${systemPrompt}\n\n${userText}` }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 1000 },
-      }),
-    });
+      const res = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${systemPrompt}\n\n${userText}` }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 1000 },
+        }),
+      });
 
-    clearTimeout(timeoutId);
-    if (res.ok) {
-      const data = await res.json();
-      const txt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (txt && txt.length > 150) return txt;
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json();
+        const txt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (txt && txt.length > 150) return txt;
+      } else {
+        const errTxt = await res.text();
+        console.warn(`[VoxPolis AI] Gemini (${model}) HTTP ${res.status}:`, errTxt.slice(0, 300));
+      }
+    } catch (err: any) {
+      console.warn(`[VoxPolis AI] Gemini (${model}) request error:`, err?.message || err);
     }
-  } catch (err) {
-    console.warn('Gemini API call error:', err);
   }
   return null;
 }
@@ -57,7 +63,7 @@ async function callKimi(systemPrompt: string, userText: string): Promise<string 
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey.trim()}`,
       },
       body: JSON.stringify({
         model: 'moonshot-v1-8k',
@@ -74,9 +80,12 @@ async function callKimi(systemPrompt: string, userText: string): Promise<string 
       const data = await res.json();
       const txt = data.choices?.[0]?.message?.content?.trim();
       if (txt && txt.length > 150) return txt;
+    } else {
+      const errTxt = await res.text();
+      console.warn(`[VoxPolis AI] Kimi HTTP ${res.status}:`, errTxt.slice(0, 300));
     }
-  } catch (err) {
-    console.warn('Kimi API call error:', err);
+  } catch (err: any) {
+    console.warn('[VoxPolis AI] Kimi API call error:', err?.message || err);
   }
   return null;
 }
@@ -95,7 +104,7 @@ async function callDeepSeek(systemPrompt: string, userText: string): Promise<str
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey.trim()}`,
       },
       body: JSON.stringify({
         model: 'deepseek-chat',
@@ -112,9 +121,12 @@ async function callDeepSeek(systemPrompt: string, userText: string): Promise<str
       const data = await res.json();
       const txt = data.choices?.[0]?.message?.content?.trim();
       if (txt && txt.length > 150) return txt;
+    } else {
+      const errTxt = await res.text();
+      console.warn(`[VoxPolis AI] DeepSeek HTTP ${res.status}:`, errTxt.slice(0, 300));
     }
-  } catch (err) {
-    console.warn('DeepSeek API call error:', err);
+  } catch (err: any) {
+    console.warn('[VoxPolis AI] DeepSeek API call error:', err?.message || err);
   }
   return null;
 }

@@ -4,13 +4,17 @@ import { useState, useEffect } from 'react';
 
 interface EmojiReactionsProps {
   articleId: string;
+  slug?: string;
   onRequireAuth?: () => void;
   isLoggedIn?: boolean;
 }
 
 export type ReactionType = 'upvote' | 'funny' | 'love' | 'surprised' | 'angry' | 'sad';
 
-export default function EmojiReactions({ articleId }: EmojiReactionsProps) {
+export default function EmojiReactions({ articleId, slug }: EmojiReactionsProps) {
+  // Canonical ID prefers slug for absolute permanence across refreshes
+  const canonicalId = (slug || articleId || '').toLowerCase().trim();
+
   // Reaction counts stored locally & synced with community tally
   const [counts, setCounts] = useState<{ [key in ReactionType]: number }>({
     upvote: 0,
@@ -25,11 +29,14 @@ export default function EmojiReactions({ articleId }: EmojiReactionsProps) {
 
   // Restore counts and active reaction from localStorage + sync with community API
   useEffect(() => {
-    if (typeof window === 'undefined' || !articleId) return;
+    if (typeof window === 'undefined' || !canonicalId) return;
 
-    // 1. Immediate restore from localStorage
+    // 1. Immediate restore from localStorage (checks canonical slug first, fallback to articleId)
     try {
-      const savedCounts = localStorage.getItem(`voxpolis_reactions_${articleId}`);
+      const savedCounts =
+        localStorage.getItem(`voxpolis_reactions_${canonicalId}`) ||
+        (articleId ? localStorage.getItem(`voxpolis_reactions_${articleId}`) : null);
+
       if (savedCounts) {
         const parsed = JSON.parse(savedCounts);
         setCounts((prev) => ({
@@ -38,14 +45,18 @@ export default function EmojiReactions({ articleId }: EmojiReactionsProps) {
         }));
       }
 
-      const savedUserReaction = localStorage.getItem(`voxpolis_my_reaction_${articleId}`) as ReactionType | null;
+      const savedUserReaction = (
+        localStorage.getItem(`voxpolis_my_reaction_${canonicalId}`) ||
+        (articleId ? localStorage.getItem(`voxpolis_my_reaction_${articleId}`) : null)
+      ) as ReactionType | null;
+
       if (savedUserReaction) {
         setUserReaction(savedUserReaction);
       }
     } catch {}
 
     // 2. Fetch server-aggregated community reactions (works for both guests & members)
-    fetch(`/api/reactions?articleId=${encodeURIComponent(articleId)}`)
+    fetch(`/api/reactions?articleId=${encodeURIComponent(canonicalId)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.reactions) {
@@ -55,14 +66,17 @@ export default function EmojiReactions({ articleId }: EmojiReactionsProps) {
               merged[key] = Math.max(merged[key] || 0, data.reactions[key] || 0);
             });
             try {
-              localStorage.setItem(`voxpolis_reactions_${articleId}`, JSON.stringify(merged));
+              localStorage.setItem(`voxpolis_reactions_${canonicalId}`, JSON.stringify(merged));
+              if (articleId && articleId !== canonicalId) {
+                localStorage.setItem(`voxpolis_reactions_${articleId}`, JSON.stringify(merged));
+              }
             } catch {}
             return merged;
           });
         }
       })
       .catch(() => {});
-  }, [articleId]);
+  }, [canonicalId, articleId]);
 
   const handleReact = (type: ReactionType) => {
     const prevType = userReaction;
@@ -86,11 +100,22 @@ export default function EmojiReactions({ articleId }: EmojiReactionsProps) {
 
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(`voxpolis_reactions_${articleId}`, JSON.stringify(nextCounts));
+        const countsJson = JSON.stringify(nextCounts);
+        localStorage.setItem(`voxpolis_reactions_${canonicalId}`, countsJson);
+        if (articleId && articleId !== canonicalId) {
+          localStorage.setItem(`voxpolis_reactions_${articleId}`, countsJson);
+        }
+
         if (nextReaction) {
-          localStorage.setItem(`voxpolis_my_reaction_${articleId}`, nextReaction);
+          localStorage.setItem(`voxpolis_my_reaction_${canonicalId}`, nextReaction);
+          if (articleId && articleId !== canonicalId) {
+            localStorage.setItem(`voxpolis_my_reaction_${articleId}`, nextReaction);
+          }
         } else {
-          localStorage.removeItem(`voxpolis_my_reaction_${articleId}`);
+          localStorage.removeItem(`voxpolis_my_reaction_${canonicalId}`);
+          if (articleId) {
+            localStorage.removeItem(`voxpolis_my_reaction_${articleId}`);
+          }
         }
       } catch {}
     }
@@ -100,7 +125,7 @@ export default function EmojiReactions({ articleId }: EmojiReactionsProps) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        articleId,
+        articleId: canonicalId,
         type: nextReaction,
         previousType: prevType,
       }),

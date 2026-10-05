@@ -308,8 +308,8 @@ function parseRssXmlToArticles(
       ? fullArticleText
       : expandToJournalisticArticle(titleText, cleanSnippet, sourceName, countryName, undefined, 'politics');
 
-    const articleId = `rss-${countryCode.toLowerCase()}-${Date.now()}-${idx}`;
     const slug = generateSlug(titleText);
+    const articleId = `rss-${countryCode.toLowerCase()}-${slug}`;
     const displayTitle = titleText.endsWith(' - Voxpolis') ? titleText : `${titleText} - Voxpolis`;
 
     articles.push({
