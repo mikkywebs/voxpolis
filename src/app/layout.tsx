@@ -8,13 +8,14 @@ import ScrollToTopButton from '@/components/layout/ScrollToTopButton';
 import NetworkErrorOverlay from '@/components/common/NetworkErrorOverlay';
 
 export const metadata: Metadata = {
-  title: 'Voxpolis - Global Political Intelligence & News Platform',
+  title: 'Voxpolis | Real Political News Made Simple',
   description:
-    'Direct global political intelligence, news briefs, multi-nation coverage, and real-time civic sentiment analysis without content paywalls.',
+    'Get quick, clear political news, key facts behind the headlines, and real public sentiment from around the world — without the clutter.',
   metadataBase: new URL('https://voxpolis.app'),
   openGraph: {
-    title: 'Voxpolis - Independent Global Political Intelligence',
-    description: 'Direct global political news coverage and citizen sentiment analysis.',
+    title: 'Voxpolis | Real Political News Made Simple',
+    description:
+      'Get quick, clear political news, key facts behind the headlines, and real public sentiment from around the world — without the clutter.',
     url: 'https://voxpolis.app',
     siteName: 'Voxpolis',
     type: 'website',
