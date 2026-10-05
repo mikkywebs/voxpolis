@@ -17,7 +17,7 @@ import OriginalSourceLink from '@/components/article/OriginalSourceLink';
 import AdSlot from '@/components/article/AdSlot';
 import DesktopVignetteAd from '@/components/ads/DesktopVignetteAd';
 import { SUPPORTED_COUNTRIES, getCountryByCode, getCountrySlug } from '@/config/countries';
-import { fetchArticlesForCountry, ArticleData, expandToJournalisticArticle, formatCleanSnippet, isColumnistOrOpinion } from '@/lib/news';
+import { fetchArticlesForCountry, ArticleData, expandToJournalisticArticle, formatCleanSnippet, isColumnistOrOpinion, getArticleImageUrl } from '@/lib/news';
 import { getPipelineArticleBySlug } from '@/lib/pipeline';
 import { get301Redirect } from '@/lib/pipeline/redirects';
 import { PipelineArticleRecord } from '@/lib/pipeline/types';
@@ -169,21 +169,54 @@ export default function NewsDetailPage() {
         }).catch(() => {});
       }
 
-      // 3. Fetch from country feed
-      const list = await fetchArticlesForCountry(selectedCountry.code);
-      const feedFound = list.find((a) => a.slug === slug);
+      // 3. Determine target search country (check URL query ?country= first)
+      let searchCode = selectedCountry.code;
+      if (typeof window !== 'undefined') {
+        const queryCountry = new URLSearchParams(window.location.search).get('country');
+        if (queryCountry) {
+          searchCode = queryCountry.toUpperCase();
+          const targetC = getCountryByCode(searchCode);
+          if (targetC) setSelectedCountry(targetC);
+        }
+      }
+
+      // Fetch from target country feed
+      let list = await fetchArticlesForCountry(searchCode);
+      let feedFound = list.find((a) => a.slug === slug);
       if (feedFound) {
         found = feedFound;
       }
 
-      // 4. If not found in current country feed, query backend /api/news?slug=...
+      // If not found in target country feed, search across other active country feeds
+      if (!found && !pipeArt) {
+        const otherCountries = ['US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'NG'].filter((c) => c !== searchCode);
+        for (const cCode of otherCountries) {
+          try {
+            const otherList = await fetchArticlesForCountry(cCode);
+            const otherFound = otherList.find((a) => a.slug === slug);
+            if (otherFound) {
+              found = otherFound;
+              list = otherList;
+              const matchedC = getCountryByCode(cCode);
+              if (matchedC) setSelectedCountry(matchedC);
+              break;
+            }
+          } catch {}
+        }
+      }
+
+      // 4. If still not found, query backend /api/news?slug=...&country=...
       if (!found && !pipeArt) {
         try {
-          const res = await fetch(`/api/news?slug=${encodeURIComponent(slug)}`);
+          const res = await fetch(`/api/news?slug=${encodeURIComponent(slug)}&country=${searchCode}`);
           if (res.ok) {
             const data = await res.json();
             if (data?.article) {
               found = data.article;
+              if (found?.country_code) {
+                const cObj = getCountryByCode(found.country_code);
+                if (cObj) setSelectedCountry(cObj);
+              }
             }
           }
         } catch {}
@@ -745,18 +778,36 @@ export default function NewsDetailPage() {
                 Trending Stories in {selectedCountry.name}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {relatedArticles.slice(0, 4).map((art) => (
-                  <Link
-                    key={art.id}
-                    href={`/news/${art.slug}`}
-                    className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 hover:border-blue-500 transition block"
-                  >
-                    <h4 className="text-xs font-bold text-gray-900 dark:text-white line-clamp-2 mb-1">
-                      {art.title}
-                    </h4>
-                    <p className="text-[11px] text-gray-500 line-clamp-2">{art.snippet}</p>
-                  </Link>
-                ))}
+                {relatedArticles.slice(0, 4).map((art) => {
+                  const img = getArticleImageUrl(art);
+                  return (
+                    <Link
+                      key={art.id}
+                      href={`/news/${art.slug}${art.country_code ? `?country=${art.country_code}` : ''}`}
+                      className="group p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 hover:border-blue-500 shadow-sm hover:shadow-md transition flex gap-3.5 items-center"
+                    >
+                      <div className="w-24 h-20 rounded-xl overflow-hidden shrink-0 bg-gray-100 dark:bg-gray-800 relative">
+                        {/* eslint-disable-next-html-element-suppression */}
+                        <img
+                          src={img}
+                          alt={art.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider block">
+                          {art.source_name}
+                        </span>
+                        <h4 className="text-xs font-bold text-gray-900 dark:text-white line-clamp-2 group-hover:text-blue-500 transition leading-snug">
+                          {art.title.replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')}
+                        </h4>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1">
+                          {art.snippet}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -4,76 +4,184 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * Faithful Editorial Rewriter powered by Anthropic Claude:
- * Ingests raw extracted news dispatches, preserving 100% of facts, names, figures,
- * dates, and direct quotes, while producing clean, original, search-optimized Voxpolis prose.
+ * Multi-AI Editorial Rewriter Cascade:
+ * Priority 1: Google Gemini (GEMINI_API_KEY)
+ * Priority 2: Moonshot Kimi (KIMI_API_KEY)
+ * Priority 3: DeepSeek (DEEPSEEK_API_KEY)
+ *
+ * Implements the "Okpebholo Model":
+ * Active punchy title + exactly 4 crisp, objective, factual paragraphs.
  */
-async function rewriteWithAnthropicClaude(
-  paragraphs: string[],
-  sourceUrl: string,
-  headline: string,
-  sourceName: string
-): Promise<{ content: string; paragraphs: string[] } | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey.trim() === '') {
-    return null;
+async function callGemini(systemPrompt: string, userText: string): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.trim() === '') return null;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const res = await fetch(url, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${systemPrompt}\n\n${userText}` }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1000 },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      const txt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (txt && txt.length > 150) return txt;
+    }
+  } catch (err) {
+    console.warn('Gemini API call error:', err);
   }
+  return null;
+}
 
-  const rawText = paragraphs.join('\n\n').slice(0, 9000);
-
-  const systemPrompt = `You are the Voxpolis senior editorial desk rewrite engine. You are provided with the raw extracted text of a verified political news report. Your task is to produce a 100% faithful, search-indexed, original news article for Voxpolis readers.
-
-STRICT EDITORIAL RULES:
-1. RETAIN 100% OF THE FACTUAL MEANING: Every single person named, institution, political party, bill, monetary figure, percentage, location, date, and core incident must be accurately preserved. Do not invent any new facts or speculate.
-2. NO GENERIC ROBOTIC FILLER: Never write vague filler paragraphs like "Beyond executive announcements...", "For citizens and community watchdogs...", "Strategic considerations continue to emerge...", or "In a significant development...".
-3. PRESERVE DIRECT QUOTATIONS: Keep key direct quotes accurate, attributing the speaker properly (e.g. As told to ${sourceName}, the official stated: "...").
-4. IN-LINE ATTRIBUTION: Attribute the primary reporting to ${sourceName} naturally in the lead or body (e.g. "According to verified reports monitored through ${sourceName}...").
-5. PROSE STYLE: Clean, authoritative, engaging, objective news journalism in active voice.
-6. OUTPUT FORMAT: Output 3 to 6 substantial paragraphs separated by double line breaks (\\n\\n). No markdown headings, no bullet points, no commentary, no intro greetings. Output only the news article paragraphs.`;
+async function callKimi(systemPrompt: string, userText: string): Promise<string | null> {
+  const apiKey = process.env.KIMI_API_KEY;
+  if (!apiKey || apiKey.trim() === '') return null;
 
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 14000);
+    const url = 'https://api.moonshot.cn/v1/chat/completions';
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(url, {
       method: 'POST',
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1500,
+        model: 'moonshot-v1-8k',
         temperature: 0.2,
-        system: systemPrompt,
         messages: [
-          {
-            role: 'user',
-            content: `Headline: ${headline}\nPublisher: ${sourceName}\nURL: ${sourceUrl}\n\nRaw Source Text:\n${rawText}`,
-          },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userText },
         ],
       }),
     });
 
     clearTimeout(timeoutId);
-
-    if (response.ok) {
-      const data = await response.json();
-      const text = data.content?.[0]?.text?.trim();
-      if (text && text.length > 200) {
-        const rewrittenParas = text.split('\n\n').map((p: string) => p.trim()).filter((p: string) => p.length > 30);
-        if (rewrittenParas.length >= 2) {
-          return {
-            content: rewrittenParas.join('\n\n'),
-            paragraphs: rewrittenParas,
-          };
-        }
-      }
+    if (res.ok) {
+      const data = await res.json();
+      const txt = data.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 150) return txt;
     }
-  } catch (e) {
-    console.warn('Anthropic rewrite request error or timeout:', e);
+  } catch (err) {
+    console.warn('Kimi API call error:', err);
+  }
+  return null;
+}
+
+async function callDeepSeek(systemPrompt: string, userText: string): Promise<string | null> {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey || apiKey.trim() === '') return null;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 14000);
+    const url = 'https://api.deepseek.com/v1/chat/completions';
+
+    const res = await fetch(url, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userText },
+        ],
+      }),
+    });
+
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      const txt = data.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 150) return txt;
+    }
+  } catch (err) {
+    console.warn('DeepSeek API call error:', err);
+  }
+  return null;
+}
+
+async function rewriteWithMultiAiEngine(
+  paragraphs: string[],
+  sourceUrl: string,
+  headline: string,
+  sourceName: string
+): Promise<{ content: string; paragraphs: string[]; headline?: string; providerUsed: string } | null> {
+  const systemPrompt = `You are the Voxpolis senior newsroom rewrite engine. You are provided with the raw extracted text of a verified political news report. Your task is to produce a sharp, engaging, reader-friendly Voxpolis news brief.
+
+STRICT EDITORIAL RULES (THE OKPEBHOLO MODEL):
+1. REWRITE THE HEADLINE: Produce an active, punchy, engaging headline on the first line prefixed with "HEADLINE: " (e.g., "HEADLINE: Nigerians Slam Okpebholo Over ₦3,000 UK Fuel Comparison").
+2. PRODUCE EXACTLY 4 CONCISE, FACTUAL PARAGRAPHS:
+   - Paragraph 1 (The Hook): State who did what, the central event, and the immediate reaction/backlash.
+   - Paragraph 2 (The Key Figures & Quotes): Detail the specific claims, statistics, monetary figures, or direct statements.
+   - Paragraph 3 (The Counter-View): Summarize the criticisms, opposition statements, or public counter-arguments.
+   - Paragraph 4 (The Political Fallout): Note any calls for resignation, party statements, or legislative next steps.
+3. PRESERVE 100% OF REAL FACTS: Keep all real names, titles, parties, dates, and numbers accurate. Never invent facts or hallucinate.
+4. NO WIRE FILLER: Eliminate wire repetitiveness, generic introductory padding, or clichéd robotic lines.
+5. NO MARKDOWN: Output only the "HEADLINE: ..." line followed by two line breaks, and then the 4 paragraphs separated by double line breaks.`;
+
+  const userText = `Headline: ${headline}\nPublisher: ${sourceName}\nURL: ${sourceUrl}\n\nRaw Source Text:\n${paragraphs.join('\n\n').slice(0, 8500)}`;
+
+  let rawOutput: string | null = null;
+  let providerUsed = 'none';
+
+  // 1. Try Gemini
+  rawOutput = await callGemini(systemPrompt, userText);
+  if (rawOutput) providerUsed = 'Gemini';
+
+  // 2. Fallback to Kimi
+  if (!rawOutput) {
+    rawOutput = await callKimi(systemPrompt, userText);
+    if (rawOutput) providerUsed = 'Kimi';
+  }
+
+  // 3. Fallback to DeepSeek
+  if (!rawOutput) {
+    rawOutput = await callDeepSeek(systemPrompt, userText);
+    if (rawOutput) providerUsed = 'DeepSeek';
+  }
+
+  if (!rawOutput) return null;
+
+  let rewrittenHeadline: string | undefined = undefined;
+  let bodyText = rawOutput;
+
+  const headlineMatch = rawOutput.match(/^HEADLINE:\s*(.*)/i);
+  if (headlineMatch) {
+    rewrittenHeadline = headlineMatch[1].replace(/[*#]/g, '').trim();
+    bodyText = rawOutput.replace(/^HEADLINE:.*(?:\r?\n)+/i, '').trim();
+  }
+
+  const paras = bodyText
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/[*#]/g, '').trim())
+    .filter((p) => p.length > 30);
+
+  if (paras.length >= 2) {
+    return {
+      content: paras.join('\n\n'),
+      paragraphs: paras,
+      headline: rewrittenHeadline,
+      providerUsed,
+    };
   }
 
   return null;
@@ -303,8 +411,8 @@ export async function GET(request: NextRequest) {
       );
 
     if (cleanedParas.length >= 2) {
-      // 2. Perform faithful Anthropic Claude rewrite retaining 100% facts and direct quotes
-      const aiResult = await rewriteWithAnthropicClaude(
+      // 2. Perform faithful Multi-AI rewrite (Gemini -> Kimi -> DeepSeek)
+      const aiResult = await rewriteWithMultiAiEngine(
         cleanedParas,
         sourceUrl,
         extractedHeadline || 'Political Report',
@@ -316,9 +424,11 @@ export async function GET(request: NextRequest) {
           success: true,
           isColumnist: false,
           isAiRewritten: true,
+          headline: aiResult.headline || extractedHeadline,
           content: aiResult.content,
           paragraphs: aiResult.paragraphs,
           wordCount: aiResult.content.split(/\s+/).length,
+          provider: aiResult.providerUsed,
           author: extractedAuthor,
           sourceName: detectedSource,
           sourceUrl,

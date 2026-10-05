@@ -166,6 +166,21 @@ export async function GET(request: NextRequest) {
         article: foundInFeeds,
       });
     }
+
+    // Check across other active country feeds
+    const otherCountryCodes = ['US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'NG'].filter((c) => c !== countryCode);
+    for (const otherCode of otherCountryCodes) {
+      try {
+        const otherFeeds = await fetchRssArticlesForCountry(otherCode, language);
+        const match = otherFeeds.find((a) => a.slug === slugParam);
+        if (match) {
+          return NextResponse.json({
+            success: true,
+            article: match,
+          });
+        }
+      } catch {}
+    }
   }
 
   // 4. Fallback to country localized template if zero articles match

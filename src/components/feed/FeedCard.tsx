@@ -34,6 +34,7 @@ export default function FeedCard({ article, onCardClick }: FeedCardProps) {
     }
     if (typeof window === 'undefined') return;
     try {
+      localStorage.setItem(`voxpolis_article_${article.slug}`, JSON.stringify(article));
       const key = `voxpolis_views_${article.id}`;
       const prev = parseInt(localStorage.getItem(key) || '0', 10);
       const next = prev + 1;
@@ -51,13 +52,14 @@ export default function FeedCard({ article, onCardClick }: FeedCardProps) {
   const imageUrl = getArticleImageUrl(article);
   const formattedTime = formatExactTimestamp(article.created_at);
   const displayTitle = (article.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
+  const articleUrl = `/news/${article.slug}${article.country_code ? `?country=${article.country_code}` : ''}`;
 
   return (
     <article className="group bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/70 rounded-2xl overflow-hidden p-5 sm:p-6 shadow-sm hover:shadow-lg transition duration-200 flex flex-col justify-between h-full">
       <div>
         {/* News Featured Image Thumbnail */}
         <Link
-          href={`/news/${article.slug}`}
+          href={articleUrl}
           onClick={handleRecordClick}
           className="block mb-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900"
         >
@@ -100,7 +102,7 @@ export default function FeedCard({ article, onCardClick }: FeedCardProps) {
           </div>
         )}
 
-        <Link href={`/news/${article.slug}`} onClick={handleRecordClick}>
+        <Link href={articleUrl} onClick={handleRecordClick}>
           <h2 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-snug line-clamp-2">
             {displayTitle}
           </h2>
@@ -121,7 +123,7 @@ export default function FeedCard({ article, onCardClick }: FeedCardProps) {
         </div>
 
         <Link
-          href={`/news/${article.slug}`}
+          href={articleUrl}
           onClick={handleRecordClick}
           className="font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-0.5 transition inline-flex items-center gap-1"
         >
