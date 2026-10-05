@@ -7,9 +7,10 @@ import { ExternalLink, AlertCircle, Eye } from 'lucide-react';
 
 interface FeedCardProps {
   article: ArticleData;
+  onCardClick?: () => void;
 }
 
-export default function FeedCard({ article }: FeedCardProps) {
+export default function FeedCard({ article, onCardClick }: FeedCardProps) {
   const [effectiveViews, setEffectiveViews] = useState<number>(article.views_count || 0);
 
   useEffect(() => {
@@ -25,7 +26,12 @@ export default function FeedCard({ article }: FeedCardProps) {
     } catch {}
   }, [article.id, article.views_count]);
 
-  const handleRecordClick = () => {
+  const handleRecordClick = (e?: React.MouseEvent) => {
+    if (onCardClick) {
+      if (e) e.preventDefault();
+      onCardClick();
+      return;
+    }
     if (typeof window === 'undefined') return;
     try {
       const key = `voxpolis_views_${article.id}`;

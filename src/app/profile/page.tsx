@@ -6,7 +6,7 @@ import Link from 'next/link';
 import SiteLogo from '@/components/branding/SiteLogo';
 import { ALL_COUNTRIES, CountryConfig, getCountryByCode, getCountrySlug } from '@/config/countries';
 import { getMemberBadge } from '@/lib/badges';
-import { ArrowLeft, User, ShieldCheck, Mail, Globe, Save, CheckCircle2, AlertCircle, Sparkles, Award, Lock } from 'lucide-react';
+import { ArrowLeft, User, ShieldCheck, Mail, Globe, Save, CheckCircle2, AlertCircle, Sparkles, Award, Lock, Check } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -22,6 +22,7 @@ export default function ProfilePage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [primaryCountry, setPrimaryCountry] = useState('NG');
+  const [followedCountries, setFollowedCountries] = useState<string[]>([]);
   const [memberSince, setMemberSince] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,25 +40,28 @@ export default function ProfilePage() {
           const metaUsername = user.user_metadata?.username || (user.email ? user.email.split('@')[0] : '');
           const metaInitial = user.user_metadata?.initial_name || metaName || '';
           const metaCountry = user.user_metadata?.primary_country || 'NG';
+          const metaFollowed = user.user_metadata?.followed_countries || [];
           const metaSince = user.created_at || user.user_metadata?.member_since || null;
 
           setInitialName(metaInitial);
           setDisplayName(metaName);
           setUsername(metaUsername);
           setPrimaryCountry(metaCountry);
+          if (Array.isArray(metaFollowed)) setFollowedCountries(metaFollowed);
           setMemberSince(metaSince);
 
           // Fetch from Supabase profiles table
           try {
             const { data: profile } = await supabase
               .from('profiles')
-              .select('full_name, primary_country, email, created_at')
+              .select('full_name, primary_country, followed_countries, email, created_at')
               .eq('id', user.id)
               .single();
 
             if (profile) {
               if (profile.full_name) setDisplayName(profile.full_name);
               if (profile.primary_country) setPrimaryCountry(profile.primary_country);
+              if (Array.isArray(profile.followed_countries)) setFollowedCountries(profile.followed_countries);
               if (profile.email) setEmail(profile.email);
               if (profile.created_at) setMemberSince(profile.created_at);
             }
@@ -68,12 +72,18 @@ export default function ProfilePage() {
           const localUsername = localStorage.getItem('voxpolis_username') || '';
           const localInitial = localStorage.getItem('voxpolis_initial_name') || localName;
           const localCountry = localStorage.getItem('voxpolis_primary_country') || 'NG';
+          let localFollowed: string[] = [];
+          try {
+            const parsed = JSON.parse(localStorage.getItem('voxpolis_followed_countries') || '[]');
+            if (Array.isArray(parsed)) localFollowed = parsed;
+          } catch {}
           const localSince = localStorage.getItem('voxpolis_member_since') || new Date().toISOString();
 
           setInitialName(localInitial);
           setDisplayName(localName);
           setUsername(localUsername);
           setPrimaryCountry(localCountry);
+          setFollowedCountries(localFollowed);
           setMemberSince(localSince);
         }
       } catch (e) {
@@ -85,6 +95,17 @@ export default function ProfilePage() {
 
     loadProfile();
   }, []);
+
+  const toggleFollowed = (code: string) => {
+    if (code === primaryCountry) return;
+    if (followedCountries.includes(code)) {
+      setFollowedCountries(followedCountries.filter((c) => c !== code));
+    } else {
+      if (followedCountries.length < 5) {
+        setFollowedCountries([...followedCountries, code]);
+      }
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,6 +129,7 @@ export default function ProfilePage() {
             full_name: cleanName,
             username: cleanUname,
             primary_country: primaryCountry,
+            followed_countries: followedCountries,
             initial_name: initialName || cleanName,
           },
         });
@@ -118,6 +140,7 @@ export default function ProfilePage() {
           email: user.email,
           full_name: cleanName,
           primary_country: primaryCountry,
+          followed_countries: followedCountries,
           updated_at: new Date().toISOString(),
         });
       }
@@ -126,6 +149,7 @@ export default function ProfilePage() {
       localStorage.setItem('voxpolis_user_name', cleanName);
       localStorage.setItem('voxpolis_username', cleanUname);
       localStorage.setItem('voxpolis_primary_country', primaryCountry);
+      localStorage.setItem('voxpolis_followed_countries', JSON.stringify(followedCountries));
       if (initialName) localStorage.setItem('voxpolis_initial_name', initialName);
 
       setSuccessMsg('Profile details successfully updated and saved!');
@@ -326,6 +350,37 @@ export default function ProfilePage() {
                   ))}
                 </select>
                 <Globe className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Followed Countries for My VoxPolis (Up to 5) */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+                  Followed Countries for My VoxPolis (Choose up to 5)
+                </label>
+                <span className="text-[10px] text-gray-400 font-semibold">{followedCountries.length} of 5 selected</span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap max-h-36 overflow-y-auto p-2 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800/40">
+                {ALL_COUNTRIES.filter((c) => c.code !== primaryCountry).map((c) => {
+                  const isFollowed = followedCountries.includes(c.code);
+                  return (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => toggleFollowed(c.code)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition cursor-pointer ${
+                        isFollowed
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-blue-400'
+                      }`}
+                    >
+                      <span>{c.flag}</span>
+                      <span>{c.name}</span>
+                      {isFollowed && <Check className="w-3 h-3" />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

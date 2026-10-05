@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { Lock, X, Globe, ArrowRight } from 'lucide-react';
+import { X, Globe, ArrowRight, Sparkles } from 'lucide-react';
 
 interface AuthPromptModalProps {
   isOpen: boolean;
@@ -16,8 +16,8 @@ interface AuthPromptModalProps {
 export default function AuthPromptModal({
   isOpen,
   onClose,
-  title = 'Members-Only Feature',
-  message = 'Country selection and multi-nation coverage are reserved for registered members. Sign in or create a free account to explore political news across 119 countries.',
+  title = 'Explore Global Political News',
+  message = 'Create your free account to unlock multi-country political coverage, saved stories, and personalize your daily My VoxPolis briefing.',
 }: AuthPromptModalProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -70,7 +70,7 @@ export default function AuthPromptModal({
           <div className="space-y-2 text-left">
             <h3 className="font-extrabold text-lg sm:text-xl text-gray-900 dark:text-white flex items-center gap-2">
               <span>{title}</span>
-              <Lock className="w-4 h-4 text-amber-500" />
+              <Sparkles className="w-4 h-4 text-blue-500" />
             </h3>
             <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
               {message}

@@ -77,7 +77,7 @@ export default function OnboardingPage() {
     if (followedCountries.includes(code)) {
       setFollowedCountries(followedCountries.filter((c) => c !== code));
     } else {
-      if (followedCountries.length < 2) {
+      if (followedCountries.length < 5) {
         setFollowedCountries([...followedCountries, code]);
       }
     }
@@ -318,7 +318,7 @@ export default function OnboardingPage() {
           {/* Step 3: Follow Up To 2 Additional Countries */}
           <div className="space-y-2 pt-1">
             <label className="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider block">
-              3. Follow Additional Countries (Optional, max 2)
+              3. Follow Additional Countries (Optional, choose up to 5)
             </label>
             <div className="flex items-center gap-2 flex-wrap max-h-28 overflow-y-auto p-2 border border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-800/40">
               {ALL_COUNTRIES.filter((c) => c.code !== primaryCountry).map((c) => {
