@@ -169,11 +169,55 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // 4. Ensure EVERY unique article on VoxPolis is rewritten into our own concise, unique brief
+  const rewrittenArticles: ArticleData[] = await Promise.all(
+    uniqueArticles.slice(0, 15).map(async (art) => {
+      const paras = (art.content || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+      const isAlreadyClean =
+        paras.length <= 4 &&
+        !art.content.includes('&#') &&
+        !art.title.includes('&#') &&
+        !art.slug.includes('8216') &&
+        !art.slug.includes('8217') &&
+        !art.content.match(/(whatsapp group|all rights reserved|click here|read also|telegram)/i);
+
+      if (isAlreadyClean && art.slug) {
+        return art;
+      }
+
+      const rewritten = await rewriteStoryForVoxpolis({
+        title: art.title,
+        content: art.content || art.snippet,
+        sourceName: art.source_name,
+        countryName: country.name,
+      });
+
+      if (art.slug && rewritten.slug && art.slug !== rewritten.slug) {
+        register301Redirect(art.slug, rewritten.slug);
+      }
+
+      return {
+        ...art,
+        title: rewritten.title,
+        slug: rewritten.slug,
+        snippet: rewritten.snippet,
+        content: rewritten.content,
+        ai_analysis: generateAiAnalysisSummary(rewritten.title, rewritten.snippet, art.source_name, country.name),
+        poll: {
+          id: `poll-${rewritten.slug}`,
+          question: generateCivicPollQuestion(rewritten.title, rewritten.snippet),
+          agree_count: 0,
+          disagree_count: 0,
+        },
+      };
+    })
+  );
+
   // If specific slug was requested, check collected feed articles
   if (slugParam) {
     const targetSlug = get301Redirect(slugParam) || slugParam;
 
-    let foundInFeeds = uniqueArticles.find((a) => a.slug === targetSlug || a.slug === slugParam);
+    let foundInFeeds = rewrittenArticles.find((a) => a.slug === targetSlug || a.slug === slugParam);
     if (!foundInFeeds) {
       const otherCountryCodes = ['US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'NG'].filter((c) => c !== countryCode);
       for (const otherCode of otherCountryCodes) {
@@ -190,7 +234,7 @@ export async function GET(request: NextRequest) {
 
     if (foundInFeeds) {
       const paras = (foundInFeeds.content || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-      if (paras.length > 4 || (foundInFeeds.content && foundInFeeds.content.length > 1600)) {
+      if (paras.length > 4 || foundInFeeds.title.includes('&#') || (foundInFeeds.content && foundInFeeds.content.length > 1600)) {
         const rewritten = await rewriteStoryForVoxpolis({
           title: foundInFeeds.title,
           content: foundInFeeds.content,
@@ -198,6 +242,7 @@ export async function GET(request: NextRequest) {
           countryName: country.name,
         });
         foundInFeeds.title = rewritten.title;
+        foundInFeeds.slug = rewritten.slug;
         foundInFeeds.content = rewritten.content;
         foundInFeeds.snippet = rewritten.snippet;
       }
@@ -208,8 +253,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 4. Fallback to country localized template if zero articles match
-  if (uniqueArticles.length === 0) {
+  // 5. Fallback to country localized template if zero articles match
+  if (rewrittenArticles.length === 0) {
     const { fetchArticlesForCountry } = await import('@/lib/news');
     const fallbackArticles = await fetchArticlesForCountry(countryCode, language);
     return NextResponse.json(
@@ -219,7 +264,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { articles: uniqueArticles, cached: false },
+    { articles: rewrittenArticles, cached: false },
     { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } }
   );
 }

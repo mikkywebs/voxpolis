@@ -51,19 +51,22 @@ const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
   ],
 };
 
-function decodeHtmlEntities(str: string): string {
+export function decodeHtmlEntities(str: string): string {
   if (!str) return '';
-  return str
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;|&#39;/g, "'")
-    .replace(/&#8216;|&#8217;|&#8218;|&#8219;|&#145;|&#146;/g, "'")
-    .replace(/&#8211;|&#8212;/g, '–')
-    .replace(/&#8220;|&#8221;|&#8222;/g, '"')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#\d+;/g, '');
+  let res = str;
+  // Handle double encoding like &amp;#8216;
+  res = res.replace(/&amp;#/gi, '&#').replace(/&amp;/gi, '&');
+  res = res.replace(/&#8216;|&#8217;|&#8218;|&#8219;|&#145;|&#146;|&lsquo;|&rsquo;/gi, "'");
+  res = res.replace(/&#8220;|&#8221;|&#8222;|&ldquo;|&rdquo;/gi, '"');
+  res = res.replace(/&#8211;|&ndash;/gi, '–');
+  res = res.replace(/&#8212;|&mdash;/gi, '—');
+  res = res.replace(/&#039;|&apos;|&#39;/gi, "'");
+  res = res.replace(/&quot;/gi, '"');
+  res = res.replace(/&lt;/gi, '<').replace(/&gt;/gi, '>');
+  res = res.replace(/&nbsp;/gi, ' ');
+  res = res.replace(/&#(\d+);/g, (m, dec) => String.fromCharCode(dec));
+  res = res.replace(/&#x([0-9a-f]+);/gi, (m, hex) => String.fromCharCode(parseInt(hex, 16)));
+  return res.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function cleanRssText(raw: string): string {

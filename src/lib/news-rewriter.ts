@@ -34,9 +34,28 @@ export function generateVoxpolisSlug(headline: string): string {
   return clean.slice(0, 90);
 }
 
+export function decodeAllHtmlEntities(str: string): string {
+  if (!str) return '';
+  let res = str;
+  // Handle double encoding like &amp;#8216;
+  res = res.replace(/&amp;#/gi, '&#').replace(/&amp;/gi, '&');
+  res = res.replace(/&#8216;|&#8217;|&#8218;|&#8219;|&#145;|&#146;|&lsquo;|&rsquo;/gi, "'");
+  res = res.replace(/&#8220;|&#8221;|&#8222;|&ldquo;|&rdquo;/gi, '"');
+  res = res.replace(/&#8211;|&ndash;/gi, '–');
+  res = res.replace(/&#8212;|&mdash;/gi, '—');
+  res = res.replace(/&#039;|&apos;|&#39;/gi, "'");
+  res = res.replace(/&quot;/gi, '"');
+  res = res.replace(/&lt;/gi, '<').replace(/&gt;/gi, '>');
+  res = res.replace(/&nbsp;/gi, ' ');
+  res = res.replace(/&#(\d+);/g, (m, dec) => String.fromCharCode(dec));
+  res = res.replace(/&#x([0-9a-f]+);/gi, (m, hex) => String.fromCharCode(parseInt(hex, 16)));
+  return res.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+}
+
 export function cleanCommercialsAndAdverts(text: string): string {
   if (!text) return '';
-  return text
+  const decoded = decodeAllHtmlEntities(text);
+  return decoded
     .split(/\n+/)
     .map((line) => line.trim())
     .filter((line) => {
@@ -69,7 +88,9 @@ export function cleanCommercialsAndAdverts(text: string): string {
  */
 async function callGeminiRewriter(systemPrompt: string, userText: string): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey.trim() === '') return null;
+  if (!apiKey || apiKey.trim() === '') {
+    return null;
+  }
 
   const models = [
     'gemini-3.5-flash-lite',
@@ -98,10 +119,13 @@ async function callGeminiRewriter(systemPrompt: string, userText: string): Promi
       if (res.ok) {
         const data = await res.json();
         const txt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (txt && txt.length > 150) return txt;
+        if (txt && txt.length > 80) return txt;
+      } else {
+        const err = await res.text();
+        console.warn(`[VoxPolis AI] Gemini ${model} HTTP ${res.status}:`, err.slice(0, 200));
       }
-    } catch {
-      // try next model
+    } catch (err: any) {
+      console.warn(`[VoxPolis AI] Gemini ${model} exception:`, err?.message || err);
     }
   }
   return null;
@@ -217,8 +241,8 @@ function algorithmicFactualCondenser(
   rawContent: string,
   sourceName: string
 ): { title: string; paragraphs: string[] } {
-  // 1. Clean headline: remove publisher prefixes, suffixes, brackets
-  let cleanTitle = (rawTitle || '')
+  // 1. Clean headline: decode entities, remove publisher prefixes, suffixes, brackets
+  let cleanTitle = decodeAllHtmlEntities(rawTitle || '')
     .replace(/^BREAKING:\s*/i, '')
     .replace(/^JUST IN:\s*/i, '')
     .replace(/\s*[-–—|]\s*(Daily Trust|Vanguard|Punch|The Nation|Channels|Premium Times|Reuters|BBC|CNN|TheCable).*$/i, '')
@@ -226,7 +250,7 @@ function algorithmicFactualCondenser(
     .trim();
 
   // 2. Parse candidate paragraphs from source text
-  const cleanBody = cleanCommercialsAndAdverts(rawContent);
+  const cleanBody = decodeAllHtmlEntities(cleanCommercialsAndAdverts(rawContent));
   const rawParas = cleanBody
     .split(/\n\s*\n/)
     .map((p) => p.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
@@ -280,21 +304,19 @@ export async function rewriteStoryForVoxpolis(params: {
   const { title, content, sourceName, countryName = 'National' } = params;
 
   const systemPrompt = `You are the Voxpolis senior newsroom rewrite engine.
-You are given a raw political news report from an external publisher.
-Your task is to produce a sharp, objective, high-clarity Voxpolis news brief.
+Rewrite this political news report into an original, concise, and engaging VoxPolis news brief.
 
-STRICT EDITORIAL RULES (THE OKPEBHOLO MODEL):
-1. REWRITE THE HEADLINE: Must be active, engaging, original, and accurate. Prefix on line 1 with "HEADLINE: ".
-2. REWRITE INTO EXACTLY 4 FACTUAL PARAGRAPHS:
-   - Paragraph 1 (The Hook): What happened, who did it, and the court/agency/political setting.
-   - Paragraph 2 (Key Details & Quotes): Specific findings, rulings, quotes, monetary figures, or statistics from the text.
-   - Paragraph 3 (The Counter-View): What the plaintiff, opposing party, or public critics argued or alleged.
-   - Paragraph 4 (The Outcome & Next Steps): Legal, electoral, or governance implications reported in the story.
-3. 100% FACTUAL FIDELITY: Use ONLY the real names, facts, dates, quotes, and claims from the source text.
-4. ZERO ADDITIONS & ZERO FILLER: Do NOT invent facts. Do NOT add robotic filler like "Stakeholders are monitoring..." or generic commentary.
-5. NO MARKDOWN: Output ONLY "HEADLINE: <headline>" followed by two newlines and the 4 paragraphs separated by double newlines.`;
+RULES:
+1. LINE 1 MUST BE: HEADLINE: <Your unique, punchy headline in title case>
+2. FOLLOWED BY 2 TO 4 CONCISE, CLEAN PARAGRAPHS summarizing the core story:
+   - What happened, key persons/institutions, allowances/amounts/laws involved, and the reaction or next steps.
+3. 100% FACTUAL FIDELITY: Use ONLY facts, names, figures, and quotes from the report.
+4. DO NOT COPY VERBATIM: Rewrite in fresh, simple, and clean Voxpolis English.
+5. NO CONVERSATIONAL FILLER: Do NOT say "Here are some options", do NOT include bullet points, do NOT provide choices.
+6. ZERO HTML ENTITIES: Use clean plain punctuation, never codes like &#8216; or &#8217;.
+7. OUTPUT ONLY the HEADLINE line and the body paragraphs separated by blank lines.`;
 
-  const userText = `Headline: ${title}\nSource: ${sourceName}\nCountry: ${countryName}\n\nSource Text:\n${content.slice(0, 7500)}`;
+  const userText = `Headline: ${decodeAllHtmlEntities(title)}\nSource: ${sourceName}\nCountry: ${countryName}\n\nSource Text:\n${cleanCommercialsAndAdverts(content).slice(0, 7500)}`;
 
   let rawOutput: string | null = null;
   let providerUsed = 'none';
@@ -331,6 +353,8 @@ STRICT EDITORIAL RULES (THE OKPEBHOLO MODEL):
       headline = headlineMatch[1].replace(/[*#]/g, '').trim();
       bodyText = rawOutput.replace(/^HEADLINE:.*(?:\r?\n)+/i, '').trim();
     }
+    headline = decodeAllHtmlEntities(headline);
+    bodyText = decodeAllHtmlEntities(bodyText);
 
     const paras = bodyText
       .split(/\n\s*\n/)
