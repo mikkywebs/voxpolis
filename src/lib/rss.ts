@@ -3,6 +3,7 @@ import {
   ArticleData,
   generateAiAnalysisSummary,
   expandToJournalisticArticle,
+  synthesize4ParagraphBrief,
   generateCivicPollQuestion,
   formatCleanSnippet,
   isPoliticalNews,
@@ -302,11 +303,14 @@ function parseRssXmlToArticles(
       cleanSnippet = formatCleanSnippet(cleanSnippet, 280);
     }
 
-    // If real paragraphs exist (>250 chars), use real journalism directly.
-    // Otherwise fallback to our neutral, plain-English synthesis.
-    const finalContent = (fullArticleText && fullArticleText.length > 250)
-      ? fullArticleText
-      : expandToJournalisticArticle(titleText, cleanSnippet, sourceName, countryName, undefined, 'politics');
+    // Strictly synthesize a clean 4-paragraph VoxPolis brief (no commercials, no verbatim dumps)
+    const finalContent = synthesize4ParagraphBrief(
+      titleText,
+      cleanSnippet,
+      fullArticleText,
+      sourceName,
+      countryName
+    );
 
     const slug = generateSlug(titleText);
     const articleId = `rss-${countryCode.toLowerCase()}-${slug}`;

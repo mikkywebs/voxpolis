@@ -25,6 +25,8 @@ import {
   isColumnistOrOpinion,
   getArticleImageUrl,
   getArticleFallbackUrl,
+  cleanCommercialsAndAdverts,
+  synthesize4ParagraphBrief,
 } from '@/lib/news';
 import { getPipelineArticleBySlug } from '@/lib/pipeline';
 import { get301Redirect } from '@/lib/pipeline/redirects';
@@ -289,32 +291,40 @@ export default function NewsDetailPage() {
               setExtractedAuthor(cachedMeta.author);
             }
             if (cachedMeta.content && cachedMeta.content.length > 200) {
-              setArticle((prev) =>
-                prev && (prev.id === found!.id || prev.slug === found!.slug)
-                  ? {
-                      ...prev,
-                      content: cachedMeta.content,
-                      author: cachedMeta.author || prev.author,
-                      title: cachedMeta.headline ? `${cachedMeta.headline} - Voxpolis` : prev.title,
-                    }
-                  : prev
-              );
-            }
-            if (cachedMeta.isAiRewritten) {
-              isAlreadyAiRewritten = true;
+              const cleanedCached = cleanCommercialsAndAdverts(cachedMeta.content);
+              const paras = cleanedCached.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+              // Invalidate stale legacy cache with > 5 paragraphs or commercials
+              if (paras.length > 5 || /whatsapp|telegram|e-paper|click here|read also|advert|copyright/i.test(cachedMeta.content)) {
+                try {
+                  localStorage.removeItem(`voxpolis_content_v3_${canonicalArtKey}`);
+                  localStorage.removeItem(`voxpolis_content_v3_${found.id}`);
+                } catch {}
+              } else {
+                const brief = paras.slice(0, 4).join('\n\n');
+                setArticle((prev) =>
+                  prev && (prev.id === found!.id || prev.slug === found!.slug)
+                    ? {
+                        ...prev,
+                        content: brief,
+                        author: cachedMeta.author || prev.author,
+                        title: cachedMeta.headline ? `${cachedMeta.headline} - Voxpolis` : prev.title,
+                      }
+                    : prev
+                );
+                if (cachedMeta.isAiRewritten) {
+                  isAlreadyAiRewritten = true;
+                }
+              }
             }
           } catch {
-            if (cachedMetaStr.length > 200) {
-              setArticle((prev) =>
-                prev && (prev.id === found!.id || prev.slug === found!.slug)
-                  ? { ...prev, content: cachedMetaStr }
-                  : prev
-              );
-            }
+            try {
+              localStorage.removeItem(`voxpolis_content_v3_${canonicalArtKey}`);
+              localStorage.removeItem(`voxpolis_content_v3_${found.id}`);
+            } catch {}
           }
         }
 
-        // If not yet AI-rewritten, trigger Multi-AI extraction (Gemini / Kimi / DeepSeek)
+        // If not yet AI-rewritten, trigger Multi-AI extraction (Gemini / Kimi / DeepSeek / Claude)
         if (
           !isAlreadyAiRewritten &&
           found.source_url &&
@@ -343,32 +353,48 @@ export default function NewsDetailPage() {
                   setExtractedAuthor(extracted.author);
                 }
                 if (extracted.content && extracted.content.length > 200) {
-                  const metaPayload = JSON.stringify({
-                    content: extracted.content,
-                    author: extracted.author,
-                    isColumnist: false,
-                    isAiRewritten: Boolean(extracted.isAiRewritten),
-                    headline: extracted.headline,
-                    provider: extracted.provider,
-                  });
-                  try {
-                    localStorage.setItem(`voxpolis_content_v3_${found!.id}`, metaPayload);
-                    localStorage.setItem(`voxpolis_content_v3_${canonicalArtKey}`, metaPayload);
-                  } catch {}
+                  const cleanedExtracted = cleanCommercialsAndAdverts(extracted.content);
+                  const paras = cleanedExtracted.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+                  const final4Paras = paras.slice(0, 4).join('\n\n');
+
                   setArticle((prev) => {
-                    if (prev && (prev.id === found!.id || prev.slug === found!.slug)) {
-                      const updated = {
-                        ...prev,
-                        content: extracted.content,
-                        author: extracted.author || prev.author,
-                        title: extracted.headline ? `${extracted.headline} - Voxpolis` : prev.title,
-                      };
-                      try {
-                        localStorage.setItem(`voxpolis_article_${slug}`, JSON.stringify(updated));
-                      } catch {}
-                      return updated;
+                    if (!prev || (prev.id !== found!.id && prev.slug !== found!.slug)) {
+                      return prev;
                     }
-                    return prev;
+
+                    // CRITICAL FIX: If not genuinely AI-rewritten, do NOT swap or overwrite
+                    // an existing 4-paragraph brief with algorithmic text.
+                    const prevParas = (prev.content || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+                    if (!extracted.isAiRewritten && prevParas.length >= 3) {
+                      return {
+                        ...prev,
+                        author: extracted.author || prev.author,
+                      };
+                    }
+
+                    const metaPayload = JSON.stringify({
+                      content: final4Paras,
+                      author: extracted.author,
+                      isColumnist: false,
+                      isAiRewritten: Boolean(extracted.isAiRewritten),
+                      headline: extracted.headline,
+                      provider: extracted.provider,
+                    });
+                    try {
+                      localStorage.setItem(`voxpolis_content_v3_${found!.id}`, metaPayload);
+                      localStorage.setItem(`voxpolis_content_v3_${canonicalArtKey}`, metaPayload);
+                    } catch {}
+
+                    const updated = {
+                      ...prev,
+                      content: final4Paras,
+                      author: extracted.author || prev.author,
+                      title: extracted.headline ? `${extracted.headline} - Voxpolis` : prev.title,
+                    };
+                    try {
+                      localStorage.setItem(`voxpolis_article_${slug}`, JSON.stringify(updated));
+                    } catch {}
+                    return updated;
                   });
                 }
               } else if (extracted?.requiresReview) {
@@ -888,14 +914,13 @@ export default function NewsDetailPage() {
         article?.category || 'politics'
       );
 
-  const cleanStandardBody = rawStandardContent
-    .replace(/https?:\/\/[^\s)]+/gi, '')
-    .replace(/www\.[^\s)]+/gi, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/(read more on|also read|click here to read|visit our website|source:)[^.\n]*/gi, '')
-    .trim();
+  const cleanStandardBody = cleanCommercialsAndAdverts(rawStandardContent);
 
-  let fallbackParagraphs = cleanStandardBody.split('\n\n').filter(Boolean);
+  let fallbackParagraphs = cleanStandardBody
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 25);
+
   if (fallbackParagraphs.length < 3) {
     const regenerated = expandToJournalisticArticle(
       article?.title || 'Political Update',
@@ -905,7 +930,19 @@ export default function NewsDetailPage() {
       selectedCountry.capital,
       article?.category || 'politics'
     );
-    fallbackParagraphs = regenerated.split('\n\n').filter(Boolean);
+    fallbackParagraphs = cleanCommercialsAndAdverts(regenerated)
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 25);
+  }
+
+  // Strictly enforce the 4-paragraph brief rule (The Okpebholo Model)!
+  // Paragraph 1: The Hook (Dateline, central actors, core event)
+  // Paragraph 2: Key figures, direct quotes, and official statements
+  // Paragraph 3: Counter-view, opposition responses, public reaction
+  // Paragraph 4: Policy implications, oversight, and next developments
+  if (fallbackParagraphs.length > 4) {
+    fallbackParagraphs = fallbackParagraphs.slice(0, 4);
   }
 
   const fbMidPoint = Math.min(2, Math.floor(fallbackParagraphs.length / 2));

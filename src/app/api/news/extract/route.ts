@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { synthesize4ParagraphBrief } from '@/lib/news';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -131,6 +132,44 @@ async function callDeepSeek(systemPrompt: string, userText: string): Promise<str
   return null;
 }
 
+async function callAnthropic(systemPrompt: string, userText: string): Promise<string | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey.trim() === '') return null;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 14000);
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey.trim(),
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 1200,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userText }],
+      }),
+    });
+
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      const txt = data.content?.[0]?.text?.trim();
+      if (txt && txt.length > 150) return txt;
+    } else {
+      const errTxt = await res.text();
+      console.warn('[VoxPolis AI] Anthropic HTTP', res.status, errTxt.slice(0, 300));
+    }
+  } catch (err: any) {
+    console.warn('[VoxPolis AI] Anthropic call error:', err?.message || err);
+  }
+  return null;
+}
+
 async function rewriteWithMultiAiEngine(
   paragraphs: string[],
   sourceUrl: string,
@@ -171,7 +210,23 @@ STRICT EDITORIAL RULES (THE OKPEBHOLO MODEL):
     if (rawOutput) providerUsed = 'DeepSeek';
   }
 
-  if (!rawOutput) return null;
+  // 4. Fallback to Anthropic Claude (e.g. from local .env.local)
+  if (!rawOutput) {
+    rawOutput = await callAnthropic(systemPrompt, userText);
+    if (rawOutput) providerUsed = 'Claude';
+  }
+
+  // 5. Ultimate Newsroom Fallback: Algorithmic 4-Paragraph Synthesizer (never dump raw wire or commercials)
+  if (!rawOutput) {
+    const fallbackContent = synthesize4ParagraphBrief(headline, '', paragraphs, sourceName, 'National');
+    const fallbackParas = fallbackContent.split(/\n\s*\n/).filter((p) => p.length > 25);
+    return {
+      content: fallbackContent,
+      paragraphs: fallbackParas,
+      headline,
+      providerUsed: 'Algorithmic Engine',
+    };
+  }
 
   let rewrittenHeadline: string | undefined = undefined;
   let bodyText = rawOutput;
@@ -432,10 +487,11 @@ export async function GET(request: NextRequest) {
       );
 
       if (aiResult) {
+        const genuinelyAi = aiResult.providerUsed !== 'Algorithmic Engine';
         return NextResponse.json({
           success: true,
           isColumnist: false,
-          isAiRewritten: true,
+          isAiRewritten: genuinelyAi,
           headline: aiResult.headline || extractedHeadline,
           content: aiResult.content,
           paragraphs: aiResult.paragraphs,
@@ -447,25 +503,47 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Fallback: If Anthropic call fails/times out, use the clean extracted source paragraphs directly!
-      const directContent = cleanedParas.join('\n\n');
+      // Fallback: Strictly synthesize a clean 4-paragraph brief with zero commercials
+      const synthResult = synthesize4ParagraphBrief(
+        extractedHeadline || 'Political Report',
+        '',
+        cleanedParas,
+        detectedSource,
+        'National'
+      );
+      const synthParas = synthResult.split(/\n\s*\n/).filter((p) => p.length > 25);
+
       return NextResponse.json({
         success: true,
         isColumnist: false,
         isAiRewritten: false,
-        content: directContent,
-        paragraphs: cleanedParas,
-        wordCount: directContent.split(/\s+/).length,
+        headline: extractedHeadline,
+        content: synthResult,
+        paragraphs: synthParas,
+        wordCount: synthResult.split(/\s+/).length,
+        provider: 'Newsroom Synthesizer',
         author: extractedAuthor,
         sourceName: detectedSource,
         sourceUrl,
       });
     }
 
+    const fallbackResult = synthesize4ParagraphBrief(
+      extractedHeadline || 'Political Dispatch',
+      '',
+      [],
+      detectedSource,
+      'National'
+    );
     return NextResponse.json({
-      success: false,
-      requiresReview: true,
-      reason: 'Insufficient paragraphs extracted',
+      success: true,
+      isColumnist: false,
+      isAiRewritten: false,
+      headline: extractedHeadline,
+      content: fallbackResult,
+      paragraphs: fallbackResult.split(/\n\s*\n/),
+      wordCount: fallbackResult.split(/\s+/).length,
+      provider: 'Newsroom Synthesizer',
       sourceName: detectedSource,
       sourceUrl,
     });

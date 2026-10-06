@@ -407,6 +407,97 @@ Committee sponsors underscored that the reform package enjoys broad multi-party 
   }),
 };
 
+export function cleanCommercialsAndAdverts(text: string): string {
+  if (!text) return '';
+  return text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => {
+      if (line.length < 25) return false;
+      if (
+        line.match(
+          /^(read also|also read|click here|source:|copyright|all rights reserved|advertisement|sponsored|promo|follow us|join our|subscribe|download our|share this|tweet|whatsapp|cookie|for advert|contact us|sign up|newsletter|for more details|watch video|photo:|in case you missed)/i
+        )
+      ) {
+        return false;
+      }
+      if (
+        line.match(
+          /(whatsapp group|telegram channel|daily newsletter|subscribe now|click the link|advertisement|all rights reserved|may not be reproduced|without prior written permission|punch nigeria|vanguard media)/i
+        )
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .join('\n\n');
+}
+
+export function synthesize4ParagraphBrief(
+  title: string,
+  snippet: string,
+  rawParagraphs?: string | string[],
+  sourceName: string = 'Press Agency',
+  countryName: string = 'National',
+  countryCapital?: string
+): string {
+  const dateline = countryCapital ? countryCapital.toUpperCase() : countryName.toUpperCase();
+  const cleanTitle = (title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
+
+  let candidateParas: string[] = [];
+  if (Array.isArray(rawParagraphs)) {
+    candidateParas = rawParagraphs;
+  } else if (typeof rawParagraphs === 'string' && rawParagraphs.length > 0) {
+    candidateParas = rawParagraphs.split(/\n\s*\n/);
+  }
+
+  // Aggressively strip ads, commercials, wire boilerplate, and short chopped lines
+  const cleanParas = candidateParas
+    .map((p) => p.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter((p) => {
+      if (p.length < 35) return false;
+      if (
+        p.match(
+          /^(read also|also read|click here|source:|copyright|all rights reserved|advertisement|sponsored|promo|follow us|join our|subscribe|download our|share this|tweet|whatsapp|cookie|for advert|contact us|sign up|newsletter|for more details|watch video|photo:)/i
+        )
+      ) {
+        return false;
+      }
+      if (
+        p.match(
+          /(whatsapp group|telegram channel|daily newsletter|subscribe now|click the link|advertisement|all rights reserved|may not be reproduced)/i
+        )
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+  // If we have at least 4 real reporting paragraphs:
+  if (cleanParas.length >= 4) {
+    const p1 = cleanParas[0].toUpperCase().startsWith(dateline) ? cleanParas[0] : `${dateline} — ${cleanParas[0]}`;
+    return [p1, cleanParas[1], cleanParas[2], cleanParas[3]].join('\n\n');
+  }
+
+  if (cleanParas.length >= 2) {
+    const p1 = `${dateline} — ${cleanTitle}. ${cleanParas[0]}`;
+    const p2 = cleanParas[1];
+    const p3 = cleanParas[2] || `Public observers and civic groups across ${countryName} have continued to monitor the policy developments reported through ${sourceName}.`;
+    const p4 = `Voxpolis verified dispatches focus on governance accountability, policy continuity, and legislative oversight regarding this development.`;
+    return [p1, p2, p3, p4].join('\n\n');
+  }
+
+  // Fallback to exactly 4 crisp journalistic paragraphs:
+  const p1 = `${dateline} — ${cleanTitle}.`;
+  const p2 =
+    snippet && snippet.length > 25
+      ? snippet
+      : `Verified political reporting and policy dispatches monitored through ${sourceName}.`;
+  const p3 = `Stakeholders and political observers in ${countryName} are monitoring the implications of this development for policy and public governance.`;
+  const p4 = `Voxpolis continues to track verified governance dispatches and institutional oversight from ${sourceName} as events unfold.`;
+  return [p1, p2, p3, p4].join('\n\n');
+}
+
 export function expandToJournalisticArticle(
   title: string,
   snippet: string,
@@ -415,18 +506,7 @@ export function expandToJournalisticArticle(
   countryCapital?: string,
   category: string = 'politics'
 ): string {
-  const cleanTitle = (title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
-  const cleanSnippet = (snippet || '').trim();
-  const dateline = countryCapital ? countryCapital.toUpperCase() : countryName.toUpperCase();
-
-  const p1 = `${dateline} — ${cleanTitle}.`;
-  const p2 =
-    cleanSnippet && cleanSnippet.length > 25
-      ? cleanSnippet
-      : `Primary political reporting and verified dispatches monitored through ${sourceName}.`;
-  const p3 = `Dispatches for this report were monitored through coverage by ${sourceName}. Voxpolis independently tracks policy developments and public accountability across ${countryName}.`;
-
-  return [p1, p2, p3].join('\n\n');
+  return synthesize4ParagraphBrief(title, snippet, undefined, sourceName, countryName, countryCapital);
 }
 
 export function generateAiAnalysisSummary(
