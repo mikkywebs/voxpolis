@@ -479,23 +479,43 @@ export function synthesize4ParagraphBrief(
     return [p1, cleanParas[1], cleanParas[2], cleanParas[3]].join('\n\n');
   }
 
-  if (cleanParas.length >= 2) {
-    const p1 = `${dateline} — ${cleanTitle}. ${cleanParas[0]}`;
-    const p2 = cleanParas[1];
-    const p3 = cleanParas[2] || `Public observers and civic groups across ${countryName} have continued to monitor the policy developments reported through ${sourceName}.`;
-    const p4 = `Voxpolis verified dispatches focus on governance accountability, policy continuity, and legislative oversight regarding this development.`;
-    return [p1, p2, p3, p4].join('\n\n');
+  // If 1-3 paragraphs exist, split by real sentences to form up to 4 paragraphs without adding fake commentary
+  if (cleanParas.length > 0) {
+    const allSentences: string[] = [];
+    for (const p of cleanParas) {
+      const sList = p.match(/[^.!?]+[.!?]+/g) || [p];
+      for (const s of sList) {
+        const tr = s.trim();
+        if (tr.length > 25) allSentences.push(tr);
+      }
+    }
+
+    if (allSentences.length >= 4) {
+      const chunkSize = Math.ceil(allSentences.length / 4);
+      const paras: string[] = [];
+      for (let i = 0; i < 4; i++) {
+        const slice = allSentences.slice(i * chunkSize, (i + 1) * chunkSize);
+        if (slice.length > 0) paras.push(slice.join(' '));
+      }
+      if (paras.length > 0) {
+        if (!paras[0].toUpperCase().startsWith(dateline)) {
+          paras[0] = `${dateline} — ${paras[0]}`;
+        }
+        return paras.join('\n\n');
+      }
+    }
+
+    const res = [...cleanParas];
+    if (!res[0].toUpperCase().startsWith(dateline)) {
+      res[0] = `${dateline} — ${res[0]}`;
+    }
+    return res.join('\n\n');
   }
 
-  // Fallback to exactly 4 crisp journalistic paragraphs:
+  // Fallback strictly using original title and snippet (zero robotic filler)
   const p1 = `${dateline} — ${cleanTitle}.`;
-  const p2 =
-    snippet && snippet.length > 25
-      ? snippet
-      : `Verified political reporting and policy dispatches monitored through ${sourceName}.`;
-  const p3 = `Stakeholders and political observers in ${countryName} are monitoring the implications of this development for policy and public governance.`;
-  const p4 = `Voxpolis continues to track verified governance dispatches and institutional oversight from ${sourceName} as events unfold.`;
-  return [p1, p2, p3, p4].join('\n\n');
+  const p2 = snippet && snippet.length > 25 ? snippet : `Reported by ${sourceName}.`;
+  return [p1, p2].join('\n\n');
 }
 
 export function expandToJournalisticArticle(
@@ -750,12 +770,21 @@ export async function fetchArticlesForCountry(
                 .replace(/(^-|-$)/g, '')
                 .slice(0, 80);
 
+              const briefContent = synthesize4ParagraphBrief(
+                displayTitle,
+                rawDesc,
+                rawContent,
+                sourceName,
+                country.name,
+                country.capital
+              );
+
               return {
                 id: item.article_id || `newsdata-${idx}`,
                 slug: cleanSlug,
                 title: displayTitle,
                 snippet: rawDesc,
-                content: rawContent.length > 250 ? rawContent : expandToJournalisticArticle(displayTitle, rawDesc, sourceName, country.name, country.capital, item.category?.[0]),
+                content: briefContent,
                 ai_analysis: generateAiAnalysisSummary(displayTitle, rawDesc, sourceName, country.name),
                 country_code: code,
                 language: langCode,

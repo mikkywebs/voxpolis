@@ -3,6 +3,8 @@ import { fetchRssArticlesForCountry } from '@/lib/rss';
 import { getCountryByCode } from '@/config/countries';
 import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion, isColumnistOrOpinion } from '@/lib/news';
 import { isValidContentImage } from '@/lib/pipeline/extractor';
+import { rewriteStoryForVoxpolis } from '@/lib/news-rewriter';
+import { register301Redirect, get301Redirect } from '@/lib/pipeline/redirects';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -62,9 +64,12 @@ export async function GET(request: NextRequest) {
       if (res.ok) {
         const data = await res.json();
         if (data.results && Array.isArray(data.results)) {
-          newsDataArticles = data.results
+          const filteredItems = data.results
             .filter((item: any) => isValidContentImage(item.image_url) && !isColumnistOrOpinion(item.title, item.description, item.keywords || item.category, item.link))
-            .map((item: any, idx: number) => {
+            .slice(0, 10);
+
+          newsDataArticles = await Promise.all(
+            filteredItems.map(async (item: any, idx: number) => {
               const cleanTitle = (item.title || 'Political Update')
                 .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
                 .replace(/The post .* appeared first on .*/gi, '')
@@ -72,31 +77,37 @@ export async function GET(request: NextRequest) {
                 .trim();
               const rawDesc = (item.description || item.snippet || item.title || '')
                 .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
-                .replace(/The post .* appeared first on .*/gi, '')
-                .replace(/appeared first on .*/gi, '')
                 .trim();
               const rawContent = (item.content || item.description || item.title || '')
                 .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
-                .replace(/The post .* appeared first on .*/gi, '')
-                .replace(/appeared first on .*/gi, '')
                 .trim();
               const sourceName = item.source_id || `${country.name} Press`;
 
-              const displayTitle = cleanTitle.endsWith(' - Voxpolis') ? cleanTitle : `${cleanTitle} - Voxpolis`;
-              const cleanSlug = cleanTitle
+              const rewritten = await rewriteStoryForVoxpolis({
+                title: cleanTitle,
+                content: rawContent.length > 80 ? rawContent : rawDesc,
+                sourceName,
+                countryName: country.name,
+              });
+
+              // Register redirect from old raw wire slug to new VoxPolis slug
+              const rawSlug = cleanTitle
                 .toLowerCase()
                 .replace(/ - voxpolis$/i, '')
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/(^-|-$)/g, '')
                 .slice(0, 80);
+              if (rawSlug && rewritten.slug) {
+                register301Redirect(rawSlug, rewritten.slug);
+              }
 
               return {
                 id: item.article_id || `newsdata-${countryCode}-${idx}`,
-                slug: cleanSlug,
-                title: displayTitle,
-                snippet: rawDesc,
-                content: rawContent.length > 250 ? rawContent : expandToJournalisticArticle(displayTitle, rawDesc, sourceName, country.name, country.capital, item.category?.[0]),
-                ai_analysis: generateAiAnalysisSummary(displayTitle, rawDesc, sourceName, country.name),
+                slug: rewritten.slug,
+                title: rewritten.title,
+                snippet: rewritten.snippet,
+                content: rewritten.content,
+                ai_analysis: generateAiAnalysisSummary(rewritten.title, rewritten.snippet, sourceName, country.name),
                 country_code: countryCode,
                 language: language,
                 category: item.category?.[0] || 'politics',
@@ -111,12 +122,13 @@ export async function GET(request: NextRequest) {
                 created_at: item.pubDate || new Date().toISOString(),
                 poll: {
                   id: `poll-newsdata-${idx}`,
-                  question: generateCivicPollQuestion(cleanTitle, rawDesc),
+                  question: generateCivicPollQuestion(rewritten.title, rewritten.snippet),
                   agree_count: 0,
                   disagree_count: 0,
                 },
               };
-            });
+            })
+          );
         }
       }
     } catch (err) {
@@ -159,27 +171,40 @@ export async function GET(request: NextRequest) {
 
   // If specific slug was requested, check collected feed articles
   if (slugParam) {
-    const foundInFeeds = uniqueArticles.find((a) => a.slug === slugParam);
+    const targetSlug = get301Redirect(slugParam) || slugParam;
+
+    let foundInFeeds = uniqueArticles.find((a) => a.slug === targetSlug || a.slug === slugParam);
+    if (!foundInFeeds) {
+      const otherCountryCodes = ['US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'NG'].filter((c) => c !== countryCode);
+      for (const otherCode of otherCountryCodes) {
+        try {
+          const otherFeeds = await fetchRssArticlesForCountry(otherCode, language);
+          const match = otherFeeds.find((a) => a.slug === targetSlug || a.slug === slugParam);
+          if (match) {
+            foundInFeeds = match;
+            break;
+          }
+        } catch {}
+      }
+    }
+
     if (foundInFeeds) {
+      const paras = (foundInFeeds.content || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+      if (paras.length > 4 || (foundInFeeds.content && foundInFeeds.content.length > 1600)) {
+        const rewritten = await rewriteStoryForVoxpolis({
+          title: foundInFeeds.title,
+          content: foundInFeeds.content,
+          sourceName: foundInFeeds.source_name,
+          countryName: country.name,
+        });
+        foundInFeeds.title = rewritten.title;
+        foundInFeeds.content = rewritten.content;
+        foundInFeeds.snippet = rewritten.snippet;
+      }
       return NextResponse.json({
         success: true,
         article: foundInFeeds,
       });
-    }
-
-    // Check across other active country feeds
-    const otherCountryCodes = ['US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'NG'].filter((c) => c !== countryCode);
-    for (const otherCode of otherCountryCodes) {
-      try {
-        const otherFeeds = await fetchRssArticlesForCountry(otherCode, language);
-        const match = otherFeeds.find((a) => a.slug === slugParam);
-        if (match) {
-          return NextResponse.json({
-            success: true,
-            article: match,
-          });
-        }
-      } catch {}
     }
   }
 
