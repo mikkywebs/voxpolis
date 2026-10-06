@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchRssArticlesForCountry } from '@/lib/rss';
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion, isColumnistOrOpinion } from '@/lib/news';
+import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion, isColumnistOrOpinion, isPoliticalNews, isRelevantToCountry } from '@/lib/news';
 import { isValidContentImage } from '@/lib/pipeline/extractor';
 import { rewriteStoryForVoxpolis, decodeAllHtmlEntities } from '@/lib/news-rewriter';
 import { register301Redirect, get301Redirect } from '@/lib/pipeline/redirects';
@@ -28,6 +28,11 @@ export async function GET(request: NextRequest) {
       if (dbArticle) {
         let cleanTitle = decodeAllHtmlEntities(dbArticle.title || 'Political Update');
         let cleanSnippet = decodeAllHtmlEntities(dbArticle.snippet || '');
+
+        if (!isPoliticalNews(cleanTitle, cleanSnippet, dbArticle.tags || [])) {
+          return NextResponse.json({ success: false, error: 'Non-political content excluded from Voxpolis' }, { status: 404 });
+        }
+
         let cleanContent = dbArticle.content || '';
 
         const paras = cleanContent.split(/\n\s*\n/).map((p: string) => p.trim()).filter(Boolean);
@@ -164,7 +169,6 @@ export async function GET(request: NextRequest) {
   const rssArticles = await fetchRssArticlesForCountry(countryCode, language);
 
   // 3. Combine NewsData + RSS Feeds
-  const { isPoliticalNews, isRelevantToCountry } = await import('@/lib/news');
   const combined = [...newsDataArticles, ...rssArticles];
 
   // Deduplicate by story key & enforce political filtering and country relevance
@@ -281,6 +285,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (foundInFeeds) {
+      if (!isPoliticalNews(foundInFeeds.title, foundInFeeds.snippet, foundInFeeds.tags)) {
+        return NextResponse.json({ success: false, error: 'Non-political report excluded from Voxpolis' }, { status: 404 });
+      }
+
       const paras = (foundInFeeds.content || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
       if (paras.length > 4 || foundInFeeds.title.includes('&#') || (foundInFeeds.content && foundInFeeds.content.length > 1600)) {
         const rewritten = await rewriteStoryForVoxpolis({

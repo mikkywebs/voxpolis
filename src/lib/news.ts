@@ -45,20 +45,40 @@ export function isArticleArchived(createdAt: string): boolean {
 
 const POLITICAL_KEYWORDS = [
   'politic', 'politics', 'government', 'governance', 'parliament', 'parliamentary',
-  'congress', 'congressional', 'president', 'presidential', 'minister', 'ministry',
+  'congress', 'congressional', 'president', 'presidential', 'presidency', 'minister', 'ministry',
   'senate', 'senator', 'lawmaker', 'election', 'electoral', 'policy', 'policies',
-  'legislation', 'legislative', 'assembly', 'governor', 'diplomacy', 'diplomatic',
+  'legislation', 'legislative', 'assembly', 'governor', 'governorship', 'diplomacy', 'diplomatic',
   'sanction', 'treaty', 'cabinet', 'party', 'democrat', 'republican', 'mp', 'mps',
-  'official', 'constitution', 'constitutional', 'court', 'judge', 'bill', 'reform',
-  'prime minister', 'supreme court', 'chancellor', 'bureau', 'federal', 'state department',
+  'constitution', 'constitutional', 'court', 'judge', 'judiciary', 'bill',
+  'prime minister', 'supreme court', 'appeal court', 'high court', 'state department',
   'national assembly', 'ballot', 'vote', 'voter', 'candidate', 'campaign', 'white house',
-  'kremlin', 'downing street', 'capitol', 'foreign affairs', 'defense minister'
+  'downing street', 'capitol', 'foreign affairs', 'defense minister',
+  'inec', 'efcc', 'icpc', 'dss', 'apc', 'pdp', 'lp', 'nnpp', 'fct', 'federal government',
+  'budget', 'appropriation', 'parliamentarian', 'civil service', 'executive order',
+  'impeachment', 'tenure', 'referendum', 'geopolitical'
 ];
 
 const FORBIDDEN_NON_POLITICAL_KEYWORDS = [
-  'phone-sex', 'sex session', 'celebrity', 'nollywood', 'hollywood', 'relationship scandal',
-  'bitch', 'ex-girlfriend', 'ex-boyfriend', 'nude', 'onlyfans', 'big brother', 'bbnaija',
-  'grammy', 'oscar', 'box office', 'reality show', 'hookup'
+  // 1. Sports & Athletics (STRICTLY BANNED on Voxpolis)
+  'super eagles', 'super falcons', 'akor adams', 'osimhen', 'lookman', 'boniface', 'iwobi', 'chukwueze', 'nwabali',
+  'football', 'soccer', 'premier league', 'champions league', 'europa league', 'la liga', 'serie a', 'bundesliga',
+  'world cup', 'fifa', 'caf', 'afcon', 'nff', 'npfl', "ballon d'or", 'fa cup',
+  'arsenal', 'chelsea', 'manchester united', 'manchester city', 'liverpool', 'real madrid', 'barcelona', 'bayern', 'psg',
+  'goal', 'goals', 'scored', 'scoreline', 'penalty', 'penalties', 'half-time', 'halftime', 'full-time',
+  'striker', 'midfielder', 'defender', 'goalkeeper', 'coach', 'head coach', 'referee', 'stoppage time', 'fixture', 'fixtures',
+  'qualifier', 'qualifiers', 'friendly match', 'stadium', 'rescues super eagles', 'super eagles draw',
+  'basketball', 'nba', 'athletics', 'olympics', 'paralympics', 'marathon', 'boxing', 'heavyweight', 'tennis', 'wimbledon', 'golf',
+
+  // 2. Entertainment, Pop Culture & Celebrities (STRICTLY BANNED)
+  'nollywood', 'hollywood', 'bollywood', 'celebrity', 'actress', 'actor', 'movie', 'movies', 'cinema', 'film',
+  'musician', 'singer', 'song', 'album', 'grammy', 'oscar', 'headies', 'afrobeats',
+  'davido', 'wizkid', 'burna boy', 'tiwa savage', 'rema', 'asake', 'olamide',
+  'skit maker', 'comedian', 'comedy', 'big brother', 'bbnaija', 'reality show', 'box office',
+
+  // 3. Gossip, Relationships & Adult Content (STRICTLY BANNED)
+  'phone-sex', 'sex session', 'celebrity scandal', 'relationship scandal',
+  'bitch', 'ex-girlfriend', 'ex-boyfriend', 'nude', 'onlyfans', 'hookup',
+  'cheating scandal', 'divorce scandal', 'baby mama', 'side chick'
 ];
 
 /**
@@ -234,10 +254,35 @@ export function isPoliticalNews(title: string, snippet: string = '', tags: strin
     return false;
   }
 
+  // 3. Strictly exclude sports match scorelines (e.g. "Russia 3-3 Nigeria", "Arsenal 2-1 Chelsea", "3-1 win")
+  if (/\b\d+\s*[-–:]\s*\d+\b/.test(cleanTitle) && (
+    text.includes('goal') || text.includes('eagles') || text.includes('super eagles') ||
+    text.includes('fc') || text.includes('vs') || text.includes('cup') || text.includes('match') ||
+    text.includes('draw') || text.includes('win') || text.includes('defeat') || text.includes('russia') ||
+    text.includes('league') || text.includes('lead early') || text.includes('second half')
+  )) {
+    return false;
+  }
+
+  // 4. Strictly exclude sports match phrases in title or body
+  if (
+    text.includes('super eagles') ||
+    text.includes('akor adams') ||
+    text.includes('rescues super eagles') ||
+    text.includes('second half') ||
+    text.includes('first half') ||
+    text.includes('stoppage time') ||
+    text.includes('late goal')
+  ) {
+    return false;
+  }
+
+  // 5. Strictly exclude all items matching the non-political forbidden dictionary
   for (const forbidden of FORBIDDEN_NON_POLITICAL_KEYWORDS) {
     if (text.includes(forbidden)) return false;
   }
 
+  // 6. Must contain a genuine political governance term
   return POLITICAL_KEYWORDS.some((kw) => text.includes(kw));
 }
 

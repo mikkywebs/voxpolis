@@ -23,6 +23,7 @@ import {
   expandToJournalisticArticle,
   formatCleanSnippet,
   isColumnistOrOpinion,
+  isPoliticalNews,
   getArticleImageUrl,
   getArticleFallbackUrl,
   cleanCommercialsAndAdverts,
@@ -170,6 +171,7 @@ export default function NewsDetailPage() {
           const parsed = JSON.parse(cachedArticleJson);
           const hasOldArtifacts =
             !parsed ||
+            !isPoliticalNews(parsed.title || '', parsed.snippet || '', parsed.tags || []) ||
             (parsed.title && (parsed.title.includes('&#') || parsed.title.includes('&amp;#'))) ||
             (parsed.snippet && (parsed.snippet.includes('&#') || parsed.snippet.includes('&amp;#'))) ||
             (parsed.content && (
@@ -267,6 +269,12 @@ export default function NewsDetailPage() {
             }
           }
         } catch {}
+      }
+
+      if (found) {
+        if (!isPoliticalNews(found.title || '', found.snippet || '', found.tags || [])) {
+          found = null;
+        }
       }
 
       if (found) {

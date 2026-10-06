@@ -21,7 +21,7 @@ const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
   NG: [
     { name: 'DailyPost Nigeria', url: 'https://dailypost.ng/category/politics/feed/' },
     { name: 'Vanguard Nigeria', url: 'https://www.vanguardngr.com/category/politics/feed/' },
-    { name: 'Premium Times Nigeria', url: 'https://www.premiumtimesng.com/category/news/top-news/feed' },
+    { name: 'Premium Times Nigeria', url: 'https://www.premiumtimesng.com/category/news/politics/feed' },
   ],
   US: [
     { name: 'Politico', url: 'https://rss.politico.com/politics-news.xml' },
