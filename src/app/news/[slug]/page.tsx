@@ -30,6 +30,7 @@ import {
 } from '@/lib/news';
 import { getPipelineArticleBySlug } from '@/lib/pipeline';
 import { get301Redirect } from '@/lib/pipeline/redirects';
+import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
 import { PipelineArticleRecord } from '@/lib/pipeline/types';
 import { Lock, LogIn, ExternalLink, ShieldAlert, CheckCircle2, HelpCircle, FileText, Globe, ArrowRight } from 'lucide-react';
 import SocialShareButtons from '@/components/article/SocialShareButtons';
@@ -62,12 +63,16 @@ export default function NewsDetailPage() {
     process.env.NEXT_PUBLIC_ADSENSE_PUB_ID.startsWith('ca-pub-')
   );
 
-  // 1. Check 301 Redirect for legacy/backfilled URLs
+  // 1. Check 301 Redirect for legacy/backfilled URLs & entity-corrupted slugs
   useEffect(() => {
     if (slug) {
-      const redirectedSlug = get301Redirect(slug);
-      if (redirectedSlug) {
+      const decodedSlug = decodeURIComponent(slug);
+      const cleanSlug = decodedSlug.replace(/8216|8217|8218|8219/g, '').replace(/-+/g, '-').replace(/(^-|-$)/g, '');
+      const redirectedSlug = get301Redirect(slug) || get301Redirect(cleanSlug);
+      if (redirectedSlug && redirectedSlug !== slug) {
         router.replace(`/news/${redirectedSlug}`);
+      } else if (cleanSlug && cleanSlug !== slug) {
+        router.replace(`/news/${cleanSlug}`);
       }
     }
   }, [slug, router]);
@@ -147,19 +152,47 @@ export default function NewsDetailPage() {
 
       let found: ArticleData | null = null;
 
-      // 1. FAST LOCAL STORAGE CHECK: If article was previously viewed or loaded, restore immediately!
+      // 1. FAST LOCAL STORAGE CHECK: If article was previously viewed or loaded, validate format before restoring!
       try {
+        const cacheVer = localStorage.getItem('voxpolis_cache_version');
+        if (cacheVer !== 'v4_clean') {
+          // Invalidate pre-update cached stories from old order
+          Object.keys(localStorage).forEach((k) => {
+            if (k.startsWith('voxpolis_article_') || k.startsWith('voxpolis_content_')) {
+              localStorage.removeItem(k);
+            }
+          });
+          localStorage.setItem('voxpolis_cache_version', 'v4_clean');
+        }
+
         const cachedArticleJson = localStorage.getItem(`voxpolis_article_${slug}`);
         if (cachedArticleJson) {
           const parsed = JSON.parse(cachedArticleJson);
-          if (parsed && (parsed.slug === slug || parsed.id)) {
+          const hasOldArtifacts =
+            !parsed ||
+            (parsed.title && (parsed.title.includes('&#') || parsed.title.includes('&amp;#'))) ||
+            (parsed.snippet && (parsed.snippet.includes('&#') || parsed.snippet.includes('&amp;#'))) ||
+            (parsed.content && (
+              parsed.content.includes('&#') ||
+              parsed.content.split(/\n\s*\n/).length > 4 ||
+              /whatsapp|telegram|e-paper|click here|read also|advert|copyright/i.test(parsed.content)
+            ));
+
+          if (hasOldArtifacts) {
+            localStorage.removeItem(`voxpolis_article_${slug}`);
+          } else if (parsed && (parsed.slug === slug || parsed.id)) {
+            parsed.title = decodeAllHtmlEntities(parsed.title);
+            parsed.snippet = decodeAllHtmlEntities(parsed.snippet);
+            if (parsed.content) parsed.content = decodeAllHtmlEntities(parsed.content);
             found = parsed;
             setArticle(parsed);
             const artCountry = getCountryByCode(parsed.country_code || 'NG');
             if (artCountry) setSelectedCountry(artCountry);
           }
         }
-      } catch {}
+      } catch {
+        try { localStorage.removeItem(`voxpolis_article_${slug}`); } catch {}
+      }
 
       // 2. Check Pipeline article
       const pipeArt = getPipelineArticleBySlug(slug);
@@ -227,15 +260,22 @@ export default function NewsDetailPage() {
                 const cObj = getCountryByCode(found.country_code);
                 if (cObj) setSelectedCountry(cObj);
               }
+              const targetRedirect = data.redirectedSlug || (found?.slug && found.slug !== slug ? found.slug : null);
+              if (targetRedirect && targetRedirect !== slug) {
+                router.replace(`/news/${targetRedirect}`);
+              }
             }
           }
         } catch {}
       }
 
       if (found) {
+        found.title = decodeAllHtmlEntities(found.title || '');
+        found.snippet = decodeAllHtmlEntities(found.snippet || '');
+        if (found.content) found.content = decodeAllHtmlEntities(found.content);
         setArticle(found);
         try {
-          localStorage.setItem(`voxpolis_article_${slug}`, JSON.stringify(found));
+          localStorage.setItem(`voxpolis_article_${found.slug || slug}`, JSON.stringify(found));
         } catch {}
         const artCountry = getCountryByCode(found.country_code);
         if (artCountry) setSelectedCountry(artCountry);
@@ -942,7 +982,18 @@ export default function NewsDetailPage() {
   // Paragraph 3: Counter-view, opposition responses, public reaction
   // Paragraph 4: Policy implications, oversight, and next developments
   if (fallbackParagraphs.length > 4) {
-    fallbackParagraphs = fallbackParagraphs.slice(0, 4);
+    fallbackParagraphs = synthesize4ParagraphBrief(
+      article?.title || '',
+      article?.snippet || '',
+      fallbackParagraphs,
+      article?.source_name || 'Voxpolis Desk',
+      selectedCountry.name,
+      selectedCountry.capital
+    )
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 25)
+      .slice(0, 4);
   }
 
   const fbMidPoint = Math.min(2, Math.floor(fallbackParagraphs.length / 2));

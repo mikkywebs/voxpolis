@@ -3,7 +3,7 @@ import { fetchRssArticlesForCountry } from '@/lib/rss';
 import { getCountryByCode } from '@/config/countries';
 import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion, isColumnistOrOpinion } from '@/lib/news';
 import { isValidContentImage } from '@/lib/pipeline/extractor';
-import { rewriteStoryForVoxpolis } from '@/lib/news-rewriter';
+import { rewriteStoryForVoxpolis, decodeAllHtmlEntities } from '@/lib/news-rewriter';
 import { register301Redirect, get301Redirect } from '@/lib/pipeline/redirects';
 
 export const dynamic = 'force-dynamic';
@@ -26,14 +26,38 @@ export async function GET(request: NextRequest) {
         .maybeSingle();
 
       if (dbArticle) {
+        let cleanTitle = decodeAllHtmlEntities(dbArticle.title || 'Political Update');
+        let cleanSnippet = decodeAllHtmlEntities(dbArticle.snippet || '');
+        let cleanContent = dbArticle.content || '';
+
+        const paras = cleanContent.split(/\n\s*\n/).map((p: string) => p.trim()).filter(Boolean);
+        const isOldOrder =
+          paras.length > 4 ||
+          cleanContent.includes('&#') ||
+          cleanTitle.includes('&#') ||
+          cleanContent.length > 1500 ||
+          /whatsapp|telegram|e-paper|click here|read also|advert|copyright/i.test(cleanContent);
+
+        if (isOldOrder) {
+          const rewritten = await rewriteStoryForVoxpolis({
+            title: cleanTitle,
+            content: cleanContent,
+            sourceName: dbArticle.source_name || 'Voxpolis Desk',
+            countryName: getCountryByCode(dbArticle.country_code || 'NG')?.name || 'National',
+          });
+          cleanTitle = rewritten.title;
+          cleanContent = rewritten.content;
+          cleanSnippet = rewritten.snippet;
+        }
+
         return NextResponse.json({
           success: true,
           article: {
             id: dbArticle.id || `db-${dbArticle.slug}`,
             slug: dbArticle.slug,
-            title: dbArticle.title,
-            snippet: dbArticle.snippet,
-            content: dbArticle.content,
+            title: cleanTitle,
+            snippet: cleanSnippet,
+            content: cleanContent,
             country_code: dbArticle.country_code || 'NG',
             source_name: dbArticle.source_name || 'Voxpolis Desk',
             source_url: dbArticle.source_url || 'https://voxpolis.app',
@@ -215,15 +239,39 @@ export async function GET(request: NextRequest) {
 
   // If specific slug was requested, check collected feed articles
   if (slugParam) {
-    const targetSlug = get301Redirect(slugParam) || slugParam;
+    const rawTargetSlug = get301Redirect(slugParam) || slugParam;
+    const normalizedSlug = slugParam
+      .replace(/8216|8217|8218|8219/g, '')
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
 
-    let foundInFeeds = rewrittenArticles.find((a) => a.slug === targetSlug || a.slug === slugParam);
+    const slugTokens = normalizedSlug.split('-').filter((t) => t.length > 3);
+
+    let foundInFeeds = rewrittenArticles.find((a) => {
+      if (a.slug === rawTargetSlug || a.slug === slugParam || a.slug === normalizedSlug) return true;
+      if (slugTokens.length >= 2) {
+        const artTokens = a.slug.split('-').filter((t) => t.length > 3);
+        const matches = slugTokens.filter((t) => artTokens.includes(t));
+        if (matches.length >= Math.min(3, slugTokens.length)) return true;
+      }
+      return false;
+    });
+
     if (!foundInFeeds) {
       const otherCountryCodes = ['US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'NG'].filter((c) => c !== countryCode);
       for (const otherCode of otherCountryCodes) {
         try {
           const otherFeeds = await fetchRssArticlesForCountry(otherCode, language);
-          const match = otherFeeds.find((a) => a.slug === targetSlug || a.slug === slugParam);
+          const match = otherFeeds.find((a) => {
+            if (a.slug === rawTargetSlug || a.slug === slugParam || a.slug === normalizedSlug) return true;
+            if (slugTokens.length >= 2) {
+              const artTokens = a.slug.split('-').filter((t) => t.length > 3);
+              const matches = slugTokens.filter((t) => artTokens.includes(t));
+              if (matches.length >= Math.min(3, slugTokens.length)) return true;
+            }
+            return false;
+          });
           if (match) {
             foundInFeeds = match;
             break;
@@ -249,6 +297,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         article: foundInFeeds,
+        redirectedSlug: foundInFeeds.slug !== slugParam ? foundInFeeds.slug : undefined,
       });
     }
   }

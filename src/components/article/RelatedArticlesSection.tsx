@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ArticleData, getArticleImageUrl, getArticleFallbackUrl } from '@/lib/news';
+import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
 
 interface RelatedArticlesSectionProps {
   articles: ArticleData[];
@@ -53,12 +54,12 @@ export default function RelatedArticlesSection({ articles }: RelatedArticlesSect
                 {art.source_name}
               </span>
               <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition line-clamp-2 leading-snug">
-                {art.title.replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')}
+                {decodeAllHtmlEntities(art.title.replace(/\s*[-–—|]\s*Voxpolis.*$/i, ''))}
               </h4>
             </div>
 
             <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mt-2.5 line-clamp-2 leading-relaxed">
-              {art.snippet}
+              {decodeAllHtmlEntities(art.snippet)}
             </p>
           </Link>
           );

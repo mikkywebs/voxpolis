@@ -1,5 +1,6 @@
 import { getCountryByCode } from '@/config/countries';
 import { fetchRssArticlesForCountry } from './rss';
+import { decodeAllHtmlEntities } from './news-rewriter';
 
 export interface ArticleData {
   id: string;
@@ -70,8 +71,10 @@ const FORBIDDEN_NON_POLITICAL_KEYWORDS = [
 export function formatCleanSnippet(text: string, maxLen: number = 280): string {
   if (!text) return '';
 
+  const decoded = decodeAllHtmlEntities(text);
+
   // Fix HTML/entity concatenation and missing spaces between joined words
-  let clean = text
+  let clean = decoded
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/https?:\/\/[^\s)]+/gi, '')
@@ -708,7 +711,8 @@ export function generateCivicPollQuestion(title: string, snippet?: string): stri
 
 export function cleanNewsText(raw: string): string {
   if (!raw) return '';
-  return raw
+  const decoded = decodeAllHtmlEntities(raw);
+  return decoded
     .replace(/<[^>]+>/g, ' ')
     .replace(/https?:\/\/[^\s)]+/gi, '')
     .replace(/www\.[^\s)]+/gi, '')

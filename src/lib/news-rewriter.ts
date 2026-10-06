@@ -49,7 +49,7 @@ export function decodeAllHtmlEntities(str: string): string {
   res = res.replace(/&nbsp;/gi, ' ');
   res = res.replace(/&#(\d+);/g, (m, dec) => String.fromCharCode(dec));
   res = res.replace(/&#x([0-9a-f]+);/gi, (m, hex) => String.fromCharCode(parseInt(hex, 16)));
-  return res.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  return res.replace(/<[^>]+>/g, '').replace(/[^\S\r\n]+/g, ' ').trim();
 }
 
 export function cleanCommercialsAndAdverts(text: string): string {
@@ -258,27 +258,42 @@ function algorithmicFactualCondenser(
 
   let finalParas: string[] = [];
 
-  if (rawParas.length >= 4) {
-    finalParas = rawParas.slice(0, 4);
-  } else if (rawParas.length > 0) {
-    // If fewer than 4 paragraphs exist, split by sentences to form up to 4 clean paragraphs without inventing ANY words
+  if (rawParas.length > 4) {
+    // Distribute sentence selection across the entire story arc (Lead, Development, Statements/Quotes, Outcome)
     const allSentences: string[] = [];
     for (const p of rawParas) {
       const sList = p.match(/[^.!?]+[.!?]+/g) || [p];
       for (const s of sList) {
         const tr = s.trim();
-        if (tr.length > 25) allSentences.push(tr);
+        if (tr.length > 25 && !/whatsapp|telegram|newsletter|advert|copyright|read also|click here/i.test(tr)) {
+          allSentences.push(tr);
+        }
       }
     }
 
     if (allSentences.length >= 4) {
       const chunkSize = Math.ceil(allSentences.length / 4);
       for (let i = 0; i < 4; i++) {
-        const slice = allSentences.slice(i * chunkSize, (i + 1) * chunkSize);
-        if (slice.length > 0) finalParas.push(slice.join(' '));
+        const quadrant = allSentences.slice(i * chunkSize, (i + 1) * chunkSize);
+        if (quadrant.length > 0) {
+          finalParas.push(quadrant.slice(0, 2).join(' '));
+        }
       }
     } else {
-      // Just keep the real sentences that actually exist
+      finalParas = rawParas.slice(0, 4);
+    }
+  } else if (rawParas.length >= 2) {
+    finalParas = rawParas;
+  } else if (rawParas.length === 1) {
+    const sList = rawParas[0].match(/[^.!?]+[.!?]+/g) || [rawParas[0]];
+    const cleanSentences = sList.map((s) => s.trim()).filter((s) => s.length > 25);
+    if (cleanSentences.length >= 2) {
+      const mid = Math.ceil(cleanSentences.length / 2);
+      finalParas = [
+        cleanSentences.slice(0, mid).join(' '),
+        cleanSentences.slice(mid).join(' '),
+      ];
+    } else {
       finalParas = rawParas;
     }
   } else {

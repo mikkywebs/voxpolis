@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl, formatCleanSnippet } from '@/lib/news';
+import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
 import { ExternalLink, AlertCircle, Eye } from 'lucide-react';
 
 interface FeedCardProps {
@@ -53,7 +54,7 @@ export default function FeedCard({ article, index, onCardClick }: FeedCardProps)
   const imageUrl = getArticleImageUrl(article, index);
   const fallbackUrl = getArticleFallbackUrl(article, index);
   const formattedTime = formatExactTimestamp(article.created_at);
-  const displayTitle = (article.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
+  const displayTitle = decodeAllHtmlEntities((article.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
   const articleUrl = `/news/${article.slug}${article.country_code ? `?country=${article.country_code}` : ''}`;
 
   return (
@@ -114,7 +115,7 @@ export default function FeedCard({ article, index, onCardClick }: FeedCardProps)
         </Link>
 
         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mt-2 line-clamp-3 leading-relaxed">
-          {formatCleanSnippet(article.snippet)}
+          {formatCleanSnippet(decodeAllHtmlEntities(article.snippet))}
         </p>
       </div>
 
