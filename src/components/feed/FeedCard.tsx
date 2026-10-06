@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArticleData, formatExactTimestamp, getArticleImageUrl, formatCleanSnippet } from '@/lib/news';
+import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl, formatCleanSnippet } from '@/lib/news';
 import { ExternalLink, AlertCircle, Eye } from 'lucide-react';
 
 interface FeedCardProps {
   article: ArticleData;
+  index?: number;
   onCardClick?: () => void;
 }
 
-export default function FeedCard({ article, onCardClick }: FeedCardProps) {
+export default function FeedCard({ article, index, onCardClick }: FeedCardProps) {
   const [effectiveViews, setEffectiveViews] = useState<number>(article.views_count || 0);
 
   useEffect(() => {
@@ -49,7 +50,8 @@ export default function FeedCard({ article, onCardClick }: FeedCardProps) {
     } catch {}
   };
 
-  const imageUrl = getArticleImageUrl(article);
+  const imageUrl = getArticleImageUrl(article, index);
+  const fallbackUrl = getArticleFallbackUrl(article, index);
   const formattedTime = formatExactTimestamp(article.created_at);
   const displayTitle = (article.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
   const articleUrl = `/news/${article.slug}${article.country_code ? `?country=${article.country_code}` : ''}`;
@@ -68,7 +70,10 @@ export default function FeedCard({ article, onCardClick }: FeedCardProps) {
             src={imageUrl}
             alt={article.title}
             onError={(e) => {
-              (e.target as HTMLImageElement).src = '/breaking-news-banner.png';
+              const target = e.target as HTMLImageElement;
+              if (!target.src.endsWith(fallbackUrl)) {
+                target.src = fallbackUrl;
+              }
             }}
             className="w-full h-48 object-cover group-hover:scale-105 transition duration-300"
           />

@@ -1,7 +1,7 @@
 'use client';
 
 import { ExternalLink, AlertCircle, Clock, Eye } from 'lucide-react';
-import { formatExactTimestamp, formatCleanSnippet } from '@/lib/news';
+import { formatExactTimestamp, formatCleanSnippet, BREAKING_NEWS_FALLBACK, getStandardFallbackImage } from '@/lib/news';
 
 interface ArticleImageHeaderProps {
   title: string;
@@ -33,9 +33,16 @@ export default function ArticleImageHeader({
   const readingTimeMin = Math.max(1, Math.ceil(totalReadingTimeSeconds / 60));
   const formattedTimestamp = formatExactTimestamp(createdAt);
 
-  const displayImage = (originalImageUrl && originalImageUrl.startsWith('http'))
-    ? originalImageUrl
-    : '/breaking-news-banner.png';
+  const fallbackImage = isBreaking
+    ? BREAKING_NEWS_FALLBACK
+    : getStandardFallbackImage(title);
+
+  const displayImage =
+    originalImageUrl &&
+    originalImageUrl.startsWith('http') &&
+    !originalImageUrl.includes('google.com/news')
+      ? originalImageUrl
+      : fallbackImage;
 
   const cleanTitle = (title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
 
@@ -91,7 +98,17 @@ export default function ArticleImageHeader({
       <div className="mt-4 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 shadow-md">
         <div className="relative group">
           {/* eslint-disable-next-html-element-suppression */}
-          <img src={displayImage} alt={title} className="w-full h-64 sm:h-96 object-cover" />
+          <img
+            src={displayImage}
+            alt={title}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              if (!target.src.endsWith(fallbackImage)) {
+                target.src = fallbackImage;
+              }
+            }}
+            className="w-full h-64 sm:h-96 object-cover"
+          />
           <div className="p-2.5 bg-gray-900/90 text-white text-xs flex items-center justify-between gap-2">
             <span className="truncate">Image Credit: {sourceName}</span>
             <a

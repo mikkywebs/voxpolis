@@ -821,13 +821,42 @@ export function formatExactTimestamp(dateStr?: string): string {
   }
 }
 
-const DIVERSE_POLITICAL_FALLBACKS = [
-  '/breaking-news-banner.png',
+export const BREAKING_NEWS_FALLBACK = '/breaking-news-banner.png';
+export const STANDARD_NEWS_FALLBACKS = [
+  '/voxpolis-fallback-1.png',
+  '/voxpolis-fallback-2.png',
 ];
 
-export function getArticleImageUrl(article: Partial<ArticleData>): string {
-  if (article.original_image_url && article.original_image_url.trim() !== '' && !article.original_image_url.includes('google.com/news')) {
+export function getStandardFallbackImage(seed?: string | number): string {
+  if (typeof seed === 'number') {
+    return STANDARD_NEWS_FALLBACKS[Math.abs(seed) % STANDARD_NEWS_FALLBACKS.length];
+  }
+  if (typeof seed === 'string' && seed.length > 0) {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = (hash << 5) - hash + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    return STANDARD_NEWS_FALLBACKS[Math.abs(hash) % STANDARD_NEWS_FALLBACKS.length];
+  }
+  return STANDARD_NEWS_FALLBACKS[0];
+}
+
+export function getArticleFallbackUrl(article: Partial<ArticleData>, seed?: number | string): string {
+  if (article.is_breaking) {
+    return BREAKING_NEWS_FALLBACK;
+  }
+  return getStandardFallbackImage(seed !== undefined ? seed : (article.slug || article.id || article.title || ''));
+}
+
+export function getArticleImageUrl(article: Partial<ArticleData>, seed?: number | string): string {
+  if (
+    article.original_image_url &&
+    article.original_image_url.trim() !== '' &&
+    article.original_image_url.startsWith('http') &&
+    !article.original_image_url.includes('google.com/news')
+  ) {
     return article.original_image_url;
   }
-  return '/breaking-news-banner.png';
+  return getArticleFallbackUrl(article, seed);
 }

@@ -12,7 +12,13 @@ import RegionalCountrySelectorModal from '@/components/layout/RegionalCountrySel
 import AuthPromptModal from '@/components/auth/AuthPromptModal';
 import { createClient } from '@/lib/supabase/client';
 import { ALL_COUNTRIES, CountryConfig, getCountryByCode, getCountrySlug } from '@/config/countries';
-import { fetchArticlesForCountry, ArticleData, formatExactTimestamp, getArticleImageUrl } from '@/lib/news';
+import {
+  fetchArticlesForCountry,
+  ArticleData,
+  formatExactTimestamp,
+  getArticleImageUrl,
+  getArticleFallbackUrl,
+} from '@/lib/news';
 import {
   Globe2,
   Flame,
@@ -399,8 +405,15 @@ export default function LandingPage() {
             <div className="relative h-[420px] sm:h-[480px] w-full">
               {/* eslint-disable-next-html-element-suppression */}
               <img
-                src={getArticleImageUrl(activeSlide)}
+                src={getArticleImageUrl(activeSlide, currentSlideIndex)}
                 alt={activeSlide.title}
+                onError={(e) => {
+                  const fb = getArticleFallbackUrl(activeSlide, currentSlideIndex);
+                  const target = e.target as HTMLImageElement;
+                  if (!target.src.endsWith(fb)) {
+                    target.src = fb;
+                  }
+                }}
                 className="w-full h-full object-cover filter brightness-50"
               />
 
@@ -518,8 +531,8 @@ export default function LandingPage() {
           ) : (
             <div className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {(gridArticles.length > 0 ? gridArticles : allArticles).slice(0, 6).map((art) => (
-                  <FeedCard key={art.id} article={art} />
+                {(gridArticles.length > 0 ? gridArticles : allArticles).slice(0, 6).map((art, idx) => (
+                  <FeedCard key={art.id} article={art} index={idx} />
                 ))}
               </div>
 
@@ -564,8 +577,8 @@ export default function LandingPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                    {f.articles.map((art) => (
-                      <FeedCard key={art.id} article={art} />
+                    {f.articles.map((art, idx) => (
+                      <FeedCard key={art.id} article={art} index={idx} />
                     ))}
                   </div>
 
@@ -641,10 +654,11 @@ export default function LandingPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {f.articles.map((art) => (
+                  {f.articles.map((art, idx) => (
                     <FeedCard
                       key={art.id}
                       article={art}
+                      index={idx}
                       onCardClick={() => handleGuestGlobalArticleClick(art, f.country)}
                     />
                   ))}

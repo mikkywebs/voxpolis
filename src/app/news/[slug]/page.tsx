@@ -17,7 +17,15 @@ import OriginalSourceLink from '@/components/article/OriginalSourceLink';
 import AdSlot from '@/components/article/AdSlot';
 import DesktopVignetteAd from '@/components/ads/DesktopVignetteAd';
 import { SUPPORTED_COUNTRIES, getCountryByCode, getCountrySlug } from '@/config/countries';
-import { fetchArticlesForCountry, ArticleData, expandToJournalisticArticle, formatCleanSnippet, isColumnistOrOpinion, getArticleImageUrl } from '@/lib/news';
+import {
+  fetchArticlesForCountry,
+  ArticleData,
+  expandToJournalisticArticle,
+  formatCleanSnippet,
+  isColumnistOrOpinion,
+  getArticleImageUrl,
+  getArticleFallbackUrl,
+} from '@/lib/news';
 import { getPipelineArticleBySlug } from '@/lib/pipeline';
 import { get301Redirect } from '@/lib/pipeline/redirects';
 import { PipelineArticleRecord } from '@/lib/pipeline/types';
@@ -820,8 +828,9 @@ export default function NewsDetailPage() {
                 Trending Stories in {selectedCountry.name}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {relatedArticles.slice(0, 4).map((art) => {
-                  const img = getArticleImageUrl(art);
+                {relatedArticles.slice(0, 4).map((art, idx) => {
+                  const img = getArticleImageUrl(art, idx);
+                  const fb = getArticleFallbackUrl(art, idx);
                   return (
                     <Link
                       key={art.id}
@@ -833,6 +842,12 @@ export default function NewsDetailPage() {
                         <img
                           src={img}
                           alt={art.title}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (!target.src.endsWith(fb)) {
+                              target.src = fb;
+                            }
+                          }}
                           className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                         />
                       </div>
@@ -917,7 +932,7 @@ export default function NewsDetailPage() {
             title={article!.title}
             snippet={article!.snippet}
             imageMode={article!.image_mode === 'original' ? 'original' : 'breaking_logo'}
-            originalImageUrl={article!.original_image_url || '/breaking-news-banner.png'}
+            originalImageUrl={article!.original_image_url}
             sourceName={article!.source_name}
             sourceUrl={article!.source_url}
             isBreaking={article!.is_breaking}

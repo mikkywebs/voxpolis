@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArticleData } from '@/lib/news';
+import { ArticleData, getArticleImageUrl, getArticleFallbackUrl } from '@/lib/news';
 
 interface RelatedArticlesSectionProps {
   articles: ArticleData[];
@@ -19,25 +19,35 @@ export default function RelatedArticlesSection({ articles }: RelatedArticlesSect
 
       {/* Grid: 1 column on mobile (max 3), 2 columns on desktop (max 4) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        {articles.slice(0, 4).map((art, idx) => (
-          <Link
-            key={art.id}
-            href={`/news/${art.slug}`}
-            className={`group p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-500/50 transition flex flex-col justify-between ${
-              idx === 3 ? 'hidden sm:flex' : 'flex'
-            }`}
-          >
-            <div>
-              {/* Featured Image Thumbnail */}
-              <div className="relative w-full aspect-video rounded-xl overflow-hidden mb-3 bg-gray-100 dark:bg-gray-800 border border-gray-200/60 dark:border-gray-800">
-                {/* eslint-disable-next-html-element-suppression */}
-                <img
-                  src={art.original_image_url || '/breaking-news-banner.png'}
-                  alt={art.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-              </div>
+        {articles.slice(0, 4).map((art, idx) => {
+          const imgUrl = getArticleImageUrl(art, idx);
+          const fbUrl = getArticleFallbackUrl(art, idx);
+
+          return (
+            <Link
+              key={art.id}
+              href={`/news/${art.slug}`}
+              className={`group p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-500/50 transition flex flex-col justify-between ${
+                idx === 3 ? 'hidden sm:flex' : 'flex'
+              }`}
+            >
+              <div>
+                {/* Featured Image Thumbnail */}
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden mb-3 bg-gray-100 dark:bg-gray-800 border border-gray-200/60 dark:border-gray-800">
+                  {/* eslint-disable-next-html-element-suppression */}
+                  <img
+                    src={imgUrl}
+                    alt={art.title}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      if (!target.src.endsWith(fbUrl)) {
+                        target.src = fbUrl;
+                      }
+                    }}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                  />
+                </div>
 
               <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-1">
                 {art.source_name}
@@ -51,7 +61,8 @@ export default function RelatedArticlesSection({ articles }: RelatedArticlesSect
               {art.snippet}
             </p>
           </Link>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
