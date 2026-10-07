@@ -216,28 +216,17 @@ export default function LandingPage() {
     detectLocationAndLoadNews();
   }, [user]);
 
-  // Handle manual country change from modal
-  const handleSelectCountry = async (c: CountryConfig) => {
-    setSelectedCountry(c);
-    setIsAutoDetected(false);
+  // Handle manual country change from modal: saves preference and opens dedicated country news landing page
+  const handleSelectCountry = (c: CountryConfig) => {
+    setIsCountryModalOpen(false);
     if (typeof window !== 'undefined') {
       localStorage.setItem('voxpolis_primary_country', c.code);
+      if (c.languages?.length > 0) {
+        localStorage.setItem('voxpolis_preferred_language', c.languages[0].code);
+      }
     }
-
-    setLoadingArticles(true);
-    const data = await fetchArticlesForCountry(c.code);
-    setAllArticles(data);
-    setLoadingArticles(false);
-    setCurrentSlideIndex(0);
-
-    // If guest changes country, display friendly invitation to save preference
-    if (!user) {
-      setAuthModalConfig({
-        isOpen: true,
-        title: `Viewing ${c.name} Local News`,
-        message: `You are currently browsing verified political news for ${c.name}. Create your free account to lock in your primary newsroom and customize your daily My VoxPolis feed across up to 5 countries.`,
-      });
-    }
+    const slug = getCountrySlug(c);
+    router.push(`/${slug}`);
   };
 
   // Guest clicks on other country article
@@ -281,7 +270,7 @@ export default function LandingPage() {
 
           {/* Desktop Left Tagline */}
           <div className="hidden md:flex items-center gap-2 text-xs font-semibold text-gray-400">
-            <span>Global Civic Intelligence</span>
+            <span>Concise & Factual Global News</span>
           </div>
 
           {/* Desktop Centered Logo */}

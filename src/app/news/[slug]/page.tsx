@@ -679,14 +679,12 @@ export default function NewsDetailPage() {
         <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
 
         <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-4 sm:px-6">
-          {/* Left Wide Skyscraper (160x600 px) - strictly desktop when ads active */}
-          {hasActiveAds && (
-            <aside className="hidden xl:block shrink-0 w-[160px] mr-6">
-              <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
-                <AdSlot slotLocation="skyscraper_left" isAllowed={true} />
-              </div>
-            </aside>
-          )}
+          {/* Left Wide Skyscraper (160x600 px) - strictly desktop */}
+          <aside className="hidden xl:block shrink-0 w-[160px] mr-6">
+            <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
+              <AdSlot slotLocation="skyscraper_left" isAllowed={true} />
+            </div>
+          </aside>
 
           <main className="flex-1 max-w-3xl w-full min-w-0 py-8 space-y-6">
             {/* Headline & Dek */}
@@ -853,14 +851,12 @@ export default function NewsDetailPage() {
             />
           </main>
 
-          {/* Right Wide Skyscraper (160x600 px) - strictly desktop when ads active */}
-          {hasActiveAds && (
-            <aside className="hidden xl:block shrink-0 w-[160px] ml-6">
-              <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
-                <AdSlot slotLocation="skyscraper_right" isAllowed={true} />
-              </div>
-            </aside>
-          )}
+          {/* Right Wide Skyscraper (160x600 px) - strictly desktop */}
+          <aside className="hidden xl:block shrink-0 w-[160px] ml-6">
+            <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
+              <AdSlot slotLocation="skyscraper_right" isAllowed={true} />
+            </div>
+          </aside>
         </div>
 
         <Footer />
@@ -1014,14 +1010,12 @@ export default function NewsDetailPage() {
       <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
 
       <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-4 sm:px-6">
-        {/* Left Wide Skyscraper (160x600 px) - strictly desktop when ads active */}
-        {hasActiveAds && (
-          <aside className="hidden xl:block shrink-0 w-[160px] mr-6">
-            <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
-              <AdSlot slotLocation="skyscraper_left" isAllowed={true} />
-            </div>
-          </aside>
-        )}
+        {/* Left Wide Skyscraper (160x600 px) - strictly desktop */}
+        <aside className="hidden xl:block shrink-0 w-[160px] mr-6">
+          <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
+            <AdSlot slotLocation="skyscraper_left" isAllowed={true} />
+          </div>
+        </aside>
 
         <main className="flex-1 max-w-3xl w-full min-w-0 py-8">
           <ArticleImageHeader
@@ -1153,14 +1147,12 @@ export default function NewsDetailPage() {
           <AdSlot slotLocation="below_sources" isAllowed={true} />
         </main>
 
-        {/* Right Wide Skyscraper (160x600 px) - strictly desktop when ads active */}
-        {hasActiveAds && (
-          <aside className="hidden xl:block shrink-0 w-[160px] ml-6">
-            <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
-              <AdSlot slotLocation="skyscraper_right" isAllowed={true} />
-            </div>
-          </aside>
-        )}
+        {/* Right Wide Skyscraper (160x600 px) - strictly desktop */}
+        <aside className="hidden xl:block shrink-0 w-[160px] ml-6">
+          <div className="sticky top-20 w-[160px] min-h-[600px] flex flex-col items-center">
+            <AdSlot slotLocation="skyscraper_right" isAllowed={true} />
+          </div>
+        </aside>
       </div>
 
       {/* Desktop Interstitial / Vignette Ad provision (strictly desktop & dormant until active) */}

@@ -23,7 +23,7 @@ export default function AboutPage() {
     badge: 'Global Independent News & Civic Voice',
     title: 'Unbiased Political News Tailored to Your Nation',
     subtitle: `Voxpolis delivers real-time, independent political coverage and executive fact summaries from ${ALL_COUNTRIES.length} supported nations. Access direct regional political developments and active civic sentiment polls with zero paywalls.`,
-    mission: 'Our mission is to empower citizens worldwide with uncompromised political intelligence, balanced regional perspectives, and civic participation without corporate paywalls.',
+    mission: 'Our mission is to bring concise, factual news straight to citizens\' doorsteps worldwide, with balanced regional perspectives and civic participation without corporate paywalls.',
   });
 
   useEffect(() => {

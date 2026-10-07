@@ -41,7 +41,7 @@ export default function CorrectionsPage() {
             Corrections & Accuracy Policy
           </h1>
           <p className="text-xs sm:text-sm text-gray-300 max-w-xl mx-auto leading-relaxed">
-            Voxpolis is committed to objective, non-partisan political intelligence. Because our news briefs are automatically generated from named primary source pages, we maintain strict procedures for reporting and fixing errors.
+            Voxpolis is committed to objective, non-partisan, factual news reporting. Because our concise news briefs are generated from named primary source pages, we maintain strict procedures for reporting and fixing errors.
           </p>
         </div>
 

@@ -114,10 +114,10 @@ export default function NotFound() {
             <div>
               <div className="text-2xl mb-2">🌐</div>
               <h3 className="font-bold text-sm text-white group-hover:text-purple-400 transition">
-                Global Intelligence Feed
+                Global News Feed
               </h3>
               <p className="text-xs text-gray-400 mt-1">
-                View cross-border political briefings and international civic sentiment.
+                View cross-border political briefings and international coverage.
               </p>
             </div>
             <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-purple-400">

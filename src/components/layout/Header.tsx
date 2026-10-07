@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import SiteLogo from '@/components/branding/SiteLogo';
 import RegionalCountrySelectorModal from '@/components/layout/RegionalCountrySelectorModal';
 import AuthPromptModal from '@/components/auth/AuthPromptModal';
 import MilestoneAchievementModal from '@/components/profile/MilestoneAchievementModal';
-import { CountryConfig, SUPPORTED_COUNTRIES } from '@/config/countries';
+import { CountryConfig, SUPPORTED_COUNTRIES, getCountrySlug } from '@/config/countries';
 import { WeatherData } from '@/lib/weather';
 import { Sun, Moon, PenTool, ChevronDown, User, Shield, LogOut, Languages, Globe, Check } from 'lucide-react';
 
@@ -31,6 +32,7 @@ export default function Header({
   selectedLanguage = 'en',
   onSelectLanguage,
 }: HeaderProps) {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState(user || null);
   const [greeting, setGreeting] = useState<string>('');
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -44,6 +46,23 @@ export default function Header({
   const [memberSince, setMemberSince] = useState<string | null>(null);
 
   const countryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Seamless country switcher: saves preferences and opens the dedicated country landing page
+  const handleCountrySelect = (c: CountryConfig) => {
+    setIsCountryDropdownOpen(false);
+    setIsModalOpen(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('voxpolis_primary_country', c.code);
+      if (c.languages?.length > 0) {
+        localStorage.setItem('voxpolis_preferred_language', c.languages[0].code);
+      }
+    }
+    if (onSelectCountry) {
+      onSelectCountry(c);
+    }
+    const slug = getCountrySlug(c);
+    router.push(`/${slug}`);
+  };
 
   // Auto-resolve user session if not passed as prop or on session change
   useEffect(() => {
@@ -219,13 +238,7 @@ export default function Header({
           {/* Regional Country Selector Trigger & Dropdown Menu */}
           <div className="relative shrink-0" ref={countryDropdownRef}>
             <button
-              onClick={() => {
-                if (!currentUser) {
-                  setIsAuthPromptOpen(true);
-                } else {
-                  setIsCountryDropdownOpen(!isCountryDropdownOpen);
-                }
-              }}
+              onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
               type="button"
               className="flex items-center gap-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 hover:from-blue-100 hover:to-indigo-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs font-extrabold px-3 py-1.5 rounded-xl border border-blue-300 dark:border-gray-600 shadow-sm transition cursor-pointer shrink-0"
               title="Select Country Coverage"
@@ -255,10 +268,7 @@ export default function Header({
                       <button
                         key={c.code}
                         type="button"
-                        onClick={() => {
-                          onSelectCountry(c);
-                          setIsCountryDropdownOpen(false);
-                        }}
+                        onClick={() => handleCountrySelect(c)}
                         className={`w-full text-left px-3 py-2 flex items-center justify-between font-medium hover:bg-blue-50 dark:hover:bg-gray-700 transition ${
                           isSelected ? 'bg-blue-50/70 dark:bg-gray-700/70 text-blue-600 font-bold' : 'text-gray-800 dark:text-gray-200'
                         }`}
@@ -447,7 +457,7 @@ export default function Header({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         selectedCountry={selectedCountry}
-        onSelectCountry={onSelectCountry}
+        onSelectCountry={handleCountrySelect}
       />
 
       {/* Auth Prompt Modal for Guests */}

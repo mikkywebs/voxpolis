@@ -92,7 +92,7 @@ function SearchContent() {
         {/* Search Header & Bar */}
         <div className="max-w-2xl mx-auto text-center space-y-4">
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-            Search Political Intelligence
+            Search Political News
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Search live policy briefs, executive orders, parliamentary records, and breaking news.

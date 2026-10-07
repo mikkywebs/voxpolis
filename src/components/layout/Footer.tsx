@@ -34,7 +34,7 @@ export default function Footer() {
         {/* Copyright & Platform Description */}
         <div className="space-y-1 text-[11px] text-gray-500 max-w-md">
           <p>© {new Date().getFullYear()} Voxpolis. Independent Global Political Journalism.</p>
-          <p>Authoritative political analysis, multi-nation coverage, and civic intelligence. Operated from Abuja, Nigeria.</p>
+          <p>Authoritative political analysis, multi-nation coverage, concise and factual news delivered straight to your doorstep. Operated from Abuja, Nigeria.</p>
         </div>
       </div>
     </footer>

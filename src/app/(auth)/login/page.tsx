@@ -143,7 +143,7 @@ export default function LoginPage() {
             <SiteLogo variant="full" className="h-12 sm:h-14 w-auto mx-auto" />
           </Link>
           <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">Sign In to Voxpolis</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Access personalized global political intelligence</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">We bring concise, factual news straight to your doorstep</p>
         </div>
 
         {errorMsg && (

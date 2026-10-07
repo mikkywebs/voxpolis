@@ -10,7 +10,7 @@ export default function TermsOfServicePage() {
   const [data, setData] = useState({
     title: 'Terms of Service & Editorial Standards',
     subtitle: 'Fair use guidelines for readers, civic participants, and contributing columnists.',
-    content: `Welcome to Voxpolis ("voxpolis.app"). By accessing our political intelligence platform, you agree to these Terms of Service.
+    content: `Welcome to Voxpolis ("voxpolis.app"). We bring concise, factual news straight to your doorstep. By accessing our news platform, you agree to these Terms of Service.
 
 1. Editorial Mission & Content Use
 All news coverage, policy analyses, and primary-source citations are published for civic knowledge, educational transparency, and research purposes.

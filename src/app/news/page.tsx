@@ -3,16 +3,19 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import NewsAdDesktopLayout from '@/components/layout/NewsAdDesktopLayout';
 import HolidayBanner from '@/components/feed/HolidayBanner';
 import FeedCard from '@/components/feed/FeedCard';
 import FeedAdCard from '@/components/feed/FeedAdCard';
-import { SUPPORTED_COUNTRIES, CountryConfig, getCountryByCode } from '@/config/countries';
+import { SUPPORTED_COUNTRIES, CountryConfig, getCountryByCode, getCountrySlug } from '@/config/countries';
 import { fetchArticlesForCountry, ArticleData } from '@/lib/news';
 import { Newspaper } from 'lucide-react';
 
 export default function NewsIndexPage() {
+  const router = useRouter();
   const [selectedCountry, setSelectedCountry] = useState<CountryConfig>(SUPPORTED_COUNTRIES[0]);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const [articles, setArticles] = useState<ArticleData[]>([]);
@@ -59,6 +62,7 @@ export default function NewsIndexPage() {
     setSelectedLanguage(defaultLang);
     localStorage.setItem('voxpolis_primary_country', c.code);
     localStorage.setItem('voxpolis_preferred_language', defaultLang);
+    router.push(`/${getCountrySlug(c)}`);
   };
 
   const handleLanguageChange = (lang: string) => {
@@ -93,7 +97,7 @@ export default function NewsIndexPage() {
         onSelectLanguage={handleLanguageChange}
       />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <NewsAdDesktopLayout contentClassName="space-y-6">
         <HolidayBanner countryCode={selectedCountry.code} />
 
         {/* Section Header Bar */}
@@ -174,7 +178,7 @@ export default function NewsIndexPage() {
             )}
           </div>
         )}
-      </main>
+      </NewsAdDesktopLayout>
 
       <Footer />
     </div>

@@ -661,7 +661,7 @@ export default function AdminDashboardPage() {
                           impact: 'High',
                         },
                         {
-                          title: 'Nigeria National Civic Feed & Intelligence',
+                          title: 'Nigeria National News & Civic Feed',
                           path: '/news?country=NG',
                           country: 'Nigeria',
                           flag: '🇳🇬',
@@ -685,7 +685,7 @@ export default function AdminDashboardPage() {
                           impact: 'High',
                         },
                         {
-                          title: 'United Kingdom Westminster & Policy Intelligence',
+                          title: 'United Kingdom Westminster & Policy News',
                           path: '/news?country=GB',
                           country: 'United Kingdom',
                           flag: '🇬🇧',
@@ -1257,7 +1257,7 @@ export default function AdminDashboardPage() {
                         />
                       </div>
                       <div className="text-[11px] font-medium text-slate-800 truncate">
-                        Voxpolis — Global Civic Intelligence
+                        Voxpolis — Concise & Factual Global News
                       </div>
                     </div>
                     {/* Dark tab mockup */}
@@ -1270,7 +1270,7 @@ export default function AdminDashboardPage() {
                         />
                       </div>
                       <div className="text-[11px] font-medium text-gray-200 truncate">
-                        Voxpolis — Global Civic Intelligence
+                        Voxpolis — Concise & Factual Global News
                       </div>
                     </div>
                   </div>

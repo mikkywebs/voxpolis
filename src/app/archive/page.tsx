@@ -47,7 +47,7 @@ export default function GlobalArchivePage() {
                 Voxpolis Global Political Archive
               </h1>
               <p className="text-xs text-gray-300">
-                Permanent historical archives for political intelligence across 230+ nations.
+                Permanent historical archives for concise, factual news across 230+ nations.
               </p>
             </div>
           </div>

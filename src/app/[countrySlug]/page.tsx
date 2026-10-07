@@ -5,10 +5,12 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
+import NewsAdDesktopLayout from '@/components/layout/NewsAdDesktopLayout';
 import HolidayBanner from '@/components/feed/HolidayBanner';
 import FeedCard from '@/components/feed/FeedCard';
 import FeedAdCard from '@/components/feed/FeedAdCard';
-import { ALL_COUNTRIES, CountryConfig, getCountryByCode } from '@/config/countries';
+import { ALL_COUNTRIES, CountryConfig, getCountryByCode, getCountrySlug, getCountryBySlug } from '@/config/countries';
 import { fetchArticlesForCountry, ArticleData } from '@/lib/news';
 import { createClient } from '@/lib/supabase/client';
 import { Newspaper, Lock, ArrowRight, Sparkles, PenTool } from 'lucide-react';
@@ -20,10 +22,7 @@ export default function CountryFeedPage() {
   const supabase = createClient();
   const countrySlug = (params?.countrySlug as string || 'nigeria').toLowerCase();
 
-  const initialCountry = ALL_COUNTRIES.find((c) => {
-    const nameSlug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    return nameSlug === countrySlug || c.code.toLowerCase() === countrySlug;
-  }) || getCountryByCode('US');
+  const initialCountry = getCountryBySlug(countrySlug);
 
   const [selectedCountry, setSelectedCountry] = useState<CountryConfig>(initialCountry);
   const [selectedLanguage, setSelectedLanguage] = useState<string>(initialCountry.languages[0]?.code || 'en');
@@ -33,25 +32,64 @@ export default function CountryFeedPage() {
 
   // Sync state if countrySlug URL param changes dynamically
   useEffect(() => {
-    const matched = ALL_COUNTRIES.find((c) => {
-      const nameSlug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      return nameSlug === countrySlug || c.code.toLowerCase() === countrySlug;
-    }) || getCountryByCode('US');
-
+    const matched = getCountryBySlug(countrySlug);
     setSelectedCountry(matched);
     const defaultLang = matched.languages[0]?.code || 'en';
     setSelectedLanguage(defaultLang);
   }, [countrySlug]);
 
-  // Check auth status for guest vs member rules
+  // Check auth status for guest vs member rules (supports Supabase and persistent local session)
   useEffect(() => {
+    let authSub: any = null;
+
     async function checkAuth() {
-      const { data } = await supabase.auth.getSession();
-      if (data?.session?.user) {
-        setUser(data.session.user);
+      try {
+        const { data } = await supabase.auth.getSession();
+        const sessionUser = data?.session?.user;
+        const localActive = typeof window !== 'undefined' && localStorage.getItem('voxpolis_session_active') === 'true';
+        const localName = typeof window !== 'undefined' && localStorage.getItem('voxpolis_user_name');
+        const localEmail = typeof window !== 'undefined' && localStorage.getItem('voxpolis_user_email');
+
+        if (sessionUser) {
+          setUser(sessionUser);
+        } else if (localActive || localName) {
+          setUser({
+            id: 'local-member',
+            email: localEmail || undefined,
+            user_metadata: { full_name: localName || 'Citizen' },
+          });
+        }
+
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            setUser(session.user);
+          } else if (typeof window !== 'undefined' && localStorage.getItem('voxpolis_session_active') === 'true') {
+            setUser({
+              id: 'local-member',
+              user_metadata: { full_name: localStorage.getItem('voxpolis_user_name') || 'Citizen' },
+            });
+          } else {
+            setUser(null);
+          }
+        });
+        authSub = sub?.subscription;
+      } catch (e) {
+        if (typeof window !== 'undefined') {
+          const localName = localStorage.getItem('voxpolis_user_name');
+          if (localName || localStorage.getItem('voxpolis_session_active') === 'true') {
+            setUser({
+              id: 'local-member',
+              user_metadata: { full_name: localName || 'Citizen' },
+            });
+          }
+        }
       }
     }
+
     checkAuth();
+    return () => {
+      if (authSub) authSub.unsubscribe();
+    };
   }, [supabase]);
 
   // Fetch articles when country or language changes
@@ -68,8 +106,8 @@ export default function CountryFeedPage() {
   }, [selectedCountry, selectedLanguage]);
 
   const handleCountryChange = (c: CountryConfig) => {
-    const nameSlug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    router.push(`/${nameSlug}`);
+    const slug = getCountrySlug(c);
+    router.push(`/${slug}`);
   };
 
   const handleLanguageChange = (lang: string) => {
@@ -107,7 +145,7 @@ export default function CountryFeedPage() {
         onSelectLanguage={handleLanguageChange}
       />
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8">
+      <NewsAdDesktopLayout>
         {/* Country & Holiday Greeting Banner */}
         <HolidayBanner countryCode={selectedCountry.code} />
 
@@ -267,7 +305,9 @@ export default function CountryFeedPage() {
             </div>
           </div>
         )}
-      </main>
+      </NewsAdDesktopLayout>
+
+      <Footer />
     </div>
   );
 }

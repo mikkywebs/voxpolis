@@ -86,7 +86,7 @@ export default function EngagementPromptModal({ userId, isOpen, onClose }: Engag
             </div>
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">How is your experience with Voxpolis?</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-6">
-              Your honest feedback helps us deliver accurate, unbiased political news intelligence.
+              Your honest feedback helps us deliver accurate, unbiased, concise, and factual news.
             </p>
 
             <div className="grid grid-cols-2 gap-3">
