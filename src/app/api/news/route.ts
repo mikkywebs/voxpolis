@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
         const data = await res.json();
         if (data.results && Array.isArray(data.results)) {
           const filteredItems = data.results
-            .filter((item: any) => isValidContentImage(item.image_url) && !isColumnistOrOpinion(item.title, item.description, item.keywords || item.category, item.link))
+            .filter((item: any) => !isColumnistOrOpinion(item.title, item.description, item.keywords || item.category, item.link))
             .slice(0, 10);
 
           newsDataArticles = await Promise.all(
@@ -130,6 +130,8 @@ export async function GET(request: NextRequest) {
                 register301Redirect(rawSlug, rewritten.slug);
               }
 
+              const hasValidImg = isValidContentImage(item.image_url);
+
               return {
                 id: item.article_id || `newsdata-${countryCode}-${idx}`,
                 slug: rewritten.slug,
@@ -140,8 +142,8 @@ export async function GET(request: NextRequest) {
                 country_code: countryCode,
                 language: language,
                 category: item.category?.[0] || 'politics',
-                image_mode: 'original' as const,
-                original_image_url: item.image_url,
+                image_mode: hasValidImg ? ('original' as const) : ('breaking_logo' as const),
+                original_image_url: hasValidImg ? item.image_url : undefined,
                 source_name: sourceName,
                 source_url: item.link || 'https://voxpolis.app',
                 is_breaking: idx === 0,
@@ -178,7 +180,6 @@ export async function GET(request: NextRequest) {
   for (const art of combined) {
     if (!isPoliticalNews(art.title, art.snippet, art.tags)) continue;
     if (!isRelevantToCountry(art.title, art.snippet, countryCode)) continue;
-    if (!isValidContentImage(art.original_image_url)) continue;
 
     const normKey = art.title
       .toLowerCase()

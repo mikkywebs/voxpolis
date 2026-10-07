@@ -85,7 +85,7 @@ function cleanRssText(raw: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  if (text.length < 5 || text.startsWith('<a') || text.includes('news.google.com')) {
+  if (text.length < 5 || text.startsWith('<a')) {
     return '';
   }
   return text;
@@ -109,13 +109,65 @@ export async function fetchRssArticlesForCountry(
   const country = getCountryByCode(code);
 
   const explicitFeeds = COUNTRY_RSS_MAP[code] || [];
-  
-  const googleNewsUrl = `https://news.google.com/rss/search?q=politics+${encodeURIComponent(country.name)}&hl=en-${code}&gl=${code}&ceid=${code}:en`;
-  
-  const targetFeeds: RssFeedConfig[] = [
-    ...explicitFeeds,
-    { name: `${country.name} Political News`, url: googleNewsUrl },
-  ];
+  const targetFeeds: RssFeedConfig[] = [...explicitFeeds];
+
+  // 1. Primary Google News Search in English with valid parameters (US:en)
+  const cleanCountryName = country.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  targetFeeds.push({
+    name: `${country.name} Political Dispatch`,
+    url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' politics')}&hl=en-US&gl=US&ceid=US:en`,
+  });
+
+  // 2. Multilingual queries if the country speaks French, Spanish, Portuguese, or German
+  const primaryLang = country.languages?.[0]?.code || 'en';
+  if (primaryLang === 'fr' || language === 'fr') {
+    targetFeeds.push({
+      name: `${country.name} Actualités Politiques`,
+      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' politique')}&hl=fr&gl=FR&ceid=FR:fr`,
+    });
+  } else if (primaryLang === 'es' || language === 'es') {
+    targetFeeds.push({
+      name: `${country.name} Noticias Políticas`,
+      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' política')}&hl=es&gl=ES&ceid=ES:es`,
+    });
+  } else if (primaryLang === 'pt' || language === 'pt') {
+    targetFeeds.push({
+      name: `${country.name} Notícias Políticas`,
+      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' política')}&hl=pt-BR&gl=BR&ceid=BR:pt-419`,
+    });
+  } else if (primaryLang === 'de' || language === 'de') {
+    targetFeeds.push({
+      name: `${country.name} Politik`,
+      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' politik')}&hl=de&gl=DE&ceid=DE:de`,
+    });
+  }
+
+  // 3. Continental authoritative feeds for added coverage
+  if (country.continent === 'Africa') {
+    targetFeeds.push({
+      name: 'AllAfrica Governance',
+      url: 'https://allafrica.com/tools/headlines/rdf/politics/headlines.rdf',
+    });
+    targetFeeds.push({
+      name: 'AfricaNews',
+      url: 'https://www.africanews.com/feed/rss',
+    });
+  } else if (country.continent === 'Europe') {
+    targetFeeds.push({
+      name: 'BBC Europe',
+      url: 'https://feeds.bbci.co.uk/news/world/europe/rss.xml',
+    });
+  } else if (country.continent === 'Asia') {
+    targetFeeds.push({
+      name: 'BBC Asia',
+      url: 'https://feeds.bbci.co.uk/news/world/asia/rss.xml',
+    });
+  } else if (country.continent === 'Americas' || country.region?.includes('America')) {
+    targetFeeds.push({
+      name: 'BBC Americas',
+      url: 'https://feeds.bbci.co.uk/news/world/latin_america/rss.xml',
+    });
+  }
 
   const fetchedResults: ArticleData[] = [];
 
@@ -157,9 +209,6 @@ export async function fetchRssArticlesForCountry(
   const uniqueArticles: ArticleData[] = [];
 
   for (const art of fetchedResults) {
-    // Completely ignore articles without a valid content photograph
-    if (!isValidContentImage(art.original_image_url)) continue;
-
     // Strictly skip articles that are about another country or not political
     if (!isPoliticalNews(art.title, art.snippet, art.tags)) continue;
     if (!isRelevantToCountry(art.title, art.snippet, code)) continue;
@@ -285,9 +334,9 @@ function parseRssXmlToArticles(
       }
     }
 
-    // Completely skip articles without a valid content photograph (e.g. punchng.com logos)
-    if (!isValidContentImage(imageUrl)) {
-      return;
+    // Validate image: if it's a known placeholder or site logo, omit it so crisp fallback visual is used
+    if (imageUrl && !isValidContentImage(imageUrl)) {
+      imageUrl = undefined;
     }
 
     // Extract full real article paragraphs
@@ -329,7 +378,7 @@ function parseRssXmlToArticles(
       country_code: countryCode,
       language: 'en',
       category: 'politics',
-      image_mode: 'original',
+      image_mode: imageUrl ? 'original' : 'breaking_logo',
       original_image_url: imageUrl,
       source_name: sourceName,
       source_url: link || 'https://voxpolis.app',

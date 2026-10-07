@@ -43,6 +43,16 @@ export function isArticleArchived(createdAt: string): boolean {
   return age > fortyEightHoursMs;
 }
 
+export function normalizeForMatching(text: string): string {
+  return (text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['’`‘]/g, "'")
+    .replace(/["“”]/g, '"')
+    .toLowerCase()
+    .trim();
+}
+
 const POLITICAL_KEYWORDS = [
   'politic', 'politics', 'government', 'governance', 'parliament', 'parliamentary',
   'congress', 'congressional', 'president', 'presidential', 'presidency', 'minister', 'ministry',
@@ -55,7 +65,14 @@ const POLITICAL_KEYWORDS = [
   'downing street', 'capitol', 'foreign affairs', 'defense minister',
   'inec', 'efcc', 'icpc', 'dss', 'apc', 'pdp', 'lp', 'nnpp', 'fct', 'federal government',
   'budget', 'appropriation', 'parliamentarian', 'civil service', 'executive order',
-  'impeachment', 'tenure', 'referendum', 'geopolitical'
+  'impeachment', 'tenure', 'referendum', 'geopolitical',
+  // Multilingual political terms (French, Spanish, Portuguese, German)
+  'politique', 'politiques', 'gouvernement', 'gouvernance', 'parlement', 'assemblee',
+  'assemblee nationale', 'depute', 'deputes', 'ministre', 'ministere', 'president',
+  'presidentielle', 'senat', 'loi', 'lois', 'election', 'elections', 'electorale',
+  'parti', 'partis', 'opposition', 'decret', 'droit', 'tribunal',
+  'politica', 'gobierno', 'gobernanza', 'parlamento', 'diputado', 'presidencia',
+  'ley', 'asamblea', 'partido', 'orçamento', 'governo', 'politik', 'regierung'
 ];
 
 const FORBIDDEN_NON_POLITICAL_KEYWORDS = [
@@ -297,7 +314,7 @@ const COUNTRY_SPECIFIC_IDENTIFIERS: Record<string, string[]> = {
     'sokoto', 'kebbi', 'katsina', 'jigawa', 'bauchi', 'gombe', 'yobe', 'adamawa', 'nasarawa',
     'cross river', 'akwa ibom', 'bayelsa', 'ebonyi', 'imo', 'abia', 'federal government'
   ],
-  US: ['united states', 'u.s.', 'usa', 'american', 'biden', 'trump', 'harris', 'congress', 'white house', 'capitol', 'senate', 'democrat', 'republican', 'pentagon', 'supreme court', 'fbi', 'gop'],
+  US: ['united states', 'u.s.', 'usa', 'america', 'american', 'biden', 'trump', 'harris', 'congress', 'white house', 'capitol', 'senate', 'democrat', 'republican', 'pentagon', 'supreme court', 'fbi', 'gop'],
   GB: ['united kingdom', 'u.k.', 'britain', 'british', 'london', 'downing street', 'parliament', 'starmer', 'sunak', 'labour', 'tory', 'conservative', 'westminster', 'holyrood', 'bank of england'],
   GH: ['ghana', 'ghanaian', 'accra', 'akufo-addo', 'bawumia', 'mahama', 'cedi', 'parliament of ghana'],
   ZA: ['south africa', 'south african', 'pretoria', 'cape town', 'johannesburg', 'ramaphosa', 'anc', 'da', 'eff', 'rand', 'parliament'],
@@ -306,9 +323,76 @@ const COUNTRY_SPECIFIC_IDENTIFIERS: Record<string, string[]> = {
   AU: ['australia', 'australian', 'canberra', 'albanese', 'dutton', 'parliament'],
   IN: ['india', 'indian', 'delhi', 'new delhi', 'modi', 'rahul gandhi', 'bjp', 'congress party', 'lok sabha', 'rupee'],
   CN: ['china', 'chinese', 'beijing', 'xi jinping', 'communist party', 'politburo'],
-  JP: ['japan', 'japanese', 'tokyo', 'kishida', 'diet'],
+  JP: ['japan', 'japanese', 'tokyo', 'kishida', 'ishiba', 'diet'],
   DE: ['germany', 'german', 'berlin', 'scholz', 'bundestag'],
-  FR: ['france', 'french', 'paris', 'macron', 'assemblee nationale', 'elysee'],
+  FR: ['france', 'french', 'paris', 'macron', 'assemblee nationale', 'elysee', 'barnier'],
+  // African Nations
+  CI: ['cote divoire', "cote d'ivoire", 'ivory coast', 'ivorian', 'abidjan', 'yamoussoukro', 'ouattara', 'gbagbo', 'thiam', 'bedie', 'rhdp', 'ppa-ci'],
+  SN: ['senegal', 'senegalese', 'dakar', 'faye', 'sonko', 'macky sall'],
+  CM: ['cameroon', 'cameroonian', 'yaounde', 'douala', 'biya'],
+  CD: ['dr congo', 'drc', 'democratic republic of congo', 'congolese', 'kinshasa', 'tshisekedi'],
+  CG: ['congo', 'congolese', 'brazzaville', 'sassou nguesso'],
+  EG: ['egypt', 'egyptian', 'cairo', 'sisi'],
+  RW: ['rwanda', 'rwandan', 'kigali', 'kagame'],
+  UG: ['uganda', 'ugandan', 'kampala', 'museveni'],
+  TZ: ['tanzania', 'tanzanian', 'dodoma', 'dar es salaam', 'samia suluhu'],
+  ET: ['ethiopia', 'ethiopian', 'addis ababa', 'abiy ahmed'],
+  MA: ['morocco', 'moroccan', 'rabat', 'casablanca', 'mohammed vi'],
+  DZ: ['algeria', 'algerian', 'algiers', 'tebboune'],
+  TN: ['tunisia', 'tunisian', 'tunis', 'saied'],
+  AO: ['angola', 'angolan', 'luanda', 'lourenco'],
+  MZ: ['mozambique', 'mozambican', 'maputo', 'nyusi'],
+  ZW: ['zimbabwe', 'zimbabwean', 'harare', 'mnangagwa'],
+  ZM: ['zambia', 'zambian', 'lusaka', 'hichilema'],
+  MW: ['malawi', 'malawian', 'lilongwe', 'chakwera'],
+  BW: ['botswana', 'motswana', 'batswana', 'gaborone', 'boko', 'masisi'],
+  NA: ['namibia', 'namibian', 'windhoek', 'mbumba'],
+  LR: ['liberia', 'liberian', 'monrovia', 'boakai', 'weah'],
+  SL: ['sierra leone', 'sierra leonean', 'freetown', 'bio'],
+  GN: ['guinea', 'guinean', 'conakry', 'doumbouya'],
+  ML: ['mali', 'malian', 'bamako', 'goita'],
+  BF: ['burkina faso', 'burkinabe', 'ouagadougou', 'traore'],
+  NE: ['niger', 'nigerien', 'niamey', 'tchiani'],
+  TD: ['chad', 'chadian', 'ndjamena', 'deby'],
+  GA: ['gabon', 'gabonese', 'libreville', 'oligui'],
+  BJ: ['benin', 'beninese', 'porto-novo', 'talon'],
+  TG: ['togo', 'togolese', 'lome', 'gnassingbe'],
+  GM: ['gambia', 'gambian', 'banjul', 'barrow'],
+  MR: ['mauritania', 'mauritanian', 'nouakchott', 'ghazouani'],
+  SO: ['somalia', 'somali', 'mogadishu', 'hassan sheikh'],
+  SD: ['sudan', 'sudanese', 'khartoum', 'burhan'],
+  SS: ['south sudan', 'south sudanese', 'juba', 'kiir'],
+  // Americas, Europe, Asia, Pacific
+  BR: ['brazil', 'brazilian', 'brasilia', 'lula', 'bolsonaro'],
+  MX: ['mexico', 'mexican', 'mexico city', 'sheinbaum', 'amlo'],
+  AR: ['argentina', 'argentine', 'buenos aires', 'milei'],
+  CO: ['colombia', 'colombian', 'bogota', 'petro'],
+  CL: ['chile', 'chilean', 'santiago', 'boric'],
+  PE: ['peru', 'peruvian', 'lima', 'boluarte'],
+  VE: ['venezuela', 'venezuelan', 'caracas', 'maduro'],
+  UA: ['ukraine', 'ukrainian', 'kyiv', 'zelensky'],
+  RU: ['russia', 'russian', 'moscow', 'putin', 'duma'],
+  TR: ['turkey', 'turkiye', 'turkish', 'ankara', 'erdogan'],
+  SA: ['saudi arabia', 'saudi', 'riyadh', 'mbs'],
+  AE: ['uae', 'emirates', 'emirati', 'abu dhabi', 'dubai'],
+  IL: ['israel', 'israeli', 'jerusalem', 'netanyahu', 'knesset'],
+  IR: ['iran', 'iranian', 'tehran', 'khamenei', 'pezeshkian'],
+  PK: ['pakistan', 'pakistani', 'islamabad', 'shehbaz', 'imran khan'],
+  BD: ['bangladesh', 'bangladeshi', 'dhaka', 'yunus', 'hasina'],
+  ID: ['indonesia', 'indonesian', 'jakarta', 'prabowo'],
+  MY: ['malaysia', 'malaysian', 'kuala lumpur', 'anwar ibrahim'],
+  PH: ['philippines', 'filipino', 'manila', 'marcos'],
+  SG: ['singapore', 'singaporean', 'wong'],
+  TH: ['thailand', 'thai', 'bangkok', 'paetongtarn'],
+  VN: ['vietnam', 'vietnamese', 'hanoi', 'to lam'],
+  IT: ['italy', 'italian', 'rome', 'meloni'],
+  ES: ['spain', 'spanish', 'madrid', 'sanchez'],
+  NL: ['netherlands', 'dutch', 'the hague', 'amsterdam', 'schoof'],
+  PL: ['poland', 'polish', 'warsaw', 'tusk', 'duda'],
+  SE: ['sweden', 'swedish', 'stockholm', 'kristersson'],
+  NO: ['norway', 'norwegian', 'oslo', 'store'],
+  IE: ['ireland', 'irish', 'dublin', 'harris', 'dail'],
+  NZ: ['new zealand', 'luxon', 'wellington'],
 };
 
 const FOREIGN_WIRE_PREFIXES = [
@@ -321,15 +405,16 @@ const FOREIGN_WIRE_PREFIXES = [
 export function isRelevantToCountry(title: string, snippet: string = '', countryCode: string): boolean {
   const code = countryCode.toUpperCase();
   const country = getCountryByCode(code);
-  const cleanTitle = (title || '').toLowerCase().trim();
-  const cleanSnippet = (snippet || '').toLowerCase().trim();
+  const cleanTitle = normalizeForMatching(title);
+  const cleanSnippet = normalizeForMatching(snippet);
   const fullText = `${cleanTitle} ${cleanSnippet}`;
 
   // 1. Check if the headline starts with a foreign country tag/prefix (e.g. "Saudi Arabia: ...", "Israel: ...")
   const prefixMatch = cleanTitle.match(/^([a-z\s]+)[:–—-]/);
   if (prefixMatch) {
     const prefix = prefixMatch[1].trim();
-    const isTargetCountry = prefix.includes(country.name.toLowerCase()) || prefix.includes(country.code.toLowerCase());
+    const normCountryName = normalizeForMatching(country.name);
+    const isTargetCountry = prefix.includes(normCountryName) || prefix.includes(code.toLowerCase());
     const isForeignWire = FOREIGN_WIRE_PREFIXES.some((f) => prefix.includes(f));
     if (isForeignWire && !isTargetCountry) {
       return false;
@@ -343,10 +428,21 @@ export function isRelevantToCountry(title: string, snippet: string = '', country
   ].some((foreignKeyword) => cleanTitle.includes(foreignKeyword));
 
   // 3. Target country identifier requirement
-  const targetKeywords = COUNTRY_SPECIFIC_IDENTIFIERS[code] || [
-    country.name.toLowerCase(),
-    country.capital.toLowerCase(),
-  ];
+  const baseTargetKeywords = COUNTRY_SPECIFIC_IDENTIFIERS[code] || [];
+  const normalizedCountryName = normalizeForMatching(country.name);
+  const normalizedCapital = normalizeForMatching(country.capital);
+  const nameWithoutPunctuation = normalizedCountryName.replace(/['’\s-]/g, '');
+
+  const targetKeywords = Array.from(new Set([
+    ...baseTargetKeywords.map((k) => normalizeForMatching(k)),
+    normalizedCountryName,
+    normalizedCapital,
+    nameWithoutPunctuation,
+    `${normalizedCountryName}n`,
+    `${normalizedCountryName}an`,
+    `${normalizedCountryName}ese`,
+    `${normalizedCountryName}i`,
+  ])).filter((k) => k.length >= 3);
 
   const hasTargetKeywordInTitle = targetKeywords.some((kw) => cleanTitle.includes(kw));
   const hasTargetKeywordInSnippet = targetKeywords.some((kw) => cleanSnippet.includes(kw));
@@ -361,10 +457,10 @@ export function isRelevantToCountry(title: string, snippet: string = '', country
     return false;
   }
 
-  // Check if article belongs primarily to another country
+  // Check if article belongs primarily to another major country
   for (const [otherCode, otherKeywords] of Object.entries(COUNTRY_SPECIFIC_IDENTIFIERS)) {
     if (otherCode !== code) {
-      const mentionsOtherCountryInTitle = otherKeywords.slice(0, 3).some((kw) => cleanTitle.includes(kw));
+      const mentionsOtherCountryInTitle = otherKeywords.slice(0, 3).some((kw) => cleanTitle.includes(normalizeForMatching(kw)));
       if (mentionsOtherCountryInTitle && !hasTargetKeywordInTitle) {
         return false;
       }
@@ -953,14 +1049,216 @@ Addressing press representatives in ${country.capital}, government officials con
       tags: [country.name, 'Infrastructure', 'Energy'],
       views_count: Math.floor(Math.random() * 2000) + 920,
       total_reading_time_seconds: 160,
-      created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-      affiliate_link_label: 'Explore Energy Policy Reports',
-      affiliate_link_url: 'https://voxpolis.app',
+      created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
       poll: {
         id: `poll-${code}-2`,
         question: `Do you agree with increasing national budget allocation for clean energy transit in ${country.name}?`,
         agree_count: 420,
         disagree_count: 58,
+      },
+    },
+    {
+      id: `art-${code}-3`,
+      slug: `${code.toLowerCase()}-public-healthcare-and-hospital-modernization-package`,
+      title: `${country.flag} ${country.name} Cabinet Approves Major Healthcare Resilience Budget`,
+      snippet: `Public health officials announce direct capital grants to expand regional clinics, upgrade diagnostics, and reinforce pharmaceutical supply chains nationwide.`,
+      content: `MINISTRY OF HEALTH (${country.capital.toUpperCase()}) — Health authorities in ${country.name} have confirmed the official rollout of a national healthcare revitalization initiative focused on modernizing secondary hospital facilities and expanding primary care access.
+
+The program establishes targeted funding for decentralized emergency clinics, cold-chain medical storage, and specialized clinician retention incentives across both urban centers and rural provinces.
+
+A joint parliamentary monitoring panel will oversee procurement processes to guarantee full transparency, competitive bidding, and prompt equipment deployment.
+
+"Ensuring affordable, resilient healthcare for every family is the cornerstone of our national stability," noted the Director of Public Health during a press briefing today.`,
+      ai_analysis: `Analysis of Reported Facts:
+- Fact 1: Ministry of Health approved a comprehensive public healthcare revitalization grant across ${country.name}.
+- Fact 2: Key priorities include regional clinic upgrades, supply chain security, and medical staff retention.
+- Fact 3: Parliamentary oversight committee established to monitor equipment procurement.`,
+      country_code: code,
+      language: langCode,
+      category: 'health',
+      image_mode: 'breaking_logo',
+      source_name: `${country.name} National Monitor`,
+      source_url: 'https://voxpolis.app',
+      is_breaking: false,
+      tags: [country.name, 'Healthcare', 'Public Policy'],
+      views_count: Math.floor(Math.random() * 1800) + 740,
+      total_reading_time_seconds: 175,
+      created_at: new Date(Date.now() - 3600000 * 6).toISOString(),
+      poll: {
+        id: `poll-${code}-3`,
+        question: `Should the government mandate higher baseline spending on provincial public hospitals in ${country.name}?`,
+        agree_count: 615,
+        disagree_count: 32,
+      },
+    },
+    {
+      id: `art-${code}-4`,
+      slug: `${code.toLowerCase()}-fiscal-budget-and-economic-modernization-framework`,
+      title: `${country.flag} ${country.name} Treasury Unveils Comprehensive Fiscal Alignment Strategy`,
+      snippet: `Finance authorities introduce measures to curb inflationary pressures, streamline public debt servicing, and broaden domestic revenue collection without burdening small businesses.`,
+      content: `TREASURY HEADQUARTERS (${country.capital.toUpperCase()}) — Economic policymakers have released ${country.name}'s updated macroeconomic guideline, introducing fiscal consolidation measures designed to stabilize currency reserves and improve revenue administration.
+
+The framework proposes automated tax assessment portals for commercial entities, a reduction in non-essential executive recurrent expenditures, and dedicated credit guarantees for domestic manufacturers.
+
+Financial analysts noted that the strategy strikes a calculated balance between controlling inflation and sustaining capital investments required for long-term job creation.
+
+"Fiscal discipline combined with targeted support for local enterprise will safeguard our national economic resilience," emphasized the Treasury Secretary during the presentation.`,
+      ai_analysis: `Analysis of Reported Facts:
+- Fact 1: Finance officials presented an updated fiscal strategy aimed at debt sustainability in ${country.name}.
+- Fact 2: Policy measures focus on automated tax collection, spending efficiency, and manufacturing credits.
+- Fact 3: Economic targets prioritize currency stabilization and inflation management.`,
+      country_code: code,
+      language: langCode,
+      category: 'economy',
+      image_mode: 'breaking_logo',
+      source_name: `${country.name} Financial Dispatch`,
+      source_url: 'https://voxpolis.app',
+      is_breaking: false,
+      tags: [country.name, 'Economy', 'Fiscal Policy'],
+      views_count: Math.floor(Math.random() * 2200) + 850,
+      total_reading_time_seconds: 185,
+      created_at: new Date(Date.now() - 3600000 * 10).toISOString(),
+      poll: {
+        id: `poll-${code}-4`,
+        question: `Do you support prioritizing domestic manufacturing tax credits over public borrowing in ${country.name}?`,
+        agree_count: 489,
+        disagree_count: 45,
+      },
+    },
+    {
+      id: `art-${code}-5`,
+      slug: `${code.toLowerCase()}-regional-trade-and-diplomatic-cooperation-pact`,
+      title: `${country.flag} ${country.name} Ratifies Regional Economic and Border Trade Agreement`,
+      snippet: `Foreign affairs delegation concludes bilateral protocol lowering cross-border tariffs, harmonizing customs inspections, and establishing joint transport corridors.`,
+      content: `MINISTRY OF FOREIGN AFFAIRS (${country.capital.toUpperCase()}) — Diplomatic envoys from ${country.name} successfully concluded high-level multilateral trade talks today, agreeing on reciprocal border customs protocols to accelerate regional commerce.
+
+The ratified accord eliminates duplicate inspection procedures at critical border crossings, harmonizes phytosanitary certifications for agricultural exports, and implements integrated cargo tracking systems.
+
+Trade chambers and transport unions welcomed the milestone, citing significant projected reductions in cross-border transit times and clearing costs.
+
+"This partnership solidifies ${country.name}'s standing as an active proponent of regional economic integration and shared prosperity," affirmed the lead diplomatic envoy.`,
+      ai_analysis: `Analysis of Reported Facts:
+- Fact 1: ${country.name} ratified a regional trade protocol to streamline cross-border customs procedures.
+- Fact 2: Accord addresses tariff reduction, cargo inspection harmonization, and transport corridors.
+- Fact 3: Commercial transport operators anticipate reduced freight transit delays and lower operating costs.`,
+      country_code: code,
+      language: langCode,
+      category: 'diplomacy',
+      image_mode: 'breaking_logo',
+      source_name: `${country.name} Diplomatic Review`,
+      source_url: 'https://voxpolis.app',
+      is_breaking: false,
+      tags: [country.name, 'Trade', 'Diplomacy'],
+      views_count: Math.floor(Math.random() * 1600) + 610,
+      total_reading_time_seconds: 165,
+      created_at: new Date(Date.now() - 3600000 * 14).toISOString(),
+      poll: {
+        id: `poll-${code}-5`,
+        question: `Will regional customs harmonization benefit local producers and consumers in ${country.name}?`,
+        agree_count: 534,
+        disagree_count: 71,
+      },
+    },
+    {
+      id: `art-${code}-6`,
+      slug: `${code.toLowerCase()}-education-and-digital-workforce-skills-program`,
+      title: `${country.flag} ${country.name} Launches National Technical & Digital Education Initiative`,
+      snippet: `Education ministry rolls out nationwide curriculum enhancements and high-speed campus connectivity to equip young graduates with competitive vocational skills.`,
+      content: `DEPARTMENT OF EDUCATION (${country.capital.toUpperCase()}) — Education authorities today launched an ambitious national skill development framework aimed at aligning vocational curricula with emerging digital and engineering industries in ${country.name}.
+
+The program funds fiber-optic broadband installations across tertiary institutions, establishes accredited apprenticeship partnerships with private sector employers, and creates subsidized teacher training institutes.
+
+Industry leaders commended the initiative as a pragmatic response to graduate employment demands and rapidly expanding technological sectors across the continent.
+
+"Equipping our youth with verified practical competencies ensures long-term industrial self-reliance and civic vitality," the Education Minister stated during the inaugurating ceremony.`,
+      ai_analysis: `Analysis of Reported Facts:
+- Fact 1: Department of Education unveiled a nationwide technical training framework for ${country.name}.
+- Fact 2: Key provisions fund university digital connectivity, vocational standards, and apprenticeships.
+- Fact 3: Program involves direct collaboration between educational boards and private industrial partners.`,
+      country_code: code,
+      language: langCode,
+      category: 'education',
+      image_mode: 'breaking_logo',
+      source_name: `${country.name} Education Gazette`,
+      source_url: 'https://voxpolis.app',
+      is_breaking: false,
+      tags: [country.name, 'Education', 'Youth'],
+      views_count: Math.floor(Math.random() * 1400) + 530,
+      total_reading_time_seconds: 170,
+      created_at: new Date(Date.now() - 3600000 * 18).toISOString(),
+      poll: {
+        id: `poll-${code}-6`,
+        question: `Should practical technical apprenticeships receive equal national funding to traditional academic degrees in ${country.name}?`,
+        agree_count: 678,
+        disagree_count: 39,
+      },
+    },
+    {
+      id: `art-${code}-7`,
+      slug: `${code.toLowerCase()}-judicial-reform-and-institutional-transparency-code`,
+      title: `${country.flag} ${country.name} Judiciary Adopts New Case Tracking & Public Transparency Code`,
+      snippet: `Chief Justice and legal councils approve digital court filing standards and mandatory timelines to eliminate trial backlogs and enforce constitutional accountability.`,
+      content: `SUPREME COURT BENCH (${country.capital.toUpperCase()}) — Senior judicial officers in ${country.name} have formally instituted an updated procedural code mandating electronic case filing, public cause list access, and strict trial duration benchmarks.
+
+The judicial reforms are designed to eliminate prolonged commercial litigation backlogs, protect fundamental rights during pretrial custody, and publish all appellate verdicts within fourteen days of pronouncement.
+
+Civil liberties organizations and the National Bar Association welcomed the transparency code as an essential structural step toward public confidence in the judicial branch.
+
+"An expeditious, transparent justice system is the highest guarantee of civic liberty and constitutional democracy," remarked the presiding judicial authority.`,
+      ai_analysis: `Analysis of Reported Facts:
+- Fact 1: Judicial council in ${country.name} established updated case tracking and public filing guidelines.
+- Fact 2: Measures require electronic court records and strict statutory duration limits for pending cases.
+- Fact 3: Legal community leaders expressed support for increased transparency in appellate rulings.`,
+      country_code: code,
+      language: langCode,
+      category: 'judiciary',
+      image_mode: 'breaking_logo',
+      source_name: `${country.name} Legal Chronicle`,
+      source_url: 'https://voxpolis.app',
+      is_breaking: false,
+      tags: [country.name, 'Judiciary', 'Rule of Law'],
+      views_count: Math.floor(Math.random() * 1900) + 810,
+      total_reading_time_seconds: 180,
+      created_at: new Date(Date.now() - 3600000 * 22).toISOString(),
+      poll: {
+        id: `poll-${code}-7`,
+        question: `Do you agree that electronic court systems and strict case deadlines will enhance judicial accountability in ${country.name}?`,
+        agree_count: 590,
+        disagree_count: 28,
+      },
+    },
+    {
+      id: `art-${code}-8`,
+      slug: `${code.toLowerCase()}-agricultural-resilience-and-food-security-plan`,
+      title: `${country.flag} ${country.name} Ministry Outlines Strategic Food Reserve & Farmer Support Plan`,
+      snippet: `Agricultural stakeholders introduce nationwide dry-season irrigation grants, subsidized organic inputs, and localized storage silos to protect consumer food affordability.`,
+      content: `MINISTRY OF AGRICULTURE (${country.capital.toUpperCase()}) — Agricultural planners have unveiled a multi-province food security strategy aimed at insulating ${country.name} from global commodity price volatility and weather disruptions.
+
+Key pillars of the program include zero-interest machinery financing for farming cooperatives, the construction of decentralized grain storage silos, and rehabilitated solar irrigation channels in key breadbasket regions.
+
+Farmers' federations emphasized that localized processing facilities will dramatically cut post-harvest food waste and stabilize market food prices for urban households.
+
+"Empowering our agricultural workforce with modern logistics and reliable irrigation ensures food sovereignty for all citizens," declared the Agriculture Director.`,
+      ai_analysis: `Analysis of Reported Facts:
+- Fact 1: Agriculture ministry in ${country.name} presented a national food reserve and irrigation program.
+- Fact 2: Strategy targets cooperative machinery financing, solar irrigation canals, and localized grain silos.
+- Fact 3: Farm federations project notable reductions in post-harvest losses and retail consumer food costs.`,
+      country_code: code,
+      language: langCode,
+      category: 'agriculture',
+      image_mode: 'breaking_logo',
+      source_name: `${country.name} Agrarian Herald`,
+      source_url: 'https://voxpolis.app',
+      is_breaking: false,
+      tags: [country.name, 'Agriculture', 'Food Security'],
+      views_count: Math.floor(Math.random() * 1750) + 680,
+      total_reading_time_seconds: 170,
+      created_at: new Date(Date.now() - 3600000 * 26).toISOString(),
+      poll: {
+        id: `poll-${code}-8`,
+        question: `Should the national budget allocate more emergency funding to decentralized grain storage and smallholder irrigation in ${country.name}?`,
+        agree_count: 642,
+        disagree_count: 41,
       },
     },
   ];
