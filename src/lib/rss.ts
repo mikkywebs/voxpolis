@@ -387,12 +387,15 @@ function parseRssXmlToArticles(
       views_count: 0,
       total_reading_time_seconds: 180,
       created_at: pubDate,
-      poll: {
-        id: `poll-${articleId}`,
-        question: generateCivicPollQuestion(titleText, cleanSnippet),
-        agree_count: 0,
-        disagree_count: 0,
-      },
+      poll: (() => {
+        const q = generateCivicPollQuestion(titleText, cleanSnippet);
+        return q ? {
+          id: `poll-${articleId}`,
+          question: q,
+          agree_count: 0,
+          disagree_count: 0,
+        } : undefined;
+      })(),
     });
   });
 

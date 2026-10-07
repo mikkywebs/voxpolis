@@ -392,11 +392,22 @@ export default function Header({
                     <User className="w-3.5 h-3.5 text-blue-500" />
                     <span>My Profile & Badges</span>
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      setIsModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 text-left font-medium cursor-pointer"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Switch Country Newsroom</span>
+                  </button>
                   <Link
                     href="/onboarding"
                     className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
                   >
-                    <Globe className="w-3.5 h-3.5" />
+                    <Globe className="w-3.5 h-3.5 text-gray-400" />
                     <span>Country Preferences</span>
                   </Link>
                   <button

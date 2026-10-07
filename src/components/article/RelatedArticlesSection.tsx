@@ -27,7 +27,7 @@ export default function RelatedArticlesSection({ articles }: RelatedArticlesSect
           return (
             <Link
               key={art.id}
-              href={`/news/${art.slug}`}
+              href={`/news/${art.slug}${art.country_code ? `?country=${art.country_code}` : ''}`}
               className={`group p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-500/50 transition flex flex-col justify-between ${
                 idx === 3 ? 'hidden sm:flex' : 'flex'
               }`}

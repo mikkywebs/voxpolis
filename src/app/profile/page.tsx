@@ -6,7 +6,7 @@ import Link from 'next/link';
 import SiteLogo from '@/components/branding/SiteLogo';
 import { ALL_COUNTRIES, CountryConfig, getCountryByCode, getCountrySlug } from '@/config/countries';
 import { getMemberBadge } from '@/lib/badges';
-import { ArrowLeft, User, ShieldCheck, Mail, Globe, Save, CheckCircle2, AlertCircle, Sparkles, Award, Lock, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, User, ShieldCheck, Mail, Globe, Save, CheckCircle2, AlertCircle, Sparkles, Award, Lock, Check } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -334,9 +334,18 @@ export default function ProfilePage() {
 
             {/* Primary Country Desk Selector */}
             <div>
-              <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1">
-                Primary Country Newsroom *
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+                  Primary Country Newsroom *
+                </label>
+                <Link
+                  href={`/${getCountrySlug(countryObj)}`}
+                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                >
+                  <span>Open {countryObj.flag} {countryObj.name} Feed</span>
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
               <div className="relative">
                 <select
                   value={primaryCountry}

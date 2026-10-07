@@ -151,12 +151,15 @@ export async function GET(request: NextRequest) {
                 views_count: 0,
                 total_reading_time_seconds: 180,
                 created_at: item.pubDate || new Date().toISOString(),
-                poll: {
-                  id: `poll-newsdata-${idx}`,
-                  question: generateCivicPollQuestion(rewritten.title, rewritten.snippet),
-                  agree_count: 0,
-                  disagree_count: 0,
-                },
+                poll: (() => {
+                  const q = generateCivicPollQuestion(rewritten.title, rewritten.snippet);
+                  return q ? {
+                    id: `poll-newsdata-${idx}`,
+                    question: q,
+                    agree_count: 0,
+                    disagree_count: 0,
+                  } : undefined;
+                })(),
               };
             })
           );
@@ -232,12 +235,15 @@ export async function GET(request: NextRequest) {
         snippet: rewritten.snippet,
         content: rewritten.content,
         ai_analysis: generateAiAnalysisSummary(rewritten.title, rewritten.snippet, art.source_name, country.name),
-        poll: {
-          id: `poll-${rewritten.slug}`,
-          question: generateCivicPollQuestion(rewritten.title, rewritten.snippet),
-          agree_count: 0,
-          disagree_count: 0,
-        },
+        poll: (() => {
+          const q = generateCivicPollQuestion(rewritten.title, rewritten.snippet);
+          return q ? {
+            id: `poll-${rewritten.slug}`,
+            question: q,
+            agree_count: 0,
+            disagree_count: 0,
+          } : undefined;
+        })(),
       };
     })
   );
@@ -264,8 +270,17 @@ export async function GET(request: NextRequest) {
     });
 
     if (!foundInFeeds) {
-      const otherCountryCodes = ['US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'NG'].filter((c) => c !== countryCode);
-      for (const otherCode of otherCountryCodes) {
+      // 1. Detect 2-letter country prefix if present
+      const prefixMatch = slugParam.match(/^([a-z]{2})-/i);
+      const prefixCode = prefixMatch ? prefixMatch[1].toUpperCase() : null;
+
+      const priorityCodes = ['NG', 'US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'FR', 'DE', 'EG', 'SN', 'CI', 'RW', 'UG', 'TZ', 'CM', 'BJ'];
+      const candidateCodes = [
+        ...(prefixCode && prefixCode !== countryCode ? [prefixCode] : []),
+        ...priorityCodes.filter((c) => c !== countryCode && c !== prefixCode),
+      ];
+
+      for (const otherCode of candidateCodes) {
         try {
           const otherFeeds = await fetchRssArticlesForCountry(otherCode, language);
           const match = otherFeeds.find((a) => {
@@ -280,6 +295,27 @@ export async function GET(request: NextRequest) {
           if (match) {
             foundInFeeds = match;
             break;
+          }
+        } catch {}
+      }
+
+      // 2. If still not found, check localized country reports (for fallback/digest stories)
+      if (!foundInFeeds) {
+        try {
+          const targetCode = prefixCode || countryCode;
+          const { fetchArticlesForCountry } = await import('@/lib/news');
+          const fallbackList = await fetchArticlesForCountry(targetCode, language);
+          const match = fallbackList.find((a) => {
+            if (a.slug === rawTargetSlug || a.slug === slugParam || a.slug === normalizedSlug) return true;
+            if (slugTokens.length >= 2) {
+              const artTokens = a.slug.split('-').filter((t) => t.length > 3);
+              const matches = slugTokens.filter((t) => artTokens.includes(t));
+              if (matches.length >= Math.min(3, slugTokens.length)) return true;
+            }
+            return false;
+          });
+          if (match) {
+            foundInFeeds = match;
           }
         } catch {}
       }

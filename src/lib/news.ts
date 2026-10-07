@@ -804,22 +804,52 @@ The Verdict:
 Governance must always be evaluated by concrete delivery and constitutional standards rather than symbolic pronouncements. In ${countryName}, sustainable democratic progress requires that leadership actions serve the public interest with openness, accountability, and impartial institutional service to all citizens.`;
 }
 
-export function generateCivicPollQuestion(title: string, snippet?: string): string {
+export function generateCivicPollQuestion(title: string, snippet?: string): string | undefined {
   const cleanTitle = (title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
   const text = `${cleanTitle} ${snippet || ''}`.toLowerCase();
 
-  // Specific political figures & topics
-  if (text.includes('atiku') && (text.includes('subsidy') || text.includes('fuel') || text.includes('president'))) {
-    return 'Do you agree Atiku will do better if elected as president come 2027?';
+  // 1. Petrol / Fuel Pricing & Donald Duke Policy Promise
+  if (text.includes('donald duke') && (text.includes('petrol') || text.includes('300') || text.includes('n300'))) {
+    return 'Do you agree with Donald Duke that reducing the petrol pump price to N300 per litre is economically viable?';
   }
-  if (text.includes('tinubu') && (text.includes('subsidy') || text.includes('economy') || text.includes('reform') || text.includes('hardship'))) {
-    return 'Do you believe the administration\'s current economic reform policies are leading Nigeria in the right direction?';
+  if ((text.includes('petrol') || text.includes('fuel')) && (text.includes('300') || text.includes('n300') || text.includes('price down') || text.includes('reduce price'))) {
+    return 'Do you believe reducing the national petrol pump price to N300 per litre is economically achievable?';
+  }
+
+  // 2. 2027 Presidential Second Term & BTO / Tinubu Re-election
+  if ((text.includes('tinubu') || text.includes('pbat')) && (text.includes('second term') || text.includes('2027'))) {
+    return 'Do you believe the administration\'s reform record justifies a second term for President Bola Tinubu in 2027?';
+  }
+
+  // 3. Seyi Makinde & PVC / Voter Mobilization
+  if (text.includes('makinde') && (text.includes('pvc') || text.includes('vote'))) {
+    return 'Do you agree with Seyi Makinde that voter mobilization and PVC collection will be the decisive factor in 2027?';
+  }
+
+  // 4. Rufai Oseni & Citizen Election Monitoring
+  if (text.includes('oseni') && (text.includes('monitor') || text.includes('voting') || text.includes('results'))) {
+    return 'Do you agree that citizens and civic groups should independently monitor and collate polling unit results in 2027?';
+  }
+
+  // 5. Party Defections & Political Realignments
+  if (text.includes('defection') || text.includes('defect') || text.includes('join sdp') || text.includes('join apc') || text.includes('join pdp')) {
+    return 'Do continuous political defections weaken democratic opposition and institutional stability?';
+  }
+
+  // 6. Campaign Violence & Security
+  if (text.includes('gunmen') || text.includes('attack members') || text.includes('campaign violence')) {
+    return 'Should electoral authorities disqualify political candidates whose supporters engage in campaign violence?';
+  }
+
+  // 7. Core Governance & Economic Debate Topics
+  if (text.includes('atiku') && (text.includes('subsidy') || text.includes('fuel') || text.includes('president') || text.includes('2027'))) {
+    return 'Do you agree Atiku Abubakar will provide better economic governance if elected president in 2027?';
   }
   if (text.includes('peter obi') || text.includes('obi:') || (text.includes('obi') && text.includes('leadership'))) {
     return 'Do you agree with Peter Obi that Nigeria\'s primary challenge is leadership failure rather than resource scarcity?';
   }
   if (text.includes('minimum wage') || text.includes('salary') || text.includes('workers') || text.includes('wage')) {
-    return 'Should federal and state governments accelerate the full implementation of the new minimum wage?';
+    return 'Should federal and state governments accelerate the full, mandatory implementation of the new minimum wage?';
   }
   if (text.includes('state police') || text.includes('policing')) {
     return 'Should individual states be granted constitutional authority to establish and fund their own state police?';
@@ -839,15 +869,26 @@ export function generateCivicPollQuestion(title: string, snippet?: string): stri
   if (text.includes('oil theft') || text.includes('pipeline') || text.includes('crude')) {
     return 'Do you believe security operations and surveillance measures have effectively curbed crude oil theft?';
   }
+
+  // 8. Genuine Named Speaker Identification (STRICT: never digits, years, or generic tags)
   if (cleanTitle.includes(':') || cleanTitle.includes('—') || cleanTitle.includes('-')) {
     const parts = cleanTitle.split(/[:—–-]/);
-    const speaker = parts[0]?.trim();
-    if (speaker && speaker.length > 2 && speaker.length < 30) {
-      return `Do you agree with the position taken by ${speaker} on this national issue?`;
+    const candidateSpeaker = parts[0]?.trim();
+    const isInvalidSpeaker =
+      !candidateSpeaker ||
+      candidateSpeaker.length < 3 ||
+      candidateSpeaker.length > 28 ||
+      /^\d+/.test(candidateSpeaker) || // Prevents "2027", "100", etc.
+      /^(breaking|just in|report|watch|video|photos?|update|exclusive|opinion|editorial|alert|special|live|court|ndc|apc|pdp|lp|nnpp|inec|fbi|dss|efcc)/i.test(candidateSpeaker) ||
+      /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december)/i.test(candidateSpeaker);
+
+    if (!isInvalidSpeaker && /[a-zA-Z]{3,}/.test(candidateSpeaker)) {
+      return `Do you agree with the position taken by ${candidateSpeaker} on this national issue?`;
     }
   }
 
-  return 'Do you support the policy direction and governance approach proposed in this report?';
+  // If there is no specific policy debate or controversy, return undefined (do NOT force a poll)
+  return undefined;
 }
 
 export function cleanNewsText(raw: string): string {
@@ -974,12 +1015,7 @@ export async function fetchArticlesForCountry(
           unique.push({
             ...a,
             is_archived: isArticleArchived(a.created_at),
-            poll: a.poll || {
-              id: `poll-${a.id}`,
-              question: `Do you agree with the policy stance reported regarding "${a.title.slice(0, 75)}"?`,
-              agree_count: 0,
-              disagree_count: 0,
-            },
+            poll: a.poll,
           });
         }
       }

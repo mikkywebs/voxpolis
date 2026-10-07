@@ -418,7 +418,7 @@ export default function LandingPage() {
                 </div>
 
                 <Link
-                  href={`/news/${activeSlide.slug}`}
+                  href={`/news/${activeSlide.slug}${activeSlide.country_code ? `?country=${activeSlide.country_code}` : ''}`}
                   className="group hover:opacity-95 transition"
                 >
                   <h2 className="text-xl sm:text-3xl font-black text-white leading-tight max-w-4xl group-hover:text-blue-300 transition">

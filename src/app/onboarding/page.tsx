@@ -240,9 +240,23 @@ export default function OnboardingPage() {
               <label className="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider block">
                 2. Select Primary Country Feed *
               </label>
-              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                Selected: {primaryObj.flag} {primaryObj.name}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                  Selected: {primaryObj.flag} {primaryObj.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('voxpolis_primary_country', primaryCountry);
+                    const slug = getCountrySlug(primaryObj);
+                    router.push(`/${slug}`);
+                  }}
+                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-bold shadow-sm transition inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Open Newsroom</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
             </div>
 
             {/* Search Bar */}

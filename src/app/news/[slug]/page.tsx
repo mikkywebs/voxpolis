@@ -16,7 +16,7 @@ import { CommentInputForm, CommentList, CommentItem } from '@/components/article
 import OriginalSourceLink from '@/components/article/OriginalSourceLink';
 import AdSlot from '@/components/article/AdSlot';
 import DesktopVignetteAd from '@/components/ads/DesktopVignetteAd';
-import { SUPPORTED_COUNTRIES, getCountryByCode, getCountrySlug } from '@/config/countries';
+import { SUPPORTED_COUNTRIES, ALL_COUNTRIES, CountryConfig, getCountryByCode, getCountrySlug } from '@/config/countries';
 import {
   fetchArticlesForCountry,
   ArticleData,
@@ -56,6 +56,18 @@ export default function NewsDetailPage() {
   const [isColumnist, setIsColumnist] = useState(false);
   const [requiresReview, setRequiresReview] = useState(false);
   const [extractedAuthor, setExtractedAuthor] = useState<string | undefined>(undefined);
+
+  // Handle country switch from header: updates country and navigates directly to country news landing page
+  const handleSelectCountry = (c: CountryConfig) => {
+    setSelectedCountry(c);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('voxpolis_primary_country', c.code);
+      if (c.languages?.length > 0) {
+        localStorage.setItem('voxpolis_preferred_language', c.languages[0].code);
+      }
+    }
+    router.push(`/${getCountrySlug(c)}`);
+  };
 
   // Active ads check
   const hasActiveAds = !!(
@@ -214,7 +226,7 @@ export default function NewsDetailPage() {
         }).catch(() => {});
       }
 
-      // 3. Determine target search country (check URL query ?country= first)
+      // 3. Determine target search country (check URL query ?country= first, then prefix)
       let searchCode = selectedCountry.code;
       if (typeof window !== 'undefined') {
         const queryCountry = new URLSearchParams(window.location.search).get('country');
@@ -222,6 +234,17 @@ export default function NewsDetailPage() {
           searchCode = queryCountry.toUpperCase();
           const targetC = getCountryByCode(searchCode);
           if (targetC) setSelectedCountry(targetC);
+        }
+      }
+
+      // If not specified by query, check if slug starts with a 2-letter country prefix (e.g. ci-, sn-, rw-, fr-)
+      const prefixMatch = slug.match(/^([a-z]{2})-/i);
+      if (prefixMatch) {
+        const candidateCode = prefixMatch[1].toUpperCase();
+        const prefixCountry = ALL_COUNTRIES.find((c) => c.code === candidateCode);
+        if (prefixCountry) {
+          searchCode = prefixCountry.code;
+          setSelectedCountry(prefixCountry);
         }
       }
 
@@ -234,7 +257,12 @@ export default function NewsDetailPage() {
 
       // If not found in target country feed, search across other active country feeds
       if (!found && !pipeArt) {
-        const otherCountries = ['US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'NG'].filter((c) => c !== searchCode);
+        const priorityCodes = ['NG', 'US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'FR', 'DE', 'EG', 'SN', 'CI', 'RW', 'UG', 'TZ', 'CM', 'BJ'];
+        const otherCountries = [
+          ...priorityCodes.filter((c) => c !== searchCode),
+          ...ALL_COUNTRIES.map((c) => c.code).filter((c) => c !== searchCode && !priorityCodes.includes(c)),
+        ];
+
         for (const cCode of otherCountries) {
           try {
             const otherList = await fetchArticlesForCountry(cCode);
@@ -599,7 +627,7 @@ export default function NewsDetailPage() {
           <title>Member Access Required | Voxpolis</title>
         </head>
 
-        <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+        <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={handleSelectCountry} />
 
         <main className="flex-1 max-w-xl mx-auto w-full px-4 py-16 text-center space-y-6 my-auto">
           <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-950/80 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center shadow-lg">
@@ -676,7 +704,7 @@ export default function NewsDetailPage() {
 
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
-        <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+        <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={handleSelectCountry} />
 
         <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-4 sm:px-6">
           {/* Left Wide Skyscraper (160x600 px) - strictly desktop when ads active */}
@@ -828,13 +856,15 @@ export default function NewsDetailPage() {
 
             <AdSlot slotLocation="below_sources" isAllowed={true} />
 
-            <PollSection
-              poll={(pipelineArticle as any).poll}
-              articleTitle={pipelineArticle.headline}
-              articleSnippet={pipelineArticle.dek}
-              onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
-              isLoggedIn={isLoggedIn}
-            />
+            {(pipelineArticle as any)?.poll?.question && (
+              <PollSection
+                poll={(pipelineArticle as any).poll}
+                articleTitle={pipelineArticle.headline}
+                articleSnippet={pipelineArticle.dek}
+                onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
+                isLoggedIn={isLoggedIn}
+              />
+            )}
             <CommentInputForm
               userName={userNameDisplay}
               userCountryFlag={selectedCountry.flag}
@@ -876,7 +906,7 @@ export default function NewsDetailPage() {
           <meta name="robots" content="noindex, follow" />
           <title>Report Not Found | Voxpolis</title>
         </head>
-        <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+        <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={handleSelectCountry} />
         <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-16 text-center space-y-6">
           <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
             <ShieldAlert className="w-6 h-6" />
@@ -1011,7 +1041,7 @@ export default function NewsDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
-      <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+      <Header user={currentUser} selectedCountry={selectedCountry} onSelectCountry={handleSelectCountry} />
 
       <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-4 sm:px-6">
         {/* Left Wide Skyscraper (160x600 px) - strictly desktop when ads active */}
@@ -1117,15 +1147,17 @@ export default function NewsDetailPage() {
 
           <AffiliateSection label={article!.affiliate_link_label} url={article!.affiliate_link_url} />
 
-          <PollSection
-            poll={article!.poll}
-            articleSlug={article!.slug || slug}
-            articleId={article!.id}
-            articleTitle={article!.title}
-            articleSnippet={article!.snippet}
-            onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
-            isLoggedIn={isLoggedIn}
-          />
+          {article?.poll?.question && (
+            <PollSection
+              poll={article!.poll}
+              articleSlug={article!.slug || slug}
+              articleId={article!.id}
+              articleTitle={article!.title}
+              articleSnippet={article!.snippet}
+              onRequireAuth={() => router.push(`/login?redirect=/news/${slug}`)}
+              isLoggedIn={isLoggedIn}
+            />
+          )}
 
           <CommentInputForm
             userName={userNameDisplay}
