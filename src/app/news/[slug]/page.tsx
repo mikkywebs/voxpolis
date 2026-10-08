@@ -222,7 +222,13 @@ export default function NewsDetailPage() {
         fetch('/api/views', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ articleId: pipeArt.id }),
+          body: JSON.stringify({
+            articleId: pipeArt.id,
+            slug: pipeArt.slug,
+            title: pipeArt.headline,
+            countryCode: pipeArt.country_code,
+            isMember: isLoggedIn,
+          }),
         }).catch(() => {});
       }
 
@@ -326,7 +332,13 @@ export default function NewsDetailPage() {
         fetch('/api/views', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ articleId: found.id }),
+          body: JSON.stringify({
+            articleId: found.id,
+            slug: found.slug || slug,
+            title: found.title,
+            countryCode: found.country_code,
+            isMember: isLoggedIn,
+          }),
         })
           .then((r) => r.json())
           .then((d) => {

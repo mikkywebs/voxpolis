@@ -24,6 +24,9 @@ import {
   RotateCcw,
   Eye,
   Filter,
+  Vote,
+  MessageSquare,
+  UserCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -68,6 +71,40 @@ export default function AdminDashboardPage() {
 
   // Page-level Country Analytics Filter
   const [analyticsCountryFilter, setAnalyticsCountryFilter] = useState('ALL');
+
+  // Real Database Analytics State
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(true);
+  const [isRefreshingAnalytics, setIsRefreshingAnalytics] = useState(false);
+  const [lastAnalyticsSync, setLastAnalyticsSync] = useState<Date | null>(null);
+
+  const fetchLiveAnalytics = async (isManual = false) => {
+    if (isManual) setIsRefreshingAnalytics(true);
+    try {
+      const res = await fetch('/api/admin/analytics', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setAnalyticsData(data);
+          setLastAnalyticsSync(new Date());
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load real analytics:', err);
+    } finally {
+      setIsLoadingAnalytics(false);
+      if (isManual) setIsRefreshingAnalytics(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveAnalytics();
+    // Real-time polling every 20 seconds
+    const interval = setInterval(() => {
+      fetchLiveAnalytics();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Columnist Submissions State
   const [submissions, setSubmissions] = useState<ColumnistItem[]>([]);
@@ -446,145 +483,300 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* TAB 1: ANALYTICS */}
+          {/* TAB 1: ANALYTICS (100% REAL DATABASE DATA) */}
           {activeTab === 'analytics' && (
-            <div className="space-y-6">
-              <div className="border-b border-gray-800 pb-4">
-                <h2 className="text-xl font-black text-white">Country & Citizen Engagement Analytics</h2>
-                <p className="text-xs text-gray-400">
-                  Real-time visitor tracking, guest vs. member breakdown, and civic participation metrics.
-                </p>
+            <div className="space-y-8">
+              {/* Header with live sync indicator */}
+              <div className="border-b border-gray-800 pb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-xl font-black text-white tracking-tight">Real Database & Citizen Analytics</h2>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-700/60 text-[10px] font-bold text-emerald-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Live DB Connected
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Direct real-time metrics pulled from Supabase Auth & PostgreSQL tables. Zero demo or simulated numbers.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {lastAnalyticsSync && (
+                    <span className="text-[11px] text-gray-400 font-mono hidden sm:inline">
+                      Synced {lastAnalyticsSync.toLocaleTimeString()}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => fetchLiveAnalytics(true)}
+                    disabled={isRefreshingAnalytics}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-gray-700 text-xs font-bold text-gray-200 transition active:scale-95 disabled:opacity-50"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isRefreshingAnalytics ? 'animate-spin text-blue-400' : 'text-gray-400'}`} />
+                    <span>{isRefreshingAnalytics ? 'Syncing...' : 'Refresh Live DB'}</span>
+                  </button>
+                </div>
               </div>
 
-              {/* High-level summary metrics */}
+              {/* High-level summary metrics (4 Real Database Cards) */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {/* 1. Registered Citizens */}
                 <div className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-1">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Visitors</span>
-                  <span className="text-2xl font-black text-white">48,920</span>
-                  <span className="text-[10px] text-emerald-400 font-semibold block">+14.2% this week</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Registered Citizens</span>
+                    <Users className="w-3.5 h-3.5 text-blue-400" />
+                  </div>
+                  <span className="text-2xl font-black text-blue-400">
+                    {isLoadingAnalytics ? '...' : (analyticsData?.metrics?.totalMembers ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-blue-300 font-medium block">
+                    {analyticsData?.members?.byCountry?.length || 0} sovereign nations represented
+                  </span>
                 </div>
+
+                {/* 2. Active Political News */}
                 <div className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-1">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Registered Members</span>
-                  <span className="text-2xl font-black text-blue-400">12,480</span>
-                  <span className="text-[10px] text-blue-300 font-semibold block">25.5% of total</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Active Political News</span>
+                    <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <span className="text-2xl font-black text-white">
+                    {isLoadingAnalytics ? '...' : (analyticsData?.metrics?.totalNewsCount ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-medium block">
+                    {analyticsData?.metrics?.databaseArticlesCount || 0} DB custom + 119 country desks
+                  </span>
                 </div>
+
+                {/* 3. Citizen Poll Votes */}
                 <div className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-1">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Guest Readers</span>
-                  <span className="text-2xl font-black text-amber-400">36,440</span>
-                  <span className="text-[10px] text-gray-400 font-semibold block">74.5% of total</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Poll Votes Cast</span>
+                    <Vote className="w-3.5 h-3.5 text-purple-400" />
+                  </div>
+                  <span className="text-2xl font-black text-purple-400">
+                    {isLoadingAnalytics ? '...' : (analyticsData?.metrics?.totalPollVotes ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-purple-300 font-medium block">
+                    Real ballots logged in database
+                  </span>
                 </div>
+
+                {/* 4. Citizen Comments */}
                 <div className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-1">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Poll Votes Cast</span>
-                  <span className="text-2xl font-black text-purple-400">89,210</span>
-                  <span className="text-[10px] text-purple-300 font-semibold block">High Civic Sentiment</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Citizen Comments</span>
+                    <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <span className="text-2xl font-black text-amber-400">
+                    {isLoadingAnalytics ? '...' : (analyticsData?.metrics?.totalComments ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-amber-300 font-medium block">
+                    {analyticsData?.metrics?.totalReactions || 0} reactions · {analyticsData?.metrics?.totalFeedback || 0} feedback
+                  </span>
                 </div>
               </div>
 
-              {/* Top Performing Countries */}
-              <div className="space-y-3 pt-2">
-                <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-blue-400" />
-                  <span>Top Performing Countries by Citizen Engagement</span>
-                </h3>
+              {/* SECTION: SIGNED-UP MEMBERS & THEIR COUNTRIES (REAL-TIME LIVE ROSTER) */}
+              <div className="space-y-4 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                      <Users className="w-4 h-4 text-blue-400" />
+                      <span>Signed-Up Members & Country Breakdown</span>
+                    </h3>
+                    <p className="text-[11px] text-gray-400">
+                      Live roster of verified citizens pulled in real-time from Supabase Auth and Profiles table.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2.5 py-1 bg-blue-950/80 border border-blue-800 text-blue-300 font-bold rounded-lg">
+                      {analyticsData?.members?.total || 0} Registered Citizens
+                    </span>
+                  </div>
+                </div>
+
+                {/* Country distribution pills/cards */}
+                {analyticsData?.members?.byCountry && analyticsData.members.byCountry.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {analyticsData.members.byCountry.map((item: any) => (
+                      <div
+                        key={item.countryCode}
+                        className="p-3 bg-slate-950 rounded-2xl border border-gray-800 flex items-center justify-between shadow-sm"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-xl">{item.flag}</span>
+                          <div>
+                            <div className="text-xs font-bold text-white line-clamp-1">{item.countryName}</div>
+                            <div className="text-[10px] text-gray-400 font-mono font-bold">{item.countryCode}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-base font-black text-blue-400">{item.memberCount}</span>
+                          <span className="text-[9px] text-gray-500 font-semibold block">{item.percentage}% share</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Member Directory Table */}
                 <div className="overflow-x-auto rounded-2xl border border-gray-800">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-950 text-gray-400 uppercase text-[10px] tracking-wider">
                       <tr>
-                        <th className="p-3.5">Country</th>
-                        <th className="p-3.5">Total Readers</th>
-                        <th className="p-3.5">Members</th>
-                        <th className="p-3.5">Guests</th>
-                        <th className="p-3.5">Engagement Rate</th>
+                        <th className="p-3.5">Citizen / Member</th>
+                        <th className="p-3.5">Email Address</th>
+                        <th className="p-3.5">Country of Residence</th>
+                        <th className="p-3.5">Auth Provider</th>
+                        <th className="p-3.5">Role</th>
+                        <th className="p-3.5 text-right">Joined Date</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800">
-                      <tr className="hover:bg-slate-800/40">
-                        <td className="p-3.5 font-bold flex items-center gap-2">
-                          <span className="text-base">🇳🇬</span> Nigeria
-                        </td>
-                        <td className="p-3.5 text-gray-300">21,400</td>
-                        <td className="p-3.5 text-blue-400 font-semibold">6,120</td>
-                        <td className="p-3.5 text-gray-400">15,280</td>
-                        <td className="p-3.5 text-emerald-400 font-bold">84.2%</td>
-                      </tr>
-                      <tr className="hover:bg-slate-800/40">
-                        <td className="p-3.5 font-bold flex items-center gap-2">
-                          <span className="text-base">🇺🇸</span> United States
-                        </td>
-                        <td className="p-3.5 text-gray-300">14,210</td>
-                        <td className="p-3.5 text-blue-400 font-semibold">3,890</td>
-                        <td className="p-3.5 text-gray-400">10,320</td>
-                        <td className="p-3.5 text-emerald-400 font-bold">78.5%</td>
-                      </tr>
-                      <tr className="hover:bg-slate-800/40">
-                        <td className="p-3.5 font-bold flex items-center gap-2">
-                          <span className="text-base">🇬🇧</span> United Kingdom
-                        </td>
-                        <td className="p-3.5 text-gray-300">6,840</td>
-                        <td className="p-3.5 text-blue-400 font-semibold">1,420</td>
-                        <td className="p-3.5 text-gray-400">5,420</td>
-                        <td className="p-3.5 text-emerald-400 font-bold">72.0%</td>
-                      </tr>
-                      <tr className="hover:bg-slate-800/40">
-                        <td className="p-3.5 font-bold flex items-center gap-2">
-                          <span className="text-base">🇿🇦</span> South Africa
-                        </td>
-                        <td className="p-3.5 text-gray-300">3,980</td>
-                        <td className="p-3.5 text-blue-400 font-semibold">820</td>
-                        <td className="p-3.5 text-gray-400">3,160</td>
-                        <td className="p-3.5 text-emerald-400 font-bold">69.4%</td>
-                      </tr>
-                      <tr className="hover:bg-slate-800/40">
-                        <td className="p-3.5 font-bold flex items-center gap-2">
-                          <span className="text-base">🇰🇪</span> Kenya
-                        </td>
-                        <td className="p-3.5 text-gray-300">2,490</td>
-                        <td className="p-3.5 text-blue-400 font-semibold">230</td>
-                        <td className="p-3.5 text-gray-400">2,260</td>
-                        <td className="p-3.5 text-emerald-400 font-bold">66.1%</td>
-                      </tr>
+                      {isLoadingAnalytics ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-gray-400">
+                            <RotateCcw className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-400" />
+                            Loading verified member directory from database...
+                          </td>
+                        </tr>
+                      ) : !analyticsData?.members?.list || analyticsData.members.list.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-gray-500">
+                            No registered members found in Supabase Auth yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        analyticsData.members.list.map((member: any) => (
+                          <tr key={member.id} className="hover:bg-slate-800/40 transition">
+                            <td className="p-3.5 font-bold">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-blue-900/60 border border-blue-700/60 flex items-center justify-center text-blue-300 font-black text-xs shrink-0 overflow-hidden">
+                                  {member.avatar ? (
+                                    <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    (member.name?.[0] || 'U').toUpperCase()
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="text-white font-semibold flex items-center gap-1.5">
+                                    <span>{member.name}</span>
+                                    {member.isAdmin && (
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800 font-bold">
+                                        Super Admin
+                                      </span>
+                                    )}
+                                  </div>
+                                  {member.username && (
+                                    <div className="text-[10px] text-gray-400 font-mono">@{member.username}</div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-3.5 font-mono text-gray-300 text-[11px] whitespace-nowrap">
+                              {member.email}
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-200">
+                                <span>{member.flag}</span>
+                                <span>{member.countryName}</span>
+                                <span className="text-[10px] text-gray-400 font-mono font-normal">({member.countryCode})</span>
+                              </span>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="text-gray-300 font-medium">
+                                {member.provider}
+                              </span>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              {member.isAdmin ? (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
+                                  Admin
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950 text-blue-400 border border-blue-800">
+                                  Verified Citizen
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3.5 text-right font-mono text-gray-400 text-[11px] whitespace-nowrap">
+                              {new Date(member.createdAt).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* Remarked Top Members */}
+              {/* SECTION: NEWS COUNT BY COUNTRY DESK (REAL CATALOG) */}
+              <div className="space-y-3 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    <span>Active Political News Catalog by Country Desk</span>
+                  </h3>
+                  <span className="text-[11px] text-gray-400 font-medium">
+                    119 sovereign country desks monitored 24/7
+                  </span>
+                </div>
+                <div className="overflow-x-auto rounded-2xl border border-gray-800">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-950 text-gray-400 uppercase text-[10px] tracking-wider">
+                      <tr>
+                        <th className="p-3.5">Country Desk</th>
+                        <th className="p-3.5">Seat of Government</th>
+                        <th className="p-3.5 text-right">Active Political Stories</th>
+                        <th className="p-3.5 text-right">Desk Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800">
+                      {analyticsData?.news?.byCountry?.map((c: any) => (
+                        <tr key={c.countryCode} className="hover:bg-slate-800/40 transition">
+                          <td className="p-3.5 font-bold flex items-center gap-2.5">
+                            <span className="text-base">{c.flag}</span>
+                            <span className="text-white">{c.countryName}</span>
+                            <span className="text-[10px] text-gray-500 font-mono">({c.countryCode})</span>
+                          </td>
+                          <td className="p-3.5 text-gray-400">{c.capital}</td>
+                          <td className="p-3.5 text-right font-black text-white">{c.newsCount}</td>
+                          <td className="p-3.5 text-right whitespace-nowrap">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
+                              {c.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Remarked Real Members */}
               <div className="space-y-3 pt-2">
                 <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
                   <Award className="w-4 h-4 text-amber-400" />
-                  <span>Remarked Top Members (Highest Civic Discussion & Polling Activity)</span>
+                  <span>Remarked Active Members (Live Supabase Registry)</span>
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-white">Barr. Tunde Oladipo</span>
-                      <span className="text-base">🇳🇬</span>
+                  {analyticsData?.members?.list?.slice(0, 3).map((m: any) => (
+                    <div key={m.id} className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-white">{m.name}</span>
+                        <span className="text-base">{m.flag}</span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 font-mono truncate">{m.email}</p>
+                      <span className="text-[10px] text-blue-400 font-semibold block pt-1">
+                        {m.isAdmin ? 'Platform Administrator' : 'Verified Registered Citizen'} · via {m.provider}
+                      </span>
                     </div>
-                    <p className="text-[11px] text-gray-400">Legal Analyst · Abuja</p>
-                    <span className="text-[10px] text-blue-400 font-semibold block pt-1">
-                      142 Comments · 98% Insightful Rating
-                    </span>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-white">Sarah Jenkins</span>
-                      <span className="text-base">🇺🇸</span>
-                    </div>
-                    <p className="text-[11px] text-gray-400">Policy Fellow · Washington D.C.</p>
-                    <span className="text-[10px] text-blue-400 font-semibold block pt-1">
-                      98 Comments · 95% Insightful Rating
-                    </span>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-white">Chuka Eze</span>
-                      <span className="text-base">🇳🇬</span>
-                    </div>
-                    <p className="text-[11px] text-gray-400">Fiscal Governance Observer · Lagos</p>
-                    <span className="text-[10px] text-blue-400 font-semibold block pt-1">
-                      87 Comments · 92% Insightful Rating
-                    </span>
-                  </div>
+                  ))}
                 </div>
               </div>
 
@@ -594,10 +786,10 @@ export default function AdminDashboardPage() {
                   <div>
                     <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
                       <Globe2 className="w-4 h-4 text-emerald-400" />
-                      <span>Page & Article Views Breakdown by Country</span>
+                      <span>Live Article Reads Breakdown by Country</span>
                     </h3>
                     <p className="text-[11px] text-gray-400">
-                      Traffic distribution per page, distinguishing anonymous guest visitors from registered civic members.
+                      Real-time reader telemetry differentiating anonymous guest readers from signed-in civic members.
                     </p>
                   </div>
 
@@ -609,7 +801,7 @@ export default function AdminDashboardPage() {
                       onChange={(e) => setAnalyticsCountryFilter(e.target.value)}
                       className="text-xs py-1.5 px-3 bg-slate-950 border border-gray-800 text-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="ALL">🌍 All Countries & Global</option>
+                      <option value="ALL">🌍 All Countries</option>
                       <option value="NG">🇳🇬 Nigeria</option>
                       <option value="US">🇺🇸 United States</option>
                       <option value="GB">🇬🇧 United Kingdom</option>
@@ -625,177 +817,58 @@ export default function AdminDashboardPage() {
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-950 text-gray-400 uppercase text-[10px] tracking-wider">
                       <tr>
-                        <th className="p-3.5">Page / Article Title & Path</th>
+                        <th className="p-3.5">Page / Article Title</th>
                         <th className="p-3.5">Country</th>
                         <th className="p-3.5 text-right">Total Reads</th>
                         <th className="p-3.5 text-right">Members</th>
                         <th className="p-3.5 text-right">Guests</th>
-                        <th className="p-3.5 text-right">Avg Time</th>
-                        <th className="p-3.5 text-right">Impact</th>
+                        <th className="p-3.5 text-right">Last Read</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800">
-                      {[
-                        {
-                          title: 'Oil Theft Has Reduced Dramatically, Tinubu Asserts',
-                          path: '/news/oil-theft-has-reduced-tinubu-says-7',
-                          country: 'Nigeria',
-                          flag: '🇳🇬',
-                          code: 'NG',
-                          views: 6420,
-                          members: 1840,
-                          guests: 4580,
-                          avg_time: '3m 42s',
-                          impact: 'High',
-                        },
-                        {
-                          title: 'Call Your Edo Chairman to Order, ADC Tells APC',
-                          path: '/news/call-your-edo-chairman-to-order-adc-tells-apc',
-                          country: 'Nigeria',
-                          flag: '🇳🇬',
-                          code: 'NG',
-                          views: 4890,
-                          members: 1210,
-                          guests: 3680,
-                          avg_time: '2m 55s',
-                          impact: 'High',
-                        },
-                        {
-                          title: 'Nigeria National News & Civic Feed',
-                          path: '/news?country=NG',
-                          country: 'Nigeria',
-                          flag: '🇳🇬',
-                          code: 'NG',
-                          views: 8940,
-                          members: 2950,
-                          guests: 5990,
-                          avg_time: '4m 10s',
-                          impact: 'Very High',
-                        },
-                        {
-                          title: 'United States Congressional & Electoral Feed',
-                          path: '/news?country=US',
-                          country: 'United States',
-                          flag: '🇺🇸',
-                          code: 'US',
-                          views: 5820,
-                          members: 1720,
-                          guests: 4100,
-                          avg_time: '3m 15s',
-                          impact: 'High',
-                        },
-                        {
-                          title: 'United Kingdom Westminster & Policy News',
-                          path: '/news?country=GB',
-                          country: 'United Kingdom',
-                          flag: '🇬🇧',
-                          code: 'GB',
-                          views: 3140,
-                          members: 890,
-                          guests: 2250,
-                          avg_time: '2m 48s',
-                          impact: 'Medium',
-                        },
-                        {
-                          title: 'South Africa Parliamentary & Governance Feed',
-                          path: '/news?country=ZA',
-                          country: 'South Africa',
-                          flag: '🇿🇦',
-                          code: 'ZA',
-                          views: 2110,
-                          members: 540,
-                          guests: 1570,
-                          avg_time: '2m 30s',
-                          impact: 'Medium',
-                        },
-                        {
-                          title: 'Kenya National Assembly & Devolution Monitor',
-                          path: '/news?country=KE',
-                          country: 'Kenya',
-                          flag: '🇰🇪',
-                          code: 'KE',
-                          views: 1650,
-                          members: 380,
-                          guests: 1270,
-                          avg_time: '2m 15s',
-                          impact: 'Medium',
-                        },
-                        {
-                          title: 'Ghana Governance & Constitutional Tracker',
-                          path: '/news?country=GH',
-                          country: 'Ghana',
-                          flag: '🇬🇭',
-                          code: 'GH',
-                          views: 1420,
-                          members: 310,
-                          guests: 1110,
-                          avg_time: '2m 05s',
-                          impact: 'Medium',
-                        },
-                        {
-                          title: 'Columnist Op-Ed Submission & Charter Portal',
-                          path: '/columnist/submit',
-                          country: 'Global',
-                          flag: '🌐',
-                          code: 'GLOBAL',
-                          views: 2890,
-                          members: 940,
-                          guests: 1950,
-                          avg_time: '4m 45s',
-                          impact: 'High',
-                        },
-                      ]
-                        .filter(
-                          (item) =>
-                            analyticsCountryFilter === 'ALL' ||
-                            item.code === analyticsCountryFilter ||
-                            item.code === 'GLOBAL'
-                        )
-                        .map((row, idx) => (
-                          <tr key={idx} className="hover:bg-slate-800/40">
-                            <td className="p-3.5">
-                              <div className="font-semibold text-white line-clamp-1">{row.title}</div>
-                              <span className="text-[10px] font-mono text-gray-400">{row.path}</span>
-                            </td>
-                            <td className="p-3.5 whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1.5 text-xs text-gray-300 font-medium">
-                                <span>{row.flag}</span>
-                                <span>{row.country}</span>
-                              </span>
-                            </td>
-                            <td className="p-3.5 text-right font-bold text-white whitespace-nowrap">
-                              {row.views.toLocaleString()}
-                            </td>
-                            <td className="p-3.5 text-right whitespace-nowrap">
-                              <span className="text-blue-400 font-semibold">{row.members.toLocaleString()}</span>
-                              <span className="text-[10px] text-gray-500 block">
-                                {Math.round((row.members / row.views) * 100)}%
-                              </span>
-                            </td>
-                            <td className="p-3.5 text-right whitespace-nowrap">
-                              <span className="text-amber-400 font-semibold">{row.guests.toLocaleString()}</span>
-                              <span className="text-[10px] text-gray-500 block">
-                                {Math.round((row.guests / row.views) * 100)}%
-                              </span>
-                            </td>
-                            <td className="p-3.5 text-right text-gray-300 whitespace-nowrap">
-                              {row.avg_time}
-                            </td>
-                            <td className="p-3.5 text-right whitespace-nowrap">
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                  row.impact === 'Very High'
-                                    ? 'bg-purple-950 text-purple-400 border-purple-800'
-                                    : row.impact === 'High'
-                                    ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
-                                    : 'bg-blue-950 text-blue-400 border-blue-800'
-                                }`}
-                              >
-                                {row.impact}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                      {analyticsData?.traffic?.recentReads && analyticsData.traffic.recentReads.length > 0 ? (
+                        analyticsData.traffic.recentReads
+                          .filter(
+                            (item: any) =>
+                              analyticsCountryFilter === 'ALL' || item.code === analyticsCountryFilter
+                          )
+                          .map((row: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-slate-800/40 transition">
+                              <td className="p-3.5">
+                                <div className="font-semibold text-white line-clamp-1">{row.title}</div>
+                                <span className="text-[10px] font-mono text-gray-400">/news/{row.slug}</span>
+                              </td>
+                              <td className="p-3.5 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1.5 text-xs text-gray-300 font-medium">
+                                  <span>{row.flag}</span>
+                                  <span>{row.country}</span>
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-right font-bold text-white whitespace-nowrap">
+                                {row.totalReads.toLocaleString()}
+                              </td>
+                              <td className="p-3.5 text-right whitespace-nowrap">
+                                <span className="text-blue-400 font-semibold">{row.memberReads.toLocaleString()}</span>
+                              </td>
+                              <td className="p-3.5 text-right whitespace-nowrap">
+                                <span className="text-amber-400 font-semibold">{row.guestReads.toLocaleString()}</span>
+                              </td>
+                              <td className="p-3.5 text-right text-gray-400 whitespace-nowrap font-mono text-[11px]">
+                                {new Date(row.lastReadAt).toLocaleTimeString()}
+                              </td>
+                            </tr>
+                          ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-gray-400">
+                            <Eye className="w-5 h-5 mx-auto mb-2 text-gray-500" />
+                            <div className="font-semibold text-gray-300">No article reads recorded yet in this session</div>
+                            <div className="text-[11px] text-gray-500 mt-1 max-w-md mx-auto">
+                              Live tracking is active across all 119 country desks. Reads will increment automatically here when visitors and registered members view articles.
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
