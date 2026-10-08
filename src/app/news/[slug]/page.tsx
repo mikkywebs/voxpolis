@@ -16,6 +16,7 @@ import { CommentInputForm, CommentList, CommentItem } from '@/components/article
 import OriginalSourceLink from '@/components/article/OriginalSourceLink';
 import AdSlot from '@/components/article/AdSlot';
 import DesktopVignetteAd from '@/components/ads/DesktopVignetteAd';
+import NativeSponsorAd from '@/components/ads/NativeSponsorAd';
 import { SUPPORTED_COUNTRIES, ALL_COUNTRIES, CountryConfig, getCountryByCode, getCountrySlug } from '@/config/countries';
 import {
   fetchArticlesForCountry,
@@ -1066,6 +1067,9 @@ export default function NewsDetailPage() {
         )}
 
         <main className="flex-1 max-w-3xl w-full min-w-0 py-8">
+          {/* Native Sponsor Horizontal Ad: Specific for Mobile (320x100) and Desktop (728x90) on top before headline */}
+          <NativeSponsorAd slotLocation="top_horizontal" countryCode={article?.country_code} />
+
           <ArticleImageHeader
             title={article!.title}
             snippet={article!.snippet}
@@ -1084,6 +1088,9 @@ export default function NewsDetailPage() {
           <EmojiReactions articleId={article!.id} slug={article!.slug || slug} />
 
           <SocialShareButtons title={article!.title} slug={article!.slug} />
+
+          {/* Native Sponsor Square Ad: 300x300 for both mobile and desktop views */}
+          <NativeSponsorAd slotLocation="square_300" countryCode={article?.country_code} />
 
           <AdSlot slotLocation="below_dek" isAllowed={true} />
 

@@ -31,6 +31,17 @@ import {
   Trash2,
   PlusCircle,
   Sparkles,
+  Megaphone,
+  DollarSign,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  ArrowDownRight,
+  ArrowUpRight,
+  Tag,
+  Monitor,
+  Smartphone,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -57,7 +68,44 @@ export default function AdminDashboardPage() {
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<'analytics' | 'published' | 'publish' | 'submissions' | 'pages' | 'logos'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'published' | 'publish' | 'submissions' | 'pages' | 'logos' | 'advert_board'>('analytics');
+
+  // Search & Filters for Users Drilldown
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userCountryFilter, setUserCountryFilter] = useState('ALL');
+  const [userTenureFilter, setUserTenureFilter] = useState<'ALL' | 'RECENT_7' | 'RECENT_30' | 'VETERAN_180'>('ALL');
+  const [userRankFilter, setUserRankFilter] = useState<string>('ALL');
+  const [userCurrentPage, setUserCurrentPage] = useState(1);
+  const usersPerPage = 10;
+
+  // Search & Slide Pagination for Active Political News Catalog
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
+  const [catalogCurrentSlide, setCatalogCurrentSlide] = useState(1);
+  const catalogPerSlide = 10;
+
+  // Search for Published Articles
+  const [publishedSearchQuery, setPublishedSearchQuery] = useState('');
+
+  // Advert Board & Sponsor Rates State
+  const [adRates, setAdRates] = useState<any>(null);
+  const [sponsorCampaigns, setSponsorCampaigns] = useState<any[]>([]);
+  const [isLoadingAds, setIsLoadingAds] = useState(false);
+  const [isSavingRates, setIsSavingRates] = useState(false);
+  const [rateSavedSuccess, setRateSavedSuccess] = useState(false);
+  const [campaignSuccessMsg, setCampaignSuccessMsg] = useState('');
+
+  // New Sponsor Ad Form State
+  const [campSponsorName, setCampSponsorName] = useState('');
+  const [campTitle, setCampTitle] = useState('');
+  const [campTagline, setCampTagline] = useState('');
+  const [campTargetUrl, setCampTargetUrl] = useState('');
+  const [campSlot, setCampSlot] = useState<'top_horizontal' | 'square_300' | 'skyscraper'>('top_horizontal');
+  const [campDesktopImage, setCampDesktopImage] = useState('');
+  const [campMobileImage, setCampMobileImage] = useState('');
+  const [campPricePaid, setCampPricePaid] = useState<number>(250);
+  const [campTargetCountry, setCampTargetCountry] = useState('ALL');
+  const [campDurationDays, setCampDurationDays] = useState(30);
+  const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
 
   // Static Pages State
   const [selectedPageKey, setSelectedPageKey] = useState<'about' | 'contact' | 'privacy' | 'terms'>('about');
@@ -126,9 +174,128 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchAdsData = async () => {
+    setIsLoadingAds(true);
+    try {
+      const res = await fetch('/api/admin/ads', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.rates) setAdRates(data.rates);
+        if (data.campaigns) setSponsorCampaigns(data.campaigns);
+      }
+    } catch (e) {
+      console.warn('Failed to load ad data:', e);
+    } finally {
+      setIsLoadingAds(false);
+    }
+  };
+
+  const handleSaveRates = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adRates) return;
+    setIsSavingRates(true);
+    setRateSavedSuccess(false);
+    try {
+      const res = await fetch('/api/admin/ads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_rates', rates: adRates }),
+      });
+      if (res.ok) {
+        setRateSavedSuccess(true);
+        setTimeout(() => setRateSavedSuccess(false), 3000);
+      }
+    } catch (e) {
+      console.error('Save rates error:', e);
+    } finally {
+      setIsSavingRates(false);
+    }
+  };
+
+  const handleCreateCampaign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!campSponsorName.trim() || !campTargetUrl.trim() || !campDesktopImage.trim()) {
+      alert('Please fill out Sponsor Name, Target URL, and Desktop Image');
+      return;
+    }
+    setIsCreatingCampaign(true);
+    try {
+      const startDate = new Date().toISOString();
+      const endDate = new Date(Date.now() + campDurationDays * 24 * 60 * 60 * 1000).toISOString();
+      const res = await fetch('/api/admin/ads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_campaign',
+          campaign: {
+            sponsor_name: campSponsorName,
+            ad_title: campTitle || `${campSponsorName} Promotion`,
+            tagline: campTagline,
+            target_url: campTargetUrl,
+            slot_location: campSlot,
+            desktop_image_url: campDesktopImage,
+            mobile_image_url: campMobileImage || campDesktopImage,
+            price_paid: Number(campPricePaid) || 0,
+            currency: adRates?.currency || 'USD',
+            target_country: campTargetCountry,
+            start_date: startDate,
+            end_date: endDate,
+            is_active: true,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        setCampaignSuccessMsg(`Sponsor Campaign "${campTitle || campSponsorName}" created and live!`);
+        setTimeout(() => setCampaignSuccessMsg(''), 4000);
+        setCampSponsorName('');
+        setCampTitle('');
+        setCampTagline('');
+        setCampTargetUrl('');
+        setCampDesktopImage('');
+        setCampMobileImage('');
+        fetchAdsData();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsCreatingCampaign(false);
+    }
+  };
+
+  const handleToggleCampaignStatus = async (id: string, currentStatus: boolean) => {
+    try {
+      const res = await fetch('/api/admin/ads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle_status', id, is_active: !currentStatus }),
+      });
+      if (res.ok) {
+        setSponsorCampaigns((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, is_active: !currentStatus } : c))
+        );
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteCampaign = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete campaign for "${name}"?`)) return;
+    try {
+      const res = await fetch(`/api/admin/ads?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (res.ok) {
+        setSponsorCampaigns((prev) => prev.filter((c) => c.id !== id));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchLiveAnalytics();
     fetchPublishedArticles();
+    fetchAdsData();
     // Real-time polling every 20 seconds
     const interval = setInterval(() => {
       fetchLiveAnalytics();
@@ -451,6 +618,77 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // User Filtering & Pagination
+  const allMembers = analyticsData?.members?.list || [];
+  const filteredMembers = allMembers.filter((m: any) => {
+    if (userSearchQuery.trim()) {
+      const q = userSearchQuery.toLowerCase();
+      const matchName = (m.name || '').toLowerCase().includes(q);
+      const matchEmail = (m.email || '').toLowerCase().includes(q);
+      const matchUser = (m.username || '').toLowerCase().includes(q);
+      const matchCountry = (m.countryName || '').toLowerCase().includes(q) || (m.countryCode || '').toLowerCase().includes(q);
+      if (!matchName && !matchEmail && !matchUser && !matchCountry) return false;
+    }
+
+    if (userCountryFilter !== 'ALL' && m.countryCode !== userCountryFilter) {
+      return false;
+    }
+
+    if (userTenureFilter === 'RECENT_7' && m.tenureDays > 7) return false;
+    if (userTenureFilter === 'RECENT_30' && m.tenureDays > 30) return false;
+    if (userTenureFilter === 'VETERAN_180' && m.tenureDays < 180) return false;
+
+    if (userRankFilter !== 'ALL') {
+      if (userRankFilter === 'DIPLOMAT' && !m.isAdmin) return false;
+      if (userRankFilter === 'AMBASSADOR' && m.civicRank !== 'Ambassador') return false;
+      if (userRankFilter === 'SENIOR' && m.civicRank !== 'Senior Citizen') return false;
+      if (userRankFilter === 'ACTIVE' && m.civicRank !== 'Active Citizen') return false;
+      if (userRankFilter === 'NEW' && m.civicRank !== 'New Citizen') return false;
+    }
+
+    return true;
+  });
+
+  const totalUserPages = Math.max(1, Math.ceil(filteredMembers.length / usersPerPage));
+  const paginatedMembers = filteredMembers.slice(
+    (userCurrentPage - 1) * usersPerPage,
+    userCurrentPage * usersPerPage
+  );
+
+  // Active Country News Catalog Filtering & Slide/Pagination
+  const allDesks = analyticsData?.news?.byCountry || [];
+  const filteredDesks = allDesks.filter((d: any) => {
+    if (!catalogSearchQuery.trim()) return true;
+    const q = catalogSearchQuery.toLowerCase();
+    return (
+      (d.countryName || '').toLowerCase().includes(q) ||
+      (d.countryCode || '').toLowerCase().includes(q) ||
+      (d.capital || '').toLowerCase().includes(q) ||
+      (d.region || '').toLowerCase().includes(q)
+    );
+  });
+
+  const totalCatalogSlides = Math.max(1, Math.ceil(filteredDesks.length / catalogPerSlide));
+  const paginatedDesks = filteredDesks.slice(
+    (catalogCurrentSlide - 1) * catalogPerSlide,
+    catalogCurrentSlide * catalogPerSlide
+  );
+
+  // Published News Filtering
+  const filteredPublishedArticles = publishedArticles.filter((art: any) => {
+    if (publishedCountryFilter !== 'ALL' && art.country_code !== publishedCountryFilter) {
+      return false;
+    }
+    if (publishedSearchQuery.trim()) {
+      const q = publishedSearchQuery.toLowerCase();
+      const matchTitle = (art.title || '').toLowerCase().includes(q);
+      const matchSlug = (art.slug || '').toLowerCase().includes(q);
+      const matchCountry = (art.country_name || '').toLowerCase().includes(q);
+      if (!matchTitle && !matchSlug && !matchCountry) return false;
+    }
+    return true;
+  });
+
   if (authChecking) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
@@ -576,6 +814,21 @@ export default function AdminDashboardPage() {
             <ImageIcon className="w-4 h-4" />
             <span>Brand Logos & Favicon</span>
           </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('advert_board');
+              fetchAdsData();
+            }}
+            className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition text-left ${
+              activeTab === 'advert_board'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-gray-300 hover:bg-slate-800'
+            }`}
+          >
+            <Megaphone className="w-4 h-4 text-amber-400" />
+            <span>Advert Board & Sponsors</span>
+          </button>
         </div>
 
         {/* Content Pane */}
@@ -680,59 +933,242 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* SECTION: SIGNED-UP MEMBERS & THEIR COUNTRIES (REAL-TIME LIVE ROSTER) */}
+              {/* SECTION 1: PERFORMANCE ANALYTICS & DRILLDOWNS (HIGHEST & LEAST PERFORMING COUNTRIES, TRENDING NEWS) */}
               <div className="space-y-4 pt-2">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                      <Users className="w-4 h-4 text-blue-400" />
-                      <span>Signed-Up Members & Country Breakdown</span>
+                      <Flame className="w-4 h-4 text-orange-400" />
+                      <span>Engagement & Performance Analytics</span>
                     </h3>
                     <p className="text-[11px] text-gray-400">
-                      Live roster of verified citizens pulled in real-time from Supabase Auth and Profiles table.
+                      Real engagement metrics comparing top performing countries, underperforming target regions, and trending news stories.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-400 font-mono">
+                    Computed across 119 sovereign desks
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Card 1: Top Performing Countries */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-3">
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                        <ArrowUpRight className="w-3.5 h-3.5" /> Top Performing Countries
+                      </span>
+                      <span className="text-[10px] text-gray-400">Highest Engagement</span>
+                    </div>
+                    <div className="space-y-2">
+                      {(analyticsData?.performance?.topCountries || []).slice(0, 5).map((c: any, idx: number) => (
+                        <div key={c.countryCode} className="flex items-center justify-between text-xs py-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[10px] text-gray-500 w-3">#{idx + 1}</span>
+                            <span className="text-base">{c.flag}</span>
+                            <span className="text-white font-medium line-clamp-1">{c.countryName}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-emerald-400 font-black">{c.reads.toLocaleString()}</span>
+                            <span className="text-[10px] text-gray-500 block">{c.members} members</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Card 2: Least Performing Viewers / Countries */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-3">
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                      <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                        <ArrowDownRight className="w-3.5 h-3.5" /> Least Performing Countries
+                      </span>
+                      <span className="text-[10px] text-gray-400">Target for Growth</span>
+                    </div>
+                    <div className="space-y-2">
+                      {(analyticsData?.performance?.leastPerformingCountries || []).slice(0, 5).map((c: any, idx: number) => (
+                        <div key={c.countryCode} className="flex items-center justify-between text-xs py-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[10px] text-gray-500 w-3">#{idx + 1}</span>
+                            <span className="text-base">{c.flag}</span>
+                            <span className="text-gray-300 font-medium line-clamp-1">{c.countryName}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-gray-400 font-mono text-xs">{c.reads} reads</span>
+                            <span className="text-[10px] text-amber-500 block">{c.members} citizens</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Card 3: Trending News per Country */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-gray-800 space-y-3">
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                      <span className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                        <Flame className="w-3.5 h-3.5 text-orange-400" /> Trending News by Country
+                      </span>
+                      <span className="text-[10px] text-gray-400">High Reader Activity</span>
+                    </div>
+                    <div className="space-y-2">
+                      {analyticsData?.performance?.trendingNews && analyticsData.performance.trendingNews.length > 0 ? (
+                        analyticsData.performance.trendingNews.slice(0, 4).map((art: any) => (
+                          <div key={art.id || art.slug} className="text-xs py-1 border-b border-gray-900/60 last:border-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[10px] text-gray-400 flex items-center gap-1 font-mono">
+                                <span>{art.flag}</span>
+                                <span>{art.code}</span>
+                              </span>
+                              <span className="text-[10px] font-bold text-blue-400">{art.totalReads} reads</span>
+                            </div>
+                            <Link href={`/news/${art.slug}`} target="_blank" className="text-white hover:text-blue-400 transition font-semibold line-clamp-1 mt-0.5">
+                              {art.title}
+                            </Link>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-xs text-gray-500 py-4 text-center">
+                          Tracking live reading patterns across published stories...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: SIGNED-UP MEMBERS & CIVIC RANKS DIRECTORY (WITH ADVANCED SEARCH & FILTERS) */}
+              <div className="space-y-4 pt-4 border-t border-gray-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                      <Users className="w-4 h-4 text-blue-400" />
+                      <span>Citizens & Civic Ranks Directory</span>
+                    </h3>
+                    <p className="text-[11px] text-gray-400">
+                      Breakdown of registered members across countries, civic tenure, and activity tiers.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs px-2.5 py-1 bg-blue-950/80 border border-blue-800 text-blue-300 font-bold rounded-lg">
-                      {analyticsData?.members?.total || 0} Registered Citizens
+                      {allMembers.length} Registered Citizens
+                    </span>
+                    <span className="text-xs px-2.5 py-1 bg-amber-950/80 border border-amber-800 text-amber-300 font-bold rounded-lg">
+                      {analyticsData?.members?.veteransCount || 0} Veterans (&gt;6mo)
+                    </span>
+                    <span className="text-xs px-2.5 py-1 bg-emerald-950/80 border border-emerald-800 text-emerald-300 font-bold rounded-lg">
+                      {analyticsData?.members?.newCount || 0} New Citizens
                     </span>
                   </div>
                 </div>
 
                 {/* Country distribution pills/cards */}
                 {analyticsData?.members?.byCountry && analyticsData.members.byCountry.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {analyticsData.members.byCountry.map((item: any) => (
-                      <div
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+                    {analyticsData.members.byCountry.slice(0, 6).map((item: any) => (
+                      <button
                         key={item.countryCode}
-                        className="p-3 bg-slate-950 rounded-2xl border border-gray-800 flex items-center justify-between shadow-sm"
+                        onClick={() => {
+                          setUserCountryFilter(userCountryFilter === item.countryCode ? 'ALL' : item.countryCode);
+                          setUserCurrentPage(1);
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition flex items-center justify-between ${
+                          userCountryFilter === item.countryCode
+                            ? 'bg-blue-950 border-blue-500 shadow'
+                            : 'bg-slate-950 border-gray-800 hover:border-gray-700'
+                        }`}
                       >
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-xl">{item.flag}</span>
-                          <div>
-                            <div className="text-xs font-bold text-white line-clamp-1">{item.countryName}</div>
-                            <div className="text-[10px] text-gray-400 font-mono font-bold">{item.countryCode}</div>
-                          </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-base">{item.flag}</span>
+                          <span className="text-xs font-bold text-white">{item.countryCode}</span>
                         </div>
-                        <div className="text-right">
-                          <span className="text-base font-black text-blue-400">{item.memberCount}</span>
-                          <span className="text-[9px] text-gray-500 font-semibold block">{item.percentage}% share</span>
-                        </div>
-                      </div>
+                        <span className="text-xs font-black text-blue-400">{item.memberCount}</span>
+                      </button>
                     ))}
                   </div>
                 )}
 
-                {/* Member Directory Table */}
+                {/* Search & Filter Bar for Citizens */}
+                <div className="p-3 bg-slate-950/90 rounded-2xl border border-gray-800 grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                  {/* Search Input */}
+                  <div className="relative sm:col-span-1">
+                    <Search className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      value={userSearchQuery}
+                      onChange={(e) => {
+                        setUserSearchQuery(e.target.value);
+                        setUserCurrentPage(1);
+                      }}
+                      placeholder="Search name, email, @handle..."
+                      className="w-full text-xs pl-8 pr-3 py-2 bg-slate-900 border border-gray-800 text-white rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Filter by Country */}
+                  <div>
+                    <select
+                      value={userCountryFilter}
+                      onChange={(e) => {
+                        setUserCountryFilter(e.target.value);
+                        setUserCurrentPage(1);
+                      }}
+                      className="w-full text-xs py-2 px-3 bg-slate-900 border border-gray-800 text-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="ALL">🌍 All Countries ({allMembers.length})</option>
+                      {analyticsData?.members?.byCountry?.map((c: any) => (
+                        <option key={c.countryCode} value={c.countryCode}>
+                          {c.flag} {c.countryName} ({c.memberCount})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Filter by Tenure (Joined Recently vs Over 6 Months) */}
+                  <div>
+                    <select
+                      value={userTenureFilter}
+                      onChange={(e) => {
+                        setUserTenureFilter(e.target.value as any);
+                        setUserCurrentPage(1);
+                      }}
+                      className="w-full text-xs py-2 px-3 bg-slate-900 border border-gray-800 text-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="ALL">📅 All Join Dates</option>
+                      <option value="RECENT_7">🌱 Joined This Week (&lt;7 days)</option>
+                      <option value="RECENT_30">⚡ Joined Recently (&lt;30 days)</option>
+                      <option value="VETERAN_180">🎖️ Veteran Citizens (&gt;6 months)</option>
+                    </select>
+                  </div>
+
+                  {/* Filter by Civic Rank */}
+                  <div>
+                    <select
+                      value={userRankFilter}
+                      onChange={(e) => {
+                        setUserRankFilter(e.target.value);
+                        setUserCurrentPage(1);
+                      }}
+                      className="w-full text-xs py-2 px-3 bg-slate-900 border border-gray-800 text-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="ALL">🏛️ All Civic Ranks</option>
+                      <option value="DIPLOMAT">👑 Super Admin / Diplomat</option>
+                      <option value="AMBASSADOR">🎖️ Ambassador (&gt;6mo)</option>
+                      <option value="SENIOR">🏛️ Senior Citizen (1-6mo)</option>
+                      <option value="ACTIVE">🗳️ Active Citizen (7-30d)</option>
+                      <option value="NEW">🌱 New Citizen (&lt;7d)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Paginated Members Table */}
                 <div className="overflow-x-auto rounded-2xl border border-gray-800">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-950 text-gray-400 uppercase text-[10px] tracking-wider">
                       <tr>
                         <th className="p-3.5">Citizen / Member</th>
+                        <th className="p-3.5">Civic Rank</th>
                         <th className="p-3.5">Email Address</th>
-                        <th className="p-3.5">Country of Residence</th>
-                        <th className="p-3.5">Auth Provider</th>
-                        <th className="p-3.5">Role</th>
+                        <th className="p-3.5">Country</th>
+                        <th className="p-3.5">Tenure</th>
                         <th className="p-3.5 text-right">Joined Date</th>
                       </tr>
                     </thead>
@@ -744,14 +1180,14 @@ export default function AdminDashboardPage() {
                             Loading verified member directory from database...
                           </td>
                         </tr>
-                      ) : !analyticsData?.members?.list || analyticsData.members.list.length === 0 ? (
+                      ) : paginatedMembers.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="p-8 text-center text-gray-500">
-                            No registered members found in Supabase Auth yet.
+                            No citizens found matching the selected search and filter criteria.
                           </td>
                         </tr>
                       ) : (
-                        analyticsData.members.list.map((member: any) => (
+                        paginatedMembers.map((member: any) => (
                           <tr key={member.id} className="hover:bg-slate-800/40 transition">
                             <td className="p-3.5 font-bold">
                               <div className="flex items-center gap-2.5">
@@ -767,7 +1203,7 @@ export default function AdminDashboardPage() {
                                     <span>{member.name}</span>
                                     {member.isAdmin && (
                                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800 font-bold">
-                                        Super Admin
+                                        Admin
                                       </span>
                                     )}
                                   </div>
@@ -776,6 +1212,21 @@ export default function AdminDashboardPage() {
                                   )}
                                 </div>
                               </div>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                member.isAdmin
+                                  ? 'bg-purple-950/80 text-purple-300 border-purple-800'
+                                  : member.civicRank === 'Ambassador'
+                                  ? 'bg-amber-950/80 text-amber-300 border-amber-800'
+                                  : member.civicRank === 'Senior Citizen'
+                                  ? 'bg-blue-950/80 text-blue-300 border-blue-800'
+                                  : member.civicRank === 'Active Citizen'
+                                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                                  : 'bg-slate-900 text-gray-300 border-gray-700'
+                              }`}>
+                                {member.rankBadge || member.civicRank}
+                              </span>
                             </td>
                             <td className="p-3.5 font-mono text-gray-300 text-[11px] whitespace-nowrap">
                               {member.email}
@@ -787,21 +1238,8 @@ export default function AdminDashboardPage() {
                                 <span className="text-[10px] text-gray-400 font-mono font-normal">({member.countryCode})</span>
                               </span>
                             </td>
-                            <td className="p-3.5 whitespace-nowrap">
-                              <span className="text-gray-300 font-medium">
-                                {member.provider}
-                              </span>
-                            </td>
-                            <td className="p-3.5 whitespace-nowrap">
-                              {member.isAdmin ? (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
-                                  Admin
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950 text-blue-400 border border-blue-800">
-                                  Verified Citizen
-                                </span>
-                              )}
+                            <td className="p-3.5 whitespace-nowrap font-mono text-gray-400 text-[11px]">
+                              {member.tenureDays !== undefined ? `${member.tenureDays} days` : 'Recent'}
                             </td>
                             <td className="p-3.5 text-right font-mono text-gray-400 text-[11px] whitespace-nowrap">
                               {new Date(member.createdAt).toLocaleDateString(undefined, {
@@ -816,48 +1254,140 @@ export default function AdminDashboardPage() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Citizens Pagination Controls */}
+                <div className="flex items-center justify-between text-xs text-gray-400 pt-1">
+                  <span>
+                    Showing {Math.min(filteredMembers.length, (userCurrentPage - 1) * usersPerPage + 1)} - {Math.min(filteredMembers.length, userCurrentPage * usersPerPage)} of {filteredMembers.length} citizens
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={userCurrentPage <= 1}
+                      onClick={() => setUserCurrentPage((p) => Math.max(1, p - 1))}
+                      className="px-3 py-1 bg-slate-950 border border-gray-800 rounded-lg hover:bg-slate-800 disabled:opacity-40 transition flex items-center gap-1"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                    </button>
+                    <span className="font-mono text-white text-[11px]">
+                      Page {userCurrentPage} of {totalUserPages}
+                    </span>
+                    <button
+                      disabled={userCurrentPage >= totalUserPages}
+                      onClick={() => setUserCurrentPage((p) => Math.min(totalUserPages, p + 1))}
+                      className="px-3 py-1 bg-slate-950 border border-gray-800 rounded-lg hover:bg-slate-800 disabled:opacity-40 transition flex items-center gap-1"
+                    >
+                      Next <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* SECTION: NEWS COUNT BY COUNTRY DESK (REAL CATALOG) */}
-              <div className="space-y-3 pt-2">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-400" />
-                    <span>Active Political News Catalog by Country Desk</span>
-                  </h3>
-                  <span className="text-[11px] text-gray-400 font-medium">
-                    119 sovereign country desks monitored 24/7
-                  </span>
+              {/* SECTION 3: ACTIVE POLITICAL NEWS CATALOG BY COUNTRY DESK (PAGINATED SLIDE CAROUSEL) */}
+              <div className="space-y-3 pt-4 border-t border-gray-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                      <span>Active Political News Catalog by Country Desk</span>
+                    </h3>
+                    <p className="text-[11px] text-gray-400">
+                      Slide through all 119 sovereign country desks or use instant search to find any national desk.
+                    </p>
+                  </div>
+
+                  {/* Search Country Desks */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="w-3 h-3 text-gray-500 absolute left-2.5 top-2.5" />
+                      <input
+                        type="text"
+                        value={catalogSearchQuery}
+                        onChange={(e) => {
+                          setCatalogSearchQuery(e.target.value);
+                          setCatalogCurrentSlide(1);
+                        }}
+                        placeholder="Search 119 country desks..."
+                        className="text-xs pl-7 pr-3 py-1.5 bg-slate-950 border border-gray-800 text-white rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 w-52"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Paginated Slide Table */}
                 <div className="overflow-x-auto rounded-2xl border border-gray-800">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-950 text-gray-400 uppercase text-[10px] tracking-wider">
                       <tr>
                         <th className="p-3.5">Country Desk</th>
                         <th className="p-3.5">Seat of Government</th>
-                        <th className="p-3.5 text-right">Active Political Stories</th>
+                        <th className="p-3.5 text-right">Active Stories</th>
                         <th className="p-3.5 text-right">Desk Status</th>
+                        <th className="p-3.5 text-right">Quick Access</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800">
-                      {analyticsData?.news?.byCountry?.map((c: any) => (
-                        <tr key={c.countryCode} className="hover:bg-slate-800/40 transition">
-                          <td className="p-3.5 font-bold flex items-center gap-2.5">
-                            <span className="text-base">{c.flag}</span>
-                            <span className="text-white">{c.countryName}</span>
-                            <span className="text-[10px] text-gray-500 font-mono">({c.countryCode})</span>
-                          </td>
-                          <td className="p-3.5 text-gray-400">{c.capital}</td>
-                          <td className="p-3.5 text-right font-black text-white">{c.newsCount}</td>
-                          <td className="p-3.5 text-right whitespace-nowrap">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
-                              {c.status}
-                            </span>
+                      {paginatedDesks.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-gray-500">
+                            No country desks found matching &ldquo;{catalogSearchQuery}&rdquo;.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        paginatedDesks.map((c: any) => (
+                          <tr key={c.countryCode} className="hover:bg-slate-800/40 transition">
+                            <td className="p-3.5 font-bold flex items-center gap-2.5">
+                              <span className="text-base">{c.flag}</span>
+                              <span className="text-white">{c.countryName}</span>
+                              <span className="text-[10px] text-gray-500 font-mono">({c.countryCode})</span>
+                            </td>
+                            <td className="p-3.5 text-gray-400">{c.capital || 'National Desk'}</td>
+                            <td className="p-3.5 text-right font-black text-white">{c.newsCount}</td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
+                                {c.status}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <Link
+                                href={`/${c.slug}`}
+                                target="_blank"
+                                className="inline-flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 font-bold"
+                              >
+                                <span>Feed</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </Link>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Catalog Slide Navigation Controls */}
+                <div className="flex items-center justify-between text-xs text-gray-400 pt-1">
+                  <span>
+                    Showing Slide {catalogCurrentSlide} of {totalCatalogSlides} ({filteredDesks.length} country desks)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={catalogCurrentSlide <= 1}
+                      onClick={() => setCatalogCurrentSlide((s) => Math.max(1, s - 1))}
+                      className="px-3 py-1 bg-slate-950 border border-gray-800 rounded-lg hover:bg-slate-800 disabled:opacity-40 transition flex items-center gap-1"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" /> Previous Slide
+                    </button>
+                    <span className="font-mono text-white text-[11px]">
+                      Slide {catalogCurrentSlide} / {totalCatalogSlides}
+                    </span>
+                    <button
+                      disabled={catalogCurrentSlide >= totalCatalogSlides}
+                      onClick={() => setCatalogCurrentSlide((s) => Math.min(totalCatalogSlides, s + 1))}
+                      className="px-3 py-1 bg-slate-950 border border-gray-800 rounded-lg hover:bg-slate-800 disabled:opacity-40 transition flex items-center gap-1"
+                    >
+                      Next Slide <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1557,24 +2087,35 @@ export default function AdminDashboardPage() {
 
               {/* Filters Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="text-xs text-gray-400 font-semibold">Filter by Country:</span>
-                  <select
-                    value={publishedCountryFilter}
-                    onChange={(e) => setPublishedCountryFilter(e.target.value)}
-                    className="text-xs py-1.5 px-3 bg-slate-950 border border-gray-800 text-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="ALL">🌍 All Countries</option>
-                    {ALL_COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.flag} {c.name}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={publishedSearchQuery}
+                      onChange={(e) => setPublishedSearchQuery(e.target.value)}
+                      placeholder="Search published news..."
+                      className="text-xs pl-8 pr-3 py-1.5 bg-slate-950 border border-gray-800 text-white rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 w-52"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Filter className="w-3.5 h-3.5 text-gray-400" />
+                    <select
+                      value={publishedCountryFilter}
+                      onChange={(e) => setPublishedCountryFilter(e.target.value)}
+                      className="text-xs py-1.5 px-3 bg-slate-950 border border-gray-800 text-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="ALL">🌍 All Countries</option>
+                      {ALL_COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <span className="text-xs text-gray-400 font-mono">
-                  {publishedArticles.filter((a) => publishedCountryFilter === 'ALL' || a.country_code === publishedCountryFilter).length} Articles Found
+                  {filteredPublishedArticles.length} Articles Found
                 </span>
               </div>
 
@@ -1600,16 +2141,14 @@ export default function AdminDashboardPage() {
                           Loading published stories from database...
                         </td>
                       </tr>
-                    ) : publishedArticles.filter((a) => publishedCountryFilter === 'ALL' || a.country_code === publishedCountryFilter).length === 0 ? (
+                    ) : filteredPublishedArticles.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="p-8 text-center text-gray-500">
-                          No published articles found for this filter. Click &ldquo;Publish New Story&rdquo; to publish an article.
+                          No published articles found matching &ldquo;{publishedSearchQuery || publishedCountryFilter}&rdquo;. Click &ldquo;Publish New Story&rdquo; to publish an article.
                         </td>
                       </tr>
                     ) : (
-                      publishedArticles
-                        .filter((a) => publishedCountryFilter === 'ALL' || a.country_code === publishedCountryFilter)
-                        .map((art) => (
+                      filteredPublishedArticles.map((art) => (
                           <tr key={art.id || art.slug} className="hover:bg-slate-800/40 transition">
                             <td className="p-3.5 font-bold text-white max-w-xs">
                               <Link
@@ -1909,6 +2448,548 @@ export default function AdminDashboardPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* TAB 7: ADVERT BOARD & SPONSOR MANAGEMENT */}
+          {activeTab === 'advert_board' && (
+            <div className="space-y-8">
+              <div className="border-b border-gray-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-black text-white flex items-center gap-2">
+                    <Megaphone className="w-5 h-5 text-amber-400" />
+                    <span>Sponsor Native Ad Board & Rate Card Matrix</span>
+                  </h2>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Determine native advertising rates for specific desktop and mobile sizes (300x300, Top Horizontal banner before news title, and Skyscraper). Manage live sponsor campaigns.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-3 py-1 bg-amber-950/70 border border-amber-800 text-amber-300 font-bold rounded-xl flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span>{sponsorCampaigns.filter((c) => c.is_active).length} Active Campaigns</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={fetchAdsData}
+                    disabled={isLoadingAds}
+                    className="p-2 bg-slate-800 hover:bg-slate-700 text-gray-300 rounded-xl transition border border-gray-700"
+                    title="Refresh campaigns"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isLoadingAds ? 'animate-spin text-blue-400' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {campaignSuccessMsg && (
+                <div className="p-4 bg-emerald-950/70 border border-emerald-800 text-emerald-300 text-xs font-bold rounded-2xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>{campaignSuccessMsg}</span>
+                </div>
+              )}
+
+              {rateSavedSuccess && (
+                <div className="p-4 bg-emerald-950/70 border border-emerald-800 text-emerald-300 text-xs font-bold rounded-2xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Ad pricing rates and size cards successfully updated!</span>
+                </div>
+              )}
+
+              {/* SECTION A: ADMIN DETERMINED PRICING MATRIX & SIZES SPECIFICATION */}
+              <div className="p-6 rounded-2xl bg-slate-950 border border-gray-800 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-blue-400" />
+                      <span>Admin Pricing Determination & Size Configuration</span>
+                    </h3>
+                    <p className="text-[11px] text-gray-400">
+                      Set pricing per size for desktop and mobile devices. These rates govern sponsor bookings.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 font-medium">Currency:</span>
+                    <select
+                      value={adRates?.currency || 'USD'}
+                      onChange={(e) => setAdRates({ ...adRates, currency: e.target.value })}
+                      className="text-xs py-1.5 px-3 bg-slate-900 border border-gray-700 text-white rounded-xl font-bold"
+                    >
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                      <option value="NGN">NGN (₦)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveRates} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {/* Size 1: Top Horizontal Banner (Before News Title) */}
+                    <div className="p-4 rounded-xl bg-slate-900/90 border border-gray-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-300">Top Horizontal Banner</span>
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-amber-950 border border-amber-800 text-amber-400 font-bold">
+                          Before Title
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-400">
+                        High-visibility top placement appearing right before article headlines across feeds and story views.
+                      </p>
+
+                      <div className="space-y-2 pt-1">
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1 mb-1">
+                            <Monitor className="w-3 h-3 text-blue-400" /> Desktop Size (728x90) Price:
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-xs text-gray-400">$</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={adRates?.top_horizontal?.desktop_price ?? 250}
+                              onChange={(e) =>
+                                setAdRates({
+                                  ...adRates,
+                                  top_horizontal: {
+                                    ...adRates?.top_horizontal,
+                                    desktop_price: Number(e.target.value),
+                                  },
+                                })
+                              }
+                              className="w-full text-xs pl-7 pr-3 py-1.5 bg-slate-950 border border-gray-700 text-white rounded-xl font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1 mb-1">
+                            <Smartphone className="w-3 h-3 text-emerald-400" /> Mobile Size (320x100) Price:
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-xs text-gray-400">$</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={adRates?.top_horizontal?.mobile_price ?? 150}
+                              onChange={(e) =>
+                                setAdRates({
+                                  ...adRates,
+                                  top_horizontal: {
+                                    ...adRates?.top_horizontal,
+                                    mobile_price: Number(e.target.value),
+                                  },
+                                })
+                              }
+                              className="w-full text-xs pl-7 pr-3 py-1.5 bg-slate-950 border border-gray-700 text-white rounded-xl font-bold"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Size 2: Square 300x300 Native Ad */}
+                    <div className="p-4 rounded-xl bg-slate-900/90 border border-gray-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-blue-300">Square 300x300 Native</span>
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-blue-950 border border-blue-800 text-blue-400 font-bold">
+                          In-Content & Feed
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-400">
+                        Integrated native sponsor card displayed in article bodies and feed timelines.
+                      </p>
+
+                      <div className="space-y-2 pt-1">
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1 mb-1">
+                            <Monitor className="w-3 h-3 text-blue-400" /> Desktop Size (300x300) Price:
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-xs text-gray-400">$</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={adRates?.square_300?.desktop_price ?? 200}
+                              onChange={(e) =>
+                                setAdRates({
+                                  ...adRates,
+                                  square_300: {
+                                    ...adRates?.square_300,
+                                    desktop_price: Number(e.target.value),
+                                  },
+                                })
+                              }
+                              className="w-full text-xs pl-7 pr-3 py-1.5 bg-slate-950 border border-gray-700 text-white rounded-xl font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1 mb-1">
+                            <Smartphone className="w-3 h-3 text-emerald-400" /> Mobile Size (300x300) Price:
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-xs text-gray-400">$</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={adRates?.square_300?.mobile_price ?? 120}
+                              onChange={(e) =>
+                                setAdRates({
+                                  ...adRates,
+                                  square_300: {
+                                    ...adRates?.square_300,
+                                    mobile_price: Number(e.target.value),
+                                  },
+                                })
+                              }
+                              className="w-full text-xs pl-7 pr-3 py-1.5 bg-slate-950 border border-gray-700 text-white rounded-xl font-bold"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Size 3: Skyscraper Vertical Ad */}
+                    <div className="p-4 rounded-xl bg-slate-900/90 border border-gray-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-purple-300">Skyscraper Sidebar</span>
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-purple-950 border border-purple-800 text-purple-400 font-bold">
+                          Sticky Sidebar
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-400">
+                        Desktop-only sticky banner flanking wide-screen article reading margins.
+                      </p>
+
+                      <div className="space-y-2 pt-1">
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1 mb-1">
+                            <Monitor className="w-3 h-3 text-blue-400" /> Desktop Size (160x600) Price:
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-xs text-gray-400">$</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={adRates?.skyscraper?.desktop_price ?? 180}
+                              onChange={(e) =>
+                                setAdRates({
+                                  ...adRates,
+                                  skyscraper: {
+                                    ...adRates?.skyscraper,
+                                    desktop_price: Number(e.target.value),
+                                  },
+                                })
+                              }
+                              className="w-full text-xs pl-7 pr-3 py-1.5 bg-slate-950 border border-gray-700 text-white rounded-xl font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 block mb-1">
+                            Billing Frequency:
+                          </label>
+                          <select
+                            value={adRates?.top_horizontal?.billing_period || 'per week'}
+                            onChange={(e) =>
+                              setAdRates({
+                                ...adRates,
+                                top_horizontal: { ...adRates?.top_horizontal, billing_period: e.target.value },
+                                square_300: { ...adRates?.square_300, billing_period: e.target.value },
+                                skyscraper: { ...adRates?.skyscraper, billing_period: e.target.value },
+                              })
+                            }
+                            className="w-full text-xs py-1.5 px-3 bg-slate-950 border border-gray-700 text-white rounded-xl"
+                          >
+                            <option value="per week">Per Week (7 Days)</option>
+                            <option value="per month">Per Month (30 Days)</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSavingRates}
+                      className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{isSavingRates ? 'Saving Rates...' : 'Save Pricing Rates'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* SECTION B: LAUNCH NEW SPONSOR AD CAMPAIGN */}
+              <div className="p-6 rounded-2xl bg-slate-950 border border-gray-800 space-y-5">
+                <div className="border-b border-gray-800 pb-3">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <PlusCircle className="w-4 h-4 text-emerald-400" />
+                    <span>Launch New Sponsor Campaign</span>
+                  </h3>
+                  <p className="text-[11px] text-gray-400">
+                    Register a paid brand sponsor ad with specific desktop and mobile creative files.
+                  </p>
+                </div>
+
+                <form onSubmit={handleCreateCampaign} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-300 block mb-1">Sponsor / Brand Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={campSponsorName}
+                        onChange={(e) => setCampSponsorName(e.target.value)}
+                        placeholder="e.g. Apex Civic Foundation, TechGov Africa..."
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-300 block mb-1">Campaign Headline / Slogan *</label>
+                      <input
+                        type="text"
+                        required
+                        value={campTitle}
+                        onChange={(e) => setCampTitle(e.target.value)}
+                        placeholder="e.g. Global Public Policy Summit 2027 Registration Open"
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-300 block mb-1">Ad Placement Slot *</label>
+                      <select
+                        value={campSlot}
+                        onChange={(e) => setCampSlot(e.target.value as any)}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="top_horizontal">Top Horizontal Banner (728x90 / 320x100) — Before Title</option>
+                        <option value="square_300">Square 300x300 Native Card (Desktop & Mobile)</option>
+                        <option value="skyscraper">Skyscraper 160x600 (Desktop Margins)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-300 block mb-1">Destination URL (Click Link) *</label>
+                      <input
+                        type="url"
+                        required
+                        value={campTargetUrl}
+                        onChange={(e) => setCampTargetUrl(e.target.value)}
+                        placeholder="https://sponsorwebsite.com/landing"
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-300 block mb-1">Target Country</label>
+                      <select
+                        value={campTargetCountry}
+                        onChange={(e) => setCampTargetCountry(e.target.value)}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="ALL">🌍 Global (All Countries)</option>
+                        {ALL_COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.flag} {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Desktop Image */}
+                    <div>
+                      <label className="text-xs font-bold text-gray-300 block mb-1">
+                        Desktop Creative Image URL * (e.g. 728x90, 300x300, 160x600)
+                      </label>
+                      <input
+                        type="url"
+                        required
+                        value={campDesktopImage}
+                        onChange={(e) => setCampDesktopImage(e.target.value)}
+                        placeholder="https://.../desktop-ad-banner.png"
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+
+                    {/* Mobile Image */}
+                    <div>
+                      <label className="text-xs font-bold text-gray-300 block mb-1">
+                        Mobile Creative Image URL (Optional - defaults to desktop image)
+                      </label>
+                      <input
+                        type="url"
+                        value={campMobileImage}
+                        onChange={(e) => setCampMobileImage(e.target.value)}
+                        placeholder="https://.../mobile-ad-banner.png (320x100 / 300x300)"
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-300 block mb-1">Price Charged / Paid ({adRates?.currency || 'USD'})</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={campPricePaid}
+                        onChange={(e) => setCampPricePaid(Number(e.target.value))}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-300 block mb-1">Campaign Duration (Days)</label>
+                      <select
+                        value={campDurationDays}
+                        onChange={(e) => setCampDurationDays(Number(e.target.value))}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value={7}>7 Days (1 Week)</option>
+                        <option value={14}>14 Days (2 Weeks)</option>
+                        <option value={30}>30 Days (1 Month)</option>
+                        <option value={60}>60 Days (2 Months)</option>
+                        <option value={90}>90 Days (Quarter)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={isCreatingCampaign}
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>{isCreatingCampaign ? 'Publishing Sponsor Ad...' : 'Launch Live Sponsor Campaign'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* SECTION C: ACTIVE & REGISTERED SPONSOR AD CAMPAIGNS */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-blue-400" />
+                    <span>Registered Sponsor Ad Campaigns ({sponsorCampaigns.length})</span>
+                  </h3>
+                  <span className="text-xs text-gray-400 font-mono">
+                    Zero blank frames served when inactive
+                  </span>
+                </div>
+
+                {sponsorCampaigns.length === 0 ? (
+                  <div className="p-8 rounded-2xl bg-slate-950 border border-gray-800 text-center space-y-2">
+                    <Megaphone className="w-8 h-8 text-gray-600 mx-auto" />
+                    <div className="text-xs font-semibold text-gray-300">No active sponsor campaigns yet</div>
+                    <p className="text-[11px] text-gray-500 max-w-md mx-auto">
+                      Use the form above to launch your first native brand sponsorship. When no sponsor is active, the news pages cleanly conceal ad slots to prevent empty boxes.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-gray-800">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-950 text-gray-400 uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="p-3.5">Sponsor & Title</th>
+                          <th className="p-3.5">Slot Placement</th>
+                          <th className="p-3.5">Creative Preview</th>
+                          <th className="p-3.5 text-right">Fee Paid</th>
+                          <th className="p-3.5 text-right">Impressions / Clicks</th>
+                          <th className="p-3.5 text-center">Status</th>
+                          <th className="p-3.5 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800">
+                        {sponsorCampaigns.map((camp) => (
+                          <tr key={camp.id} className="hover:bg-slate-800/40 transition">
+                            <td className="p-3.5 font-bold text-white max-w-xs">
+                              <div>{camp.sponsor_name}</div>
+                              <span className="text-[10px] text-gray-400 block truncate">{camp.ad_title}</span>
+                              <a
+                                href={camp.target_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] text-blue-400 font-mono hover:underline inline-flex items-center gap-0.5 mt-0.5"
+                              >
+                                <span className="truncate max-w-[150px]">{camp.target_url}</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-gray-300 border border-gray-700">
+                                {camp.slot_location === 'top_horizontal'
+                                  ? 'Top Horizontal (728x90 / 320x100)'
+                                  : camp.slot_location === 'square_300'
+                                  ? 'Square 300x300 Native'
+                                  : 'Skyscraper 160x600'}
+                              </span>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <img
+                                src={camp.desktop_image_url}
+                                alt={camp.sponsor_name}
+                                className="h-10 w-20 object-cover rounded border border-gray-700 bg-slate-900"
+                              />
+                            </td>
+                            <td className="p-3.5 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
+                              ${camp.price_paid}
+                            </td>
+                            <td className="p-3.5 text-right font-mono text-gray-300 whitespace-nowrap">
+                              <span>{(camp.impressions_count || 0).toLocaleString()} imp</span>
+                              <span className="text-gray-500 block text-[10px]">
+                                {(camp.clicks_count || 0).toLocaleString()} clicks
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-center whitespace-nowrap">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  camp.is_active
+                                    ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                                    : 'bg-red-950 text-red-400 border-red-800'
+                                }`}
+                              >
+                                {camp.is_active ? 'Active' : 'Paused'}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleCampaignStatus(camp.id, camp.is_active)}
+                                  className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-gray-300 text-[11px] font-bold border border-gray-700 transition"
+                                >
+                                  {camp.is_active ? 'Pause' : 'Activate'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCampaign(camp.id, camp.sponsor_name)}
+                                  className="p-1 rounded bg-red-950/60 hover:bg-red-900 text-red-400 border border-red-800 transition"
+                                  title="Delete campaign"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

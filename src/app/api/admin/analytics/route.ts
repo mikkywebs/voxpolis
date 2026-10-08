@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { ALL_COUNTRIES, getCountryByCode } from '@/config/countries';
+import { ALL_COUNTRIES, getCountryByCode, getCountrySlug } from '@/config/countries';
 import { analyticsStore } from '@/lib/analytics-tracker';
 
 export const dynamic = 'force-dynamic';
@@ -122,6 +122,40 @@ export async function GET(req: Request) {
       })
       .sort((a, b) => b.memberCount - a.memberCount);
 
+    const nowMs = Date.now();
+    const membersListWithRanks = membersList.map((m) => {
+      const createdAtTime = new Date(m.createdAt).getTime();
+      const tenureDays = Math.max(0, Math.floor((nowMs - createdAtTime) / (1000 * 60 * 60 * 24)));
+
+      let civicRank = 'New Citizen';
+      let rankBadge = '🌱 New Citizen';
+      if (m.isAdmin) {
+        civicRank = 'Diplomat (Admin)';
+        rankBadge = '👑 Super Admin';
+      } else if (tenureDays >= 180) {
+        civicRank = 'Ambassador';
+        rankBadge = '🎖️ Ambassador (>6mo)';
+      } else if (tenureDays >= 30) {
+        civicRank = 'Senior Citizen';
+        rankBadge = '🏛️ Senior Citizen (1-6mo)';
+      } else if (tenureDays >= 7) {
+        civicRank = 'Active Citizen';
+        rankBadge = '🗳️ Active Citizen (7-30d)';
+      } else {
+        civicRank = 'New Citizen';
+        rankBadge = '🌱 New Citizen (<7d)';
+      }
+
+      return {
+        ...m,
+        tenureDays,
+        civicRank,
+        rankBadge,
+        isNew: tenureDays <= 30,
+        isVeteran: tenureDays >= 180,
+      };
+    });
+
     // 2. Fetch Real Database Counts (Articles, Poll Votes, Comments, Feedback, Reactions)
     let databaseArticlesCount = 0;
     try {
@@ -153,9 +187,7 @@ export async function GET(req: Request) {
       totalFeedback = count || 0;
     } catch {}
 
-    // 3. News Count by Country & Total Active Catalog
-    // Each of the 119 supported nations has 8 dedicated journalistic policy briefs in the official digest catalog,
-    // plus syndicated wire stories and custom database published articles.
+    // 3. News Count by Country & Total Active Catalog across ALL 119 Desks
     const priorityDeskArticles: Record<string, number> = {
       NG: 14,
       US: 12,
@@ -174,20 +206,21 @@ export async function GET(req: Request) {
       RW: 8,
     };
 
-    // Calculate total active news count across all 119 countries
     const totalDesks = ALL_COUNTRIES.length; // 119
     const baseNewsPerDesk = 8;
     const additionalSyndicated = Object.values(priorityDeskArticles).reduce((acc, curr) => acc + (curr - baseNewsPerDesk), 0);
     const totalNewsCount = (totalDesks * baseNewsPerDesk) + additionalSyndicated + databaseArticlesCount;
 
-    // News count table for priority countries and rest of world
-    const newsCountByCountry = ALL_COUNTRIES.slice(0, 20).map((c) => {
+    // Full 119 countries catalog for pagination and slide navigation
+    const allCountryDesks = ALL_COUNTRIES.map((c) => {
       const count = (priorityDeskArticles[c.code] || baseNewsPerDesk) + (c.code === 'NG' ? databaseArticlesCount : 0);
       return {
         countryCode: c.code,
         countryName: c.name,
         flag: c.flag,
         capital: c.capital,
+        region: c.region,
+        slug: getCountrySlug(c),
         newsCount: count,
         status: 'Active Feed',
       };
@@ -202,6 +235,7 @@ export async function GET(req: Request) {
     // Build real page / article breakdown
     const recentArticleReads = globalStats.articles.map((art) => {
       const cObj = getCountryByCode(art.countryCode);
+      const engagementScore = art.totalReads + (art.memberReads * 2);
       return {
         id: art.articleId,
         slug: art.slug,
@@ -212,9 +246,48 @@ export async function GET(req: Request) {
         totalReads: art.totalReads,
         memberReads: art.memberReads,
         guestReads: art.guestReads,
+        engagementScore,
         lastReadAt: art.lastReadAt,
       };
     });
+
+    // 5. Country Performance Analytics: Highest and Least Performing Viewers / Countries
+    const countryPerformanceMap = new Map<string, {
+      countryCode: string;
+      countryName: string;
+      flag: string;
+      reads: number;
+      members: number;
+      engagementScore: number;
+    }>();
+
+    ALL_COUNTRIES.forEach((c) => {
+      const reads = globalStats.countryReads[c.code] || 0;
+      const members = countryMemberCount[c.code] || 0;
+      const engagementScore = (reads * 2) + (members * 5);
+      countryPerformanceMap.set(c.code, {
+        countryCode: c.code,
+        countryName: c.name,
+        flag: c.flag,
+        reads,
+        members,
+        engagementScore,
+      });
+    });
+
+    const performanceList = Array.from(countryPerformanceMap.values());
+    const topPerformingCountries = [...performanceList]
+      .sort((a, b) => b.engagementScore - a.engagementScore || b.reads - a.reads || b.members - a.members)
+      .slice(0, 10);
+
+    const leastPerformingCountries = [...performanceList]
+      .sort((a, b) => a.engagementScore - b.engagementScore || a.reads - b.reads || a.members - b.members)
+      .slice(0, 10);
+
+    // Trending news per countries based on views and engagements
+    const trendingNews = [...recentArticleReads]
+      .sort((a, b) => b.engagementScore - a.engagementScore || b.totalReads - a.totalReads)
+      .slice(0, 15);
 
     return NextResponse.json({
       success: true,
@@ -233,14 +306,21 @@ export async function GET(req: Request) {
       },
       members: {
         total: totalMembers,
-        list: membersList,
+        list: membersListWithRanks,
         byCountry: membersByCountry,
+        veteransCount: membersListWithRanks.filter((m) => m.isVeteran).length,
+        newCount: membersListWithRanks.filter((m) => m.isNew).length,
+      },
+      performance: {
+        topCountries: topPerformingCountries,
+        leastPerformingCountries,
+        trendingNews,
       },
       news: {
         totalNewsCount,
         databaseArticlesCount,
         totalDesks,
-        byCountry: newsCountByCountry,
+        byCountry: allCountryDesks,
       },
       traffic: {
         totalViews: liveTotalViews,
