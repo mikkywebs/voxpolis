@@ -81,6 +81,59 @@ export async function GET(request: NextRequest) {
   }
 
   const country = getCountryByCode(countryCode);
+
+  // 0. Fetch articles directly published to Supabase database for this country
+  let dbCountryArticles: ArticleData[] = [];
+  try {
+    const { supabaseAdmin } = await import('@/lib/supabase/admin');
+    const { data: dbRows, error: dbErr } = await supabaseAdmin
+      .from('articles')
+      .select('*')
+      .eq('country_code', countryCode)
+      .order('created_at', { ascending: false });
+
+    if (!dbErr && dbRows && dbRows.length > 0) {
+      dbCountryArticles = dbRows.map((dbArticle: any, idx: number) => {
+        const cleanTitle = decodeAllHtmlEntities(dbArticle.title || 'Political Update');
+        const cleanSnippet = decodeAllHtmlEntities(dbArticle.snippet || '');
+        const cleanContent = decodeAllHtmlEntities(dbArticle.content || '');
+
+        return {
+          id: dbArticle.id || `db-${dbArticle.slug}`,
+          slug: dbArticle.slug,
+          title: cleanTitle,
+          snippet: cleanSnippet,
+          content: cleanContent,
+          ai_analysis: dbArticle.ai_analysis || generateAiAnalysisSummary(cleanTitle, cleanSnippet, dbArticle.source_name || 'Voxpolis', country.name),
+          country_code: dbArticle.country_code || countryCode,
+          language: dbArticle.language || language,
+          category: dbArticle.category || 'politics',
+          image_mode: 'original' as const,
+          original_image_url: dbArticle.original_image_url || '/breaking-news-banner.png',
+          source_name: dbArticle.source_name || 'Voxpolis',
+          source_url: dbArticle.source_url || `https://voxpolis.app/news/${dbArticle.slug}`,
+          is_breaking: dbArticle.is_breaking !== undefined ? dbArticle.is_breaking : idx === 0,
+          tags: dbArticle.tags || ['Politics', country.name, 'Voxpolis'],
+          views_count: dbArticle.views_count || 0,
+          total_reading_time_seconds: dbArticle.total_reading_time_seconds || 180,
+          created_at: dbArticle.created_at || new Date().toISOString(),
+          author: dbArticle.author,
+          poll: (() => {
+            const q = generateCivicPollQuestion(cleanTitle, cleanSnippet);
+            return q ? {
+              id: `poll-${dbArticle.slug}`,
+              question: q,
+              agree_count: 0,
+              disagree_count: 0,
+            } : undefined;
+          })(),
+        };
+      });
+    }
+  } catch (e) {
+    console.warn('Error fetching database articles for country feed:', e);
+  }
+
   const apiKey = process.env.NEWSDATA_API_KEY;
   let newsDataArticles: ArticleData[] = [];
 
@@ -347,8 +400,16 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 5. Fallback to country localized template if zero articles match
-  if (rewrittenArticles.length === 0) {
+  // 5. Merge database-published articles (at the very top) with wire and rewritten articles
+  const combinedCountryArticles: ArticleData[] = [
+    ...dbCountryArticles,
+    ...rewrittenArticles.filter(
+      (r) => !dbCountryArticles.some((d) => d.slug === r.slug || d.title.toLowerCase() === r.title.toLowerCase())
+    ),
+  ];
+
+  // If both database and wire articles are empty, fallback to country localized template
+  if (combinedCountryArticles.length === 0) {
     const { fetchArticlesForCountry } = await import('@/lib/news');
     const fallbackArticles = await fetchArticlesForCountry(countryCode, language);
     return NextResponse.json(
@@ -358,7 +419,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { articles: rewrittenArticles, cached: false },
+    { articles: combinedCountryArticles, cached: false },
     { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } }
   );
 }

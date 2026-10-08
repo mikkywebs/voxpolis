@@ -27,6 +27,9 @@ import {
   Vote,
   MessageSquare,
   UserCheck,
+  ExternalLink,
+  Trash2,
+  PlusCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -53,7 +56,7 @@ export default function AdminDashboardPage() {
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<'analytics' | 'submissions' | 'pages' | 'publish' | 'logos'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'published' | 'publish' | 'submissions' | 'pages' | 'logos'>('analytics');
 
   // Static Pages State
   const [selectedPageKey, setSelectedPageKey] = useState<'about' | 'contact' | 'privacy' | 'terms'>('about');
@@ -78,6 +81,16 @@ export default function AdminDashboardPage() {
   const [isRefreshingAnalytics, setIsRefreshingAnalytics] = useState(false);
   const [lastAnalyticsSync, setLastAnalyticsSync] = useState<Date | null>(null);
 
+  // Published News Articles State
+  const [publishedArticles, setPublishedArticles] = useState<any[]>([]);
+  const [isLoadingPublished, setIsLoadingPublished] = useState(true);
+  const [publishedCountryFilter, setPublishedCountryFilter] = useState('ALL');
+  const [lastPublishedResult, setLastPublishedResult] = useState<any>(null);
+
+  // Admin Image Upload State
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
   const fetchLiveAnalytics = async (isManual = false) => {
     if (isManual) setIsRefreshingAnalytics(true);
     try {
@@ -97,11 +110,28 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchPublishedArticles = async () => {
+    setIsLoadingPublished(true);
+    try {
+      const res = await fetch('/api/admin/articles', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.articles) setPublishedArticles(data.articles);
+      }
+    } catch (e) {
+      console.warn('Failed to load published articles:', e);
+    } finally {
+      setIsLoadingPublished(false);
+    }
+  };
+
   useEffect(() => {
     fetchLiveAnalytics();
+    fetchPublishedArticles();
     // Real-time polling every 20 seconds
     const interval = setInterval(() => {
       fetchLiveAnalytics();
+      fetchPublishedArticles();
     }, 20000);
     return () => clearInterval(interval);
   }, []);
@@ -274,37 +304,88 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleAdminImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    setUploadError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/admin/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.imageUrl) {
+          setPubImage(data.imageUrl);
+        } else {
+          setUploadError('Failed to obtain image URL');
+        }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setUploadError(data.error || 'Image upload failed');
+      }
+    } catch (err: any) {
+      setUploadError(err?.message || 'Image upload failed');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleDeleteArticle = async (id: string, title: string) => {
+    if (!confirm(`Are you sure you want to remove and unpublish "${title}"?`)) return;
+    try {
+      const res = await fetch(`/api/admin/articles?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (res.ok) {
+        setPublishedArticles((prev) => prev.filter((a) => a.id !== id));
+        setActionSuccessMsg(`Article "${title}" removed from live database.`);
+        setTimeout(() => setActionSuccessMsg(''), 4000);
+        fetchLiveAnalytics();
+      }
+    } catch (e) {
+      console.error('Delete article error:', e);
+    }
+  };
+
   const handleUpdateSubmission = async (id: string, newStatus: 'published' | 'declined') => {
     try {
       const item = submissions.find((s) => s.id === id);
       if (newStatus === 'published' && item) {
-        // Publish to Supabase public.articles table
-        await supabase.from('articles').upsert({
-          slug: item.slug,
-          title: item.title,
-          snippet: item.snippet || item.content.slice(0, 200),
-          content: item.content,
-          ai_analysis: `• Strategic Perspective: Op-ed contribution by ${item.author_name}.\n• Editorial Context: Regional political commentary covering ${item.country_code}.`,
-          country_code: item.country_code,
-          language: 'en',
-          category: 'opinion',
-          image_mode: 'original',
-          original_image_url: item.featured_image_url,
-          source_name: `Voxpolis Columnist (${item.author_name})`,
-          source_url: `https://voxpolis.app/news/${item.slug}`,
-          is_breaking: false,
-          tags: ['Op-Ed', 'Column', item.country_code],
-          views_count: 0,
-          total_reading_time_seconds: Math.max(180, Math.round(item.word_count / 3)),
-          created_at: new Date().toISOString(),
-        }, { onConflict: 'slug' });
+        // Publish to Supabase via server admin API
+        const res = await fetch('/api/admin/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: item.title,
+            snippet: item.snippet || item.content.slice(0, 200),
+            content: item.content,
+            country_code: item.country_code,
+            image_url: item.featured_image_url,
+            category: 'opinion',
+            is_breaking: false,
+            tags: ['Op-Ed', 'Column', item.country_code, item.author_name],
+          }),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.error || 'Failed to publish columnist submission');
+          return;
+        }
       }
 
       setSubmissions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, status: newStatus } : s))
       );
-      setActionSuccessMsg(`Article ${newStatus === 'published' ? 'approved and published live' : 'declined'}.`);
+      setActionSuccessMsg(`Article ${newStatus === 'published' ? 'approved and published live on Voxpolis' : 'declined'}.`);
       setTimeout(() => setActionSuccessMsg(''), 4000);
+      fetchPublishedArticles();
+      fetchLiveAnalytics();
     } catch (e) {
       console.error(e);
     }
@@ -314,47 +395,43 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     setIsPublishing(true);
     setPubSuccess(false);
+    setLastPublishedResult(null);
 
     try {
-      const cleanTitle = pubTitle.trim();
-      const displayTitle = cleanTitle.endsWith(' - Voxpolis') ? cleanTitle : `${cleanTitle} - Voxpolis`;
-      const slug = cleanTitle
-        .toLowerCase()
-        .replace(/ - voxpolis$/i, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '')
-        .slice(0, 80);
+      const countryObj = getCountryByCode(pubCountry);
+      const res = await fetch('/api/admin/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: pubTitle,
+          snippet: pubSnippet,
+          content: pubContent,
+          country_code: pubCountry,
+          image_url: pubImage,
+          category: 'politics',
+          is_breaking: true,
+          tags: ['Breaking', 'Politics', countryObj?.name || pubCountry, 'Voxpolis'],
+        }),
+      });
 
-      const country = getCountryByCode(pubCountry);
+      const data = await res.json();
 
-      await supabase.from('articles').upsert({
-        slug,
-        title: displayTitle,
-        snippet: pubSnippet.trim() || pubContent.slice(0, 200),
-        content: pubContent.trim(),
-        ai_analysis: `• Strategic Context: Official executive dispatch for ${country?.name || pubCountry}.\n• Key Takeaway: Direct policy brief filed via Voxpolis Editorial Desk.`,
-        country_code: pubCountry,
-        language: 'en',
-        category: 'politics',
-        image_mode: 'original',
-        original_image_url: pubImage || '/breaking-news-banner.png',
-        source_name: 'Voxpolis Editorial Desk',
-        source_url: `https://voxpolis.app/news/${slug}`,
-        is_breaking: true,
-        tags: ['Breaking', 'Politics', country?.name || pubCountry],
-        views_count: 0,
-        total_reading_time_seconds: 240,
-        created_at: new Date().toISOString(),
-      }, { onConflict: 'slug' });
-
-      setPubSuccess(true);
-      setPubTitle('');
-      setPubSnippet('');
-      setPubContent('');
-      setPubImage('');
-      setTimeout(() => setPubSuccess(false), 4000);
-    } catch (e) {
-      console.error(e);
+      if (res.ok && data.success) {
+        setPubSuccess(true);
+        setLastPublishedResult(data);
+        setPubTitle('');
+        setPubSnippet('');
+        setPubContent('');
+        setPubImage('');
+        // Immediately refresh published list and analytics
+        fetchPublishedArticles();
+        fetchLiveAnalytics();
+      } else {
+        alert(data.error || 'Failed to publish article');
+      }
+    } catch (e: any) {
+      console.error('Publish error:', e);
+      alert('Error publishing article: ' + e.message);
     } finally {
       setIsPublishing(false);
     }
@@ -427,6 +504,30 @@ export default function AdminDashboardPage() {
           </button>
 
           <button
+            onClick={() => setActiveTab('publish')}
+            className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition text-left ${
+              activeTab === 'publish'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-gray-300 hover:bg-slate-800'
+            }`}
+          >
+            <Send className="w-4 h-4" />
+            <span>Publish Direct News</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('published')}
+            className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition text-left ${
+              activeTab === 'published'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-gray-300 hover:bg-slate-800'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>Published News ({publishedArticles.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('submissions')}
             className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition text-left ${
               activeTab === 'submissions'
@@ -435,7 +536,7 @@ export default function AdminDashboardPage() {
             }`}
           >
             <PenTool className="w-4 h-4" />
-            <span>Columnist Submissions ({submissions.filter((s) => s.status === 'pending_review').length})</span>
+            <span>Guest & Columnist Submissions ({submissions.length})</span>
           </button>
 
           <button
@@ -448,18 +549,6 @@ export default function AdminDashboardPage() {
           >
             <Layers className="w-4 h-4" />
             <span>Edit Static Pages (CMS)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('publish')}
-            className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition text-left ${
-              activeTab === 'publish'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-gray-300 hover:bg-slate-800'
-            }`}
-          >
-            <Send className="w-4 h-4" />
-            <span>Publish Direct News</span>
           </button>
 
           <button
@@ -876,19 +965,19 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* TAB 2: COLUMNIST SUBMISSIONS */}
+          {/* TAB 2: GUEST & COLUMNIST SUBMISSIONS */}
           {activeTab === 'submissions' && (
             <div className="space-y-6">
               <div className="border-b border-gray-800 pb-4">
-                <h2 className="text-xl font-black text-white">Columnist & Op-Ed Submissions Review Desk</h2>
+                <h2 className="text-xl font-black text-white">Guest & Columnist Submissions Review Desk</h2>
                 <p className="text-xs text-gray-400">
-                  Review submitted articles from accredited columnists. Only articles of 500+ words meeting editorial decency are eligible for publication.
+                  Review and moderate submitted op-eds and guest citizen articles. Approving an article immediately publishes it live to the target country feed under Voxpolis.
                 </p>
               </div>
 
               {submissions.length === 0 ? (
                 <div className="p-12 text-center text-gray-400 text-xs">
-                  No columnist submissions in queue.
+                  No guest or columnist submissions in queue yet.
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1076,26 +1165,58 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* TAB 4: PUBLISH DIRECT NEWS */}
+          {/* TAB 3: PUBLISH DIRECT NEWS */}
           {activeTab === 'publish' && (
             <div className="space-y-6">
-              <div className="border-b border-gray-800 pb-4">
-                <h2 className="text-xl font-black text-white">Direct News & Editorial Publisher</h2>
-                <p className="text-xs text-gray-400">
-                  Compose breaking news, administrative briefs, or official reports and publish immediately to any country feed.
-                </p>
+              <div className="border-b border-gray-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-black text-white">Direct News & Editorial Publisher</h2>
+                  <p className="text-xs text-gray-400">
+                    Publish official breaking news and policy briefs directly to national feeds as official Voxpolis reporting. Every article published here appears live under source <span className="text-blue-400 font-semibold">Voxpolis</span>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('published')}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-gray-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5 self-start sm:self-auto border border-gray-700 shrink-0"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-400" />
+                  <span>View All Published News ({publishedArticles.length})</span>
+                </button>
               </div>
 
-              {pubSuccess && (
-                <div className="p-3.5 bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs font-bold rounded-2xl flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" /> News published live to {pubCountry} feed!
+              {/* Success Feedback Card with Instant Live Links */}
+              {pubSuccess && lastPublishedResult && (
+                <div className="p-4 bg-emerald-950/80 border border-emerald-700 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2 text-emerald-300 text-xs font-bold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Article successfully published live to the Voxpolis database and national news space!</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <Link
+                      href={lastPublishedResult.liveUrl}
+                      target="_blank"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow transition"
+                    >
+                      <span>View Live Article ({lastPublishedResult.liveUrl})</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                    <Link
+                      href={`/${lastPublishedResult.countrySlug}`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-gray-200 text-xs font-bold rounded-xl transition border border-gray-700"
+                    >
+                      <span>View on Country Feed (/{lastPublishedResult.countrySlug})</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </div>
               )}
 
               <form onSubmit={handleDirectPublish} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-gray-300 block mb-1">Target Country</label>
+                    <label className="text-xs font-bold text-gray-300 block mb-1">Target Country *</label>
                     <select
                       value={pubCountry}
                       onChange={(e) => setPubCountry(e.target.value)}
@@ -1103,20 +1224,63 @@ export default function AdminDashboardPage() {
                     >
                       {ALL_COUNTRIES.map((c) => (
                         <option key={c.code} value={c.code}>
-                          {c.flag} {c.name}
+                          {c.flag} {c.name} ({c.code})
                         </option>
                       ))}
                     </select>
                   </div>
+
+                  {/* Image Upload & Preview Section */}
                   <div>
-                    <label className="text-xs font-bold text-gray-300 block mb-1">Featured Photo Image URL</label>
-                    <input
-                      type="url"
-                      value={pubImage}
-                      onChange={(e) => setPubImage(e.target.value)}
-                      placeholder="https://..."
-                      className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <label className="text-xs font-bold text-gray-300 block mb-1">Featured Article Photo</label>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow transition active:scale-95 shrink-0">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{isUploadingImage ? 'Uploading Image...' : 'Upload Image'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={isUploadingImage}
+                            onChange={handleAdminImageUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        <input
+                          type="url"
+                          value={pubImage}
+                          onChange={(e) => setPubImage(e.target.value)}
+                          placeholder="Or paste image URL (https://...)"
+                          className="w-full text-xs p-2.5 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                        />
+                      </div>
+
+                      {uploadError && (
+                        <p className="text-[11px] text-red-400 font-medium">{uploadError}</p>
+                      )}
+
+                      {pubImage && (
+                        <div className="relative inline-flex items-center gap-3 p-2 bg-slate-950 border border-gray-800 rounded-xl">
+                          <img
+                            src={pubImage}
+                            alt="Article Photo Preview"
+                            className="h-16 w-24 object-cover rounded-lg border border-gray-700"
+                          />
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-emerald-400 font-bold block flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> Photo Attached
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setPubImage('')}
+                              className="text-[10px] text-red-400 hover:text-red-300 font-semibold"
+                            >
+                              Remove photo
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1127,7 +1291,7 @@ export default function AdminDashboardPage() {
                     required
                     value={pubTitle}
                     onChange={(e) => setPubTitle(e.target.value)}
-                    placeholder="Headline will automatically end with - Voxpolis..."
+                    placeholder="e.g. Syria Security Council Reaches Historic Border Accord..."
                     className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1138,7 +1302,7 @@ export default function AdminDashboardPage() {
                     type="text"
                     value={pubSnippet}
                     onChange={(e) => setPubSnippet(e.target.value)}
-                    placeholder="Short 1-2 sentence overview for feed cards..."
+                    placeholder="Short 1-2 sentence overview for feed cards (optional, auto-generated if left empty)..."
                     className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1150,8 +1314,8 @@ export default function AdminDashboardPage() {
                     required
                     value={pubContent}
                     onChange={(e) => setPubContent(e.target.value)}
-                    placeholder="Full detailed journalistic coverage and policy insights..."
-                    className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
+                    placeholder="Write the full journalistic report, executive statements, and diplomatic analysis..."
+                    className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed font-sans"
                   />
                 </div>
 
@@ -1162,10 +1326,235 @@ export default function AdminDashboardPage() {
                     className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2"
                   >
                     <Send className="w-4 h-4" />
-                    <span>{isPublishing ? 'Publishing...' : 'Publish Live Immediately'}</span>
+                    <span>{isPublishing ? 'Publishing to Live Database...' : 'Publish Live to Voxpolis Immediately'}</span>
                   </button>
                 </div>
               </form>
+
+              {/* Quick Roster of Recently Published Articles */}
+              <div className="pt-6 border-t border-gray-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-blue-400" />
+                    <span>Recently Published Articles by Voxpolis</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('published')}
+                    className="text-xs text-blue-400 hover:text-blue-300 font-semibold"
+                  >
+                    View All ({publishedArticles.length}) →
+                  </button>
+                </div>
+
+                {publishedArticles.length === 0 ? (
+                  <div className="p-6 bg-slate-950 rounded-2xl border border-gray-800 text-center text-xs text-gray-500">
+                    No articles published yet. Use the form above to publish your first story.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-gray-800">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-950 text-gray-400 uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="p-3.5">Headline</th>
+                          <th className="p-3.5">Country</th>
+                          <th className="p-3.5">Source</th>
+                          <th className="p-3.5">Date</th>
+                          <th className="p-3.5 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800">
+                        {publishedArticles.slice(0, 5).map((art) => (
+                          <tr key={art.id || art.slug} className="hover:bg-slate-800/40 transition">
+                            <td className="p-3.5 font-bold text-white">
+                              <div className="line-clamp-1">{art.title}</div>
+                              <span className="text-[10px] text-gray-500 font-mono">/news/{art.slug}</span>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1.5 text-xs text-gray-200">
+                                <span>{art.country_flag}</span>
+                                <span>{art.country_name}</span>
+                              </span>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950 text-blue-400 border border-blue-800">
+                                {art.source_name || 'Voxpolis'}
+                              </span>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap text-gray-400 font-mono text-[11px]">
+                              {new Date(art.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <Link
+                                href={art.live_url}
+                                target="_blank"
+                                className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 font-bold"
+                              >
+                                <span>View Live</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: PUBLISHED NEWS & ARTICLES MANAGER */}
+          {activeTab === 'published' && (
+            <div className="space-y-6">
+              <div className="border-b border-gray-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-black text-white">Published News & Articles Manager</h2>
+                  <p className="text-xs text-gray-400">
+                    Live database registry of all articles published by Voxpolis. Every article here is active live across national feeds.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('publish')}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    <span>Publish New Story</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fetchPublishedArticles}
+                    disabled={isLoadingPublished}
+                    className="p-2 bg-slate-800 hover:bg-slate-700 text-gray-300 rounded-xl transition border border-gray-700"
+                    title="Refresh list"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isLoadingPublished ? 'animate-spin text-blue-400' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-xs text-gray-400 font-semibold">Filter by Country:</span>
+                  <select
+                    value={publishedCountryFilter}
+                    onChange={(e) => setPublishedCountryFilter(e.target.value)}
+                    className="text-xs py-1.5 px-3 bg-slate-950 border border-gray-800 text-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="ALL">🌍 All Countries</option>
+                    {ALL_COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <span className="text-xs text-gray-400 font-mono">
+                  {publishedArticles.filter((a) => publishedCountryFilter === 'ALL' || a.country_code === publishedCountryFilter).length} Articles Found
+                </span>
+              </div>
+
+              {/* Full Published Table */}
+              <div className="overflow-x-auto rounded-2xl border border-gray-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-950 text-gray-400 uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="p-3.5">Headline & Slug</th>
+                      <th className="p-3.5">Country</th>
+                      <th className="p-3.5">Source</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5 text-right">Views</th>
+                      <th className="p-3.5">Date Published</th>
+                      <th className="p-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {isLoadingPublished ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-gray-400">
+                          <RotateCcw className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-400" />
+                          Loading published stories from database...
+                        </td>
+                      </tr>
+                    ) : publishedArticles.filter((a) => publishedCountryFilter === 'ALL' || a.country_code === publishedCountryFilter).length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-gray-500">
+                          No published articles found for this filter. Click &ldquo;Publish New Story&rdquo; to publish an article.
+                        </td>
+                      </tr>
+                    ) : (
+                      publishedArticles
+                        .filter((a) => publishedCountryFilter === 'ALL' || a.country_code === publishedCountryFilter)
+                        .map((art) => (
+                          <tr key={art.id || art.slug} className="hover:bg-slate-800/40 transition">
+                            <td className="p-3.5 font-bold text-white max-w-xs">
+                              <Link
+                                href={art.live_url}
+                                target="_blank"
+                                className="line-clamp-1 hover:text-blue-400 transition"
+                              >
+                                {art.title}
+                              </Link>
+                              <span className="text-[10px] text-gray-500 font-mono block">/news/{art.slug}</span>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1.5 text-xs text-gray-200">
+                                <span>{art.country_flag}</span>
+                                <span>{art.country_name}</span>
+                                <span className="text-[10px] text-gray-500 font-mono">({art.country_code})</span>
+                              </span>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950 text-blue-400 border border-blue-800">
+                                {art.source_name || 'Voxpolis'}
+                              </span>
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
+                                Live On Site
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-right font-mono text-gray-300 font-semibold whitespace-nowrap">
+                              {art.views_count.toLocaleString()}
+                            </td>
+                            <td className="p-3.5 text-gray-400 font-mono text-[11px] whitespace-nowrap">
+                              {new Date(art.created_at).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-2">
+                                <Link
+                                  href={art.live_url}
+                                  target="_blank"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs font-bold rounded-lg border border-gray-700 transition"
+                                >
+                                  <span>View</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteArticle(art.id, art.title)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-950/60 hover:bg-red-900 text-red-400 text-xs font-bold rounded-lg border border-red-800 transition"
+                                  title="Delete and unpublish from database"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

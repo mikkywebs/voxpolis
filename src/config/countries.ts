@@ -173,10 +173,10 @@ export const ALL_COUNTRIES: CountryConfig[] = [
   { code: 'QA', name: 'Qatar', flag: '🇶🇦', capital: 'Doha', lat: 25.2854, lon: 51.5310, continent: 'Asia', region: 'Middle East', languages: [{ code: 'ar', name: 'Arabic' }, { code: 'en', name: 'English' }] },
   { code: 'IR', name: 'Iran', flag: '🇮🇷', capital: 'Tehran', lat: 35.6892, lon: 51.3890, continent: 'Asia', region: 'Middle East', languages: [{ code: 'fa', name: 'Persian' }] },
   { code: 'IQ', name: 'Iraq', flag: '🇮🇶', capital: 'Baghdad', lat: 33.3152, lon: 44.3661, continent: 'Asia', region: 'Middle East', languages: [{ code: 'ar', name: 'Arabic' }, { code: 'ku', name: 'Kurdish' }] },
-  { code: 'JO', name: 'Jordan', flag: '🇯🇴', capital: 'Amman', lat: 31.9454, lon: 35.9284, continent: 'Asia', region: 'Middle East', languages: [{ code: 'ar', name: 'Arabic' }] },
+  { code: 'JO', name: 'Jordan', flag: '🇯🇴', capital: 'Amman', lat: 31.9454, lon: 35.9284, continent: 'Asia', region: 'Middle East', languages: [{ code: 'ar', name: 'Arabic' }, { code: 'en', name: 'English' }] },
   { code: 'LB', name: 'Lebanon', flag: '🇱🇧', capital: 'Beirut', lat: 33.8938, lon: 35.5018, continent: 'Asia', region: 'Middle East', languages: [{ code: 'ar', name: 'Arabic' }, { code: 'fr', name: 'French' }] },
   { code: 'TR', name: 'Türkiye', flag: '🇹🇷', capital: 'Ankara', lat: 39.9334, lon: 32.8597, continent: 'Asia', region: 'Middle East', languages: [{ code: 'tr', name: 'Turkish' }] },
-  { code: 'SY', name: 'Syria', flag: '🇸🇾', capital: 'Damascus', lat: 33.5138, lon: 36.2765, continent: 'Asia', region: 'Middle East', languages: [{ code: 'ar', name: 'Arabic' }] },
+  { code: 'SY', name: 'Syria', flag: '🇸🇾', capital: 'Damascus', lat: 33.5138, lon: 36.2765, continent: 'Asia', region: 'Middle East', languages: [{ code: 'en', name: 'English' }, { code: 'ar', name: 'Arabic' }] },
 ];
 
 export const SUPPORTED_COUNTRIES = ALL_COUNTRIES;
