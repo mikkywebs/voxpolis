@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { ExternalLink, AlertCircle, Clock, Eye, Sparkles } from 'lucide-react';
 import { formatExactTimestamp, formatCleanSnippet, BREAKING_NEWS_FALLBACK, getStandardFallbackImage } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
@@ -40,12 +41,17 @@ export default function ArticleImageHeader({
     ? BREAKING_NEWS_FALLBACK
     : getStandardFallbackImage(title);
 
-  const displayImage =
+  const hasValidOriginalImage =
     originalImageUrl &&
-    originalImageUrl.startsWith('http') &&
-    !originalImageUrl.includes('google.com/news')
-      ? originalImageUrl
-      : fallbackImage;
+    originalImageUrl.trim() !== '' &&
+    !originalImageUrl.includes('google.com/news');
+
+  const displayImage = hasValidOriginalImage ? originalImageUrl.trim() : fallbackImage;
+
+  const isVoxpolisSource =
+    sourceName.toLowerCase().includes('voxpolis') ||
+    sourceUrl.toLowerCase().includes('voxpolis.app') ||
+    sourceUrl.startsWith('/');
 
   const cleanTitle = decodeAllHtmlEntities((title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
 
@@ -119,15 +125,24 @@ export default function ArticleImageHeader({
           />
           <div className="p-2.5 bg-gray-900/90 text-white text-xs flex items-center justify-between gap-2">
             <span className="truncate">Image Credit: {sourceName}</span>
-            <a
-              href={sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-blue-400 hover:text-blue-300 shrink-0 font-semibold"
-            >
-              <span>View Original</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            {isVoxpolisSource ? (
+              <Link
+                href="/"
+                className="flex items-center gap-1 text-blue-400 hover:text-blue-300 shrink-0 font-semibold"
+              >
+                <span>Voxpolis.app</span>
+              </Link>
+            ) : (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-blue-400 hover:text-blue-300 shrink-0 font-semibold"
+              >
+                <span>View Original</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
           </div>
         </div>
       </div>

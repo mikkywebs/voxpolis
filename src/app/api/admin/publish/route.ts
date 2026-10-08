@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       is_breaking = false,
       is_featured = true,
       tags = [],
+      poll_question,
     } = body;
 
     if (!title || !title.trim()) {
@@ -28,7 +29,8 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanTitle = title.trim();
-    const displayTitle = cleanTitle.endsWith(' - Voxpolis') ? cleanTitle : `${cleanTitle} - Voxpolis`;
+    // Leave title exactly as written by admin - never alter or force suffixes
+    const displayTitle = cleanTitle;
     
     // Generate clean URL slug
     const baseSlug = cleanTitle
@@ -63,8 +65,6 @@ export async function POST(request: NextRequest) {
       countryName
     );
 
-    const pollQuestion = generateCivicPollQuestion(cleanTitle, cleanSnippet);
-
     const tagList: string[] = Array.isArray(tags) && tags.length > 0 ? [...tags] : ['Politics', countryName, 'Voxpolis'];
     if (is_featured && !tagList.some((t) => /featured/i.test(t))) {
       tagList.unshift('Featured News');
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       language: 'en',
       category: category || 'politics',
       image_mode: 'original',
-      original_image_url: image_url || '/breaking-news-banner.png',
+      original_image_url: image_url && image_url.trim() ? image_url.trim() : (is_breaking ? '/breaking-news-banner.png' : '/voxpolis-fallback-1.png'),
       source_name: 'Voxpolis',
       source_url: `https://voxpolis.app/news/${slug}`,
       is_breaking: !!is_breaking,
@@ -105,6 +105,38 @@ export async function POST(request: NextRequest) {
         { success: false, error: error.message || 'Failed to save article to database' },
         { status: 500 }
       );
+    }
+
+    // If admin explicitly provided a custom civic poll question, attach it to polls table
+    if (poll_question && typeof poll_question === 'string' && poll_question.trim()) {
+      try {
+        const articleId = data?.id;
+        if (articleId) {
+          const { data: existingPoll } = await supabaseAdmin
+            .from('polls')
+            .select('id')
+            .eq('article_id', articleId)
+            .maybeSingle();
+
+          if (existingPoll?.id) {
+            await supabaseAdmin
+              .from('polls')
+              .update({ question: poll_question.trim() })
+              .eq('id', existingPoll.id);
+          } else {
+            await supabaseAdmin
+              .from('polls')
+              .insert({
+                article_id: articleId,
+                question: poll_question.trim(),
+                agree_count: 0,
+                disagree_count: 0,
+              });
+          }
+        }
+      } catch (pollErr) {
+        console.warn('Could not save poll for article:', pollErr);
+      }
     }
 
     return NextResponse.json({

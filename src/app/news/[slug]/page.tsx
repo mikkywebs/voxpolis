@@ -396,7 +396,7 @@ export default function NewsDetailPage() {
                         ...prev,
                         content: brief,
                         author: cachedMeta.author || prev.author,
-                        title: cachedMeta.headline ? `${cachedMeta.headline} - Voxpolis` : prev.title,
+                        title: cachedMeta.headline ? cachedMeta.headline : prev.title,
                       }
                     : prev
                 );
@@ -413,12 +413,18 @@ export default function NewsDetailPage() {
           }
         }
 
-        // If not yet AI-rewritten, trigger Multi-AI extraction (Gemini / Kimi / DeepSeek / Claude)
+        // If not yet AI-rewritten, trigger Multi-AI extraction ONLY for external raw RSS feeds
+        // NEVER run on Voxpolis desk articles, database articles, or guest submissions
+        const isInternalVoxpolisArticle =
+          found.id?.startsWith('db-') ||
+          found.source_name?.toLowerCase().includes('voxpolis') ||
+          (found.source_url && (found.source_url.includes('voxpolis.app') || !found.source_url.startsWith('http')));
+
         if (
           !isAlreadyAiRewritten &&
+          !isInternalVoxpolisArticle &&
           found.source_url &&
-          found.source_url.startsWith('http') &&
-          !found.source_url.includes('voxpolis.app')
+          found.source_url.startsWith('http')
         ) {
           fetch(`/api/news/extract?url=${encodeURIComponent(found.source_url)}`)
             .then((r) => r.json())
@@ -478,7 +484,7 @@ export default function NewsDetailPage() {
                       ...prev,
                       content: final4Paras,
                       author: extracted.author || prev.author,
-                      title: extracted.headline ? `${extracted.headline} - Voxpolis` : prev.title,
+                      title: extracted.headline ? extracted.headline : prev.title,
                     };
                     try {
                       localStorage.setItem(`voxpolis_article_${slug}`, JSON.stringify(updated));

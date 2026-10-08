@@ -318,6 +318,7 @@ export default function AdminDashboardPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [pubIsBreaking, setPubIsBreaking] = useState(false);
   const [pubIsFeatured, setPubIsFeatured] = useState(true);
+  const [pubPollQuestion, setPubPollQuestion] = useState('');
 
   // Check Admin Authorization
   useEffect(() => {
@@ -590,6 +591,7 @@ export default function AdminDashboardPage() {
           is_breaking: pubIsBreaking,
           is_featured: pubIsFeatured,
           tags: articleTags,
+          poll_question: pubPollQuestion.trim() || undefined,
         }),
       });
 
@@ -602,6 +604,7 @@ export default function AdminDashboardPage() {
         setPubSnippet('');
         setPubContent('');
         setPubImage('');
+        setPubPollQuestion('');
         setPubIsBreaking(false);
         setPubIsFeatured(true);
         // Immediately refresh published list and analytics
@@ -1956,6 +1959,26 @@ export default function AdminDashboardPage() {
                       </div>
                     </label>
                   </div>
+                </div>
+
+                {/* Optional Civic Poll Question */}
+                <div className="p-4 bg-slate-950/80 rounded-xl border border-gray-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-200 block">
+                      Civic Poll / Opinion Question (Optional)
+                    </label>
+                    <span className="text-[10px] text-gray-400 font-medium">Leave blank if no debate is needed</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={pubPollQuestion}
+                    onChange={(e) => setPubPollQuestion(e.target.value)}
+                    placeholder="e.g. Do you support removing fuel tariffs to lower transport costs? (Must end with '?')"
+                    className="w-full text-xs p-3 rounded-xl border border-gray-800 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-[11px] text-gray-400">
+                    Voxpolis rule: Only articles with genuine policy controversies should feature an opinion/poll section. If you leave this field empty, no poll section will appear on this news article.
+                  </p>
                 </div>
 
                 <div className="pt-2">

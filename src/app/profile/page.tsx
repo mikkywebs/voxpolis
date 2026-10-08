@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SiteLogo from '@/components/branding/SiteLogo';
 import { ALL_COUNTRIES, CountryConfig, getCountryByCode, getCountrySlug } from '@/config/countries';
 import { getMemberBadge } from '@/lib/badges';
-import { ArrowLeft, ArrowRight, User, ShieldCheck, Mail, Globe, Save, CheckCircle2, AlertCircle, Sparkles, Award, Lock, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, User, ShieldCheck, Mail, Globe, Save, CheckCircle2, AlertCircle, Sparkles, Award, Lock, Check, Search, X, ChevronDown } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -24,6 +24,22 @@ export default function ProfilePage() {
   const [primaryCountry, setPrimaryCountry] = useState('NG');
   const [followedCountries, setFollowedCountries] = useState<string[]>([]);
   const [memberSince, setMemberSince] = useState<string | null>(null);
+
+  // Searchable Country Typeahead States
+  const [countrySearchQuery, setCountrySearchQuery] = useState('');
+  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
+  const [followedSearchQuery, setFollowedSearchQuery] = useState('');
+  const countryPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (countryPickerRef.current && !countryPickerRef.current.contains(event.target as Node)) {
+        setIsCountryDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     async function loadProfile() {
@@ -163,6 +179,29 @@ export default function ProfilePage() {
 
   const { badge, daysActive, progressPercent } = getMemberBadge(memberSince);
   const countryObj = getCountryByCode(primaryCountry);
+
+  const filteredPrimaryCountries = ALL_COUNTRIES.filter((c) => {
+    if (!countrySearchQuery.trim()) return true;
+    const q = countrySearchQuery.toLowerCase().trim();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      c.code.toLowerCase().includes(q) ||
+      getCountrySlug(c).toLowerCase().includes(q) ||
+      (c.capital && c.capital.toLowerCase().includes(q))
+    );
+  });
+
+  const filteredFollowedCountries = ALL_COUNTRIES.filter((c) => {
+    if (c.code === primaryCountry) return false;
+    if (!followedSearchQuery.trim()) return true;
+    const q = followedSearchQuery.toLowerCase().trim();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      c.code.toLowerCase().includes(q) ||
+      getCountrySlug(c).toLowerCase().includes(q) ||
+      (c.capital && c.capital.toLowerCase().includes(q))
+    );
+  });
 
   if (loading) {
     return (
@@ -332,8 +371,8 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Primary Country Desk Selector */}
-            <div>
+            {/* Primary Country Desk Selector with Typeahead Search */}
+            <div ref={countryPickerRef} className="space-y-2">
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
                   Primary Country Newsroom *
@@ -346,32 +385,147 @@ export default function ProfilePage() {
                   <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
-              <div className="relative">
-                <select
-                  value={primaryCountry}
-                  onChange={(e) => setPrimaryCountry(e.target.value)}
-                  className="w-full text-xs p-3 pl-9 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+              {/* Active Selected Country Banner */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{countryObj.flag}</span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-900 dark:text-white">
+                        {countryObj.name}
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-blue-600 text-white">
+                        {countryObj.code}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                      Capital: {countryObj.capital || 'National'} • Active National Newsroom
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
+                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-gray-700 transition flex items-center gap-1 shadow-sm"
                 >
-                  {ALL_COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.flag} {c.name} ({c.code})
-                    </option>
-                  ))}
-                </select>
-                <Globe className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
+                  <span>{isCountryDropdownOpen ? 'Close List' : 'Change Country'}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isCountryDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {/* Searchable Input & Floating Results Dropdown */}
+              <div className="relative">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={countrySearchQuery}
+                    onFocus={() => setIsCountryDropdownOpen(true)}
+                    onChange={(e) => {
+                      setCountrySearchQuery(e.target.value);
+                      setIsCountryDropdownOpen(true);
+                    }}
+                    placeholder="Type country name or code to search (e.g. Syria, Nigeria, France)..."
+                    className="w-full text-xs p-3 pl-9 pr-9 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                  />
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
+                  {countrySearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setCountrySearchQuery('')}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Floating Suggestions List when open */}
+                {isCountryDropdownOpen && (
+                  <div className="absolute z-30 left-0 right-0 mt-1.5 max-h-64 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl divide-y divide-gray-100 dark:divide-gray-800">
+                    <div className="p-2 bg-gray-50 dark:bg-gray-800/80 sticky top-0 z-10 flex items-center justify-between text-[11px] font-bold text-gray-500 dark:text-gray-400 px-3">
+                      <span>Matching Countries ({filteredPrimaryCountries.length})</span>
+                      <span className="text-[10px] font-normal">Click country to select</span>
+                    </div>
+
+                    {filteredPrimaryCountries.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-gray-500 dark:text-gray-400">
+                        No countries found matching &ldquo;{countrySearchQuery}&rdquo;. Try another name or code.
+                      </div>
+                    ) : (
+                      filteredPrimaryCountries.map((c) => {
+                        const isSelected = c.code === primaryCountry;
+                        return (
+                          <button
+                            key={c.code}
+                            type="button"
+                            onClick={() => {
+                              setPrimaryCountry(c.code);
+                              setCountrySearchQuery('');
+                              setIsCountryDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition hover:bg-blue-50 dark:hover:bg-blue-950/60 ${
+                              isSelected
+                                ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-bold'
+                                : 'text-gray-800 dark:text-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-xl">{c.flag}</span>
+                              <div>
+                                <span className="font-semibold text-xs block">{c.name}</span>
+                                <span className="text-[10px] text-gray-400 font-normal">
+                                  {c.capital ? `${c.capital} • ` : ''}Code: {c.code}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                                {c.code}
+                              </span>
+                              {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />}
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Followed Countries for My VoxPolis (Up to 5) */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
                   Followed Countries for My VoxPolis (Choose up to 5)
                 </label>
                 <span className="text-[10px] text-gray-400 font-semibold">{followedCountries.length} of 5 selected</span>
               </div>
+
+              {/* Quick filter input for followed countries */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={followedSearchQuery}
+                  onChange={(e) => setFollowedSearchQuery(e.target.value)}
+                  placeholder="Type to filter countries to follow..."
+                  className="w-full text-xs p-2 pl-8 pr-7 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" />
+                {followedSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setFollowedSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
               <div className="flex items-center gap-1.5 flex-wrap max-h-36 overflow-y-auto p-2 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800/40">
-                {ALL_COUNTRIES.filter((c) => c.code !== primaryCountry).map((c) => {
+                {filteredFollowedCountries.map((c) => {
                   const isFollowed = followedCountries.includes(c.code);
                   return (
                     <button

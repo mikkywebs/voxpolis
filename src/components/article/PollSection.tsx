@@ -36,19 +36,12 @@ function getValidatedPollQuestion(rawQuestion?: string, title?: string, snippet?
       /^do you support the proposed policy measures and governance approach/i.test(q) ||
       /^do you support the policy direction and governance approach proposed in this report/i.test(q);
 
-    if (!isCorrupted && q.endsWith('?') && q.length > 15) {
+    if (!isCorrupted && q.endsWith('?') && q.length > 10) {
       return q;
     }
   }
 
-  if (title) {
-    const generated = generateCivicPollQuestion(title, snippet);
-    if (generated && generated.endsWith('?') && !/expressed by \d+/i.test(generated)) {
-      return generated;
-    }
-  }
-
-  // Not all news has a debate — return null if no genuine civic question exists
+  // Not all news has a debate — return null if no genuine civic question was provided by the publisher
   return null;
 }
 

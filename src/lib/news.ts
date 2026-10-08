@@ -1346,10 +1346,9 @@ export function getArticleImageUrl(article: Partial<ArticleData>, seed?: number 
   if (
     article.original_image_url &&
     article.original_image_url.trim() !== '' &&
-    article.original_image_url.startsWith('http') &&
     !article.original_image_url.includes('google.com/news')
   ) {
-    return article.original_image_url;
+    return article.original_image_url.trim();
   }
   return getArticleFallbackUrl(article, seed);
 }

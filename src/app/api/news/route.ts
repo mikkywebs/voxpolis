@@ -28,32 +28,30 @@ export async function GET(request: NextRequest) {
       if (dbArticle) {
         let cleanTitle = decodeAllHtmlEntities(dbArticle.title || 'Political Update');
         let cleanSnippet = decodeAllHtmlEntities(dbArticle.snippet || '');
+        let cleanContent = decodeAllHtmlEntities(dbArticle.content || '');
 
         if (!isPoliticalNews(cleanTitle, cleanSnippet, dbArticle.tags || [])) {
           return NextResponse.json({ success: false, error: 'Non-political content excluded from Voxpolis' }, { status: 404 });
         }
 
-        let cleanContent = dbArticle.content || '';
+        // Query if this article has a specific poll attached to it in the polls table
+        let attachedPoll = undefined;
+        try {
+          const { data: pollRow } = await supabaseAdmin
+            .from('polls')
+            .select('id, question, agree_count, disagree_count')
+            .eq('article_id', dbArticle.id)
+            .maybeSingle();
 
-        const paras = cleanContent.split(/\n\s*\n/).map((p: string) => p.trim()).filter(Boolean);
-        const isOldOrder =
-          paras.length > 4 ||
-          cleanContent.includes('&#') ||
-          cleanTitle.includes('&#') ||
-          cleanContent.length > 1500 ||
-          /whatsapp|telegram|e-paper|click here|read also|advert|copyright/i.test(cleanContent);
-
-        if (isOldOrder) {
-          const rewritten = await rewriteStoryForVoxpolis({
-            title: cleanTitle,
-            content: cleanContent,
-            sourceName: dbArticle.source_name || 'Voxpolis Desk',
-            countryName: getCountryByCode(dbArticle.country_code || 'NG')?.name || 'National',
-          });
-          cleanTitle = rewritten.title;
-          cleanContent = rewritten.content;
-          cleanSnippet = rewritten.snippet;
-        }
+          if (pollRow && pollRow.question) {
+            attachedPoll = {
+              id: pollRow.id,
+              question: pollRow.question,
+              agree_count: pollRow.agree_count || 0,
+              disagree_count: pollRow.disagree_count || 0,
+            };
+          }
+        } catch {}
 
         return NextResponse.json({
           success: true,
@@ -70,10 +68,11 @@ export async function GET(request: NextRequest) {
             is_breaking: dbArticle.is_breaking === true,
             is_featured: dbArticle.is_featured !== undefined ? dbArticle.is_featured : (dbArticle.tags?.some((t: string) => /featured/i.test(t)) || true),
             tags: dbArticle.tags || ['Featured News', 'Politics', 'Voxpolis'],
-            views_count: 0,
-            total_reading_time_seconds: 180,
+            views_count: dbArticle.views_count || 0,
+            total_reading_time_seconds: dbArticle.total_reading_time_seconds || 180,
             created_at: dbArticle.created_at || new Date().toISOString(),
             author: dbArticle.author,
+            poll: attachedPoll,
           },
         });
       }
@@ -93,10 +92,25 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (!dbErr && dbRows && dbRows.length > 0) {
-      dbCountryArticles = dbRows.map((dbArticle: any, idx: number) => {
+      const articleIds = dbRows.map((r: any) => r.id).filter(Boolean);
+      const pollsMap = new Map();
+      if (articleIds.length > 0) {
+        try {
+          const { data: pollsData } = await supabaseAdmin
+            .from('polls')
+            .select('id, article_id, question, agree_count, disagree_count')
+            .in('article_id', articleIds);
+          if (pollsData) {
+            pollsData.forEach((p: any) => pollsMap.set(p.article_id, p));
+          }
+        } catch {}
+      }
+
+      dbCountryArticles = dbRows.map((dbArticle: any) => {
         const cleanTitle = decodeAllHtmlEntities(dbArticle.title || 'Political Update');
         const cleanSnippet = decodeAllHtmlEntities(dbArticle.snippet || '');
         const cleanContent = decodeAllHtmlEntities(dbArticle.content || '');
+        const dbPoll = pollsMap.get(dbArticle.id);
 
         return {
           id: dbArticle.id || `db-${dbArticle.slug}`,
@@ -119,15 +133,12 @@ export async function GET(request: NextRequest) {
           total_reading_time_seconds: dbArticle.total_reading_time_seconds || 180,
           created_at: dbArticle.created_at || new Date().toISOString(),
           author: dbArticle.author,
-          poll: (() => {
-            const q = generateCivicPollQuestion(cleanTitle, cleanSnippet);
-            return q ? {
-              id: `poll-${dbArticle.slug}`,
-              question: q,
-              agree_count: 0,
-              disagree_count: 0,
-            } : undefined;
-          })(),
+          poll: dbPoll && dbPoll.question ? {
+            id: dbPoll.id,
+            question: dbPoll.question,
+            agree_count: dbPoll.agree_count || 0,
+            disagree_count: dbPoll.disagree_count || 0,
+          } : undefined,
         };
       });
     }
