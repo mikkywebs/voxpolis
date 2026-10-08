@@ -42,6 +42,8 @@ export async function GET(request: NextRequest) {
         original_image_url: art.original_image_url || '/breaking-news-banner.png',
         views_count: art.views_count || 0,
         is_breaking: art.is_breaking || false,
+        is_featured: (art.tags && Array.isArray(art.tags) && art.tags.some((t: string) => /featured/i.test(t))) || false,
+        tags: art.tags || [],
         created_at: art.created_at,
         live_url: `/news/${art.slug}`,
       };

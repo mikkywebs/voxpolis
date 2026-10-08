@@ -30,6 +30,7 @@ import {
   ExternalLink,
   Trash2,
   PlusCircle,
+  Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -148,6 +149,8 @@ export default function AdminDashboardPage() {
   const [pubImage, setPubImage] = useState('');
   const [pubSuccess, setPubSuccess] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [pubIsBreaking, setPubIsBreaking] = useState(false);
+  const [pubIsFeatured, setPubIsFeatured] = useState(true);
 
   // Check Admin Authorization
   useEffect(() => {
@@ -399,6 +402,14 @@ export default function AdminDashboardPage() {
 
     try {
       const countryObj = getCountryByCode(pubCountry);
+      const articleTags = [
+        pubIsFeatured ? 'Featured News' : null,
+        pubIsBreaking ? 'Breaking' : null,
+        'Politics',
+        countryObj?.name || pubCountry,
+        'Voxpolis',
+      ].filter(Boolean) as string[];
+
       const res = await fetch('/api/admin/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -409,8 +420,9 @@ export default function AdminDashboardPage() {
           country_code: pubCountry,
           image_url: pubImage,
           category: 'politics',
-          is_breaking: true,
-          tags: ['Breaking', 'Politics', countryObj?.name || pubCountry, 'Voxpolis'],
+          is_breaking: pubIsBreaking,
+          is_featured: pubIsFeatured,
+          tags: articleTags,
         }),
       });
 
@@ -423,6 +435,8 @@ export default function AdminDashboardPage() {
         setPubSnippet('');
         setPubContent('');
         setPubImage('');
+        setPubIsBreaking(false);
+        setPubIsFeatured(true);
         // Immediately refresh published list and analytics
         fetchPublishedArticles();
         fetchLiveAnalytics();
@@ -1319,6 +1333,101 @@ export default function AdminDashboardPage() {
                   />
                 </div>
 
+                {/* Article Prominence & Badge Tag Selector */}
+                <div className="p-4 bg-slate-950/80 rounded-xl border border-gray-800 space-y-2">
+                  <label className="text-xs font-bold text-gray-200 block">
+                    Article Tag & Badge Classification
+                  </label>
+                  <p className="text-[11px] text-gray-400">
+                    Articles do not have to be Breaking News. Choose the appropriate tag and badge style:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <label
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                        pubIsFeatured && !pubIsBreaking
+                          ? 'bg-amber-950/30 border-amber-500/60 text-amber-200'
+                          : 'bg-slate-900 border-gray-800 text-gray-400 hover:border-gray-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="articleProminence"
+                        checked={pubIsFeatured && !pubIsBreaking}
+                        onChange={() => {
+                          setPubIsFeatured(true);
+                          setPubIsBreaking(false);
+                        }}
+                        className="mt-0.5 text-amber-500 focus:ring-amber-400"
+                      />
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span>Featured News (Default)</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          Special gold badge for Voxpolis executive reporting & top stories.
+                        </p>
+                      </div>
+                    </label>
+
+                    <label
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                        pubIsBreaking
+                          ? 'bg-red-950/30 border-red-500/60 text-red-200'
+                          : 'bg-slate-900 border-gray-800 text-gray-400 hover:border-gray-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="articleProminence"
+                        checked={pubIsBreaking}
+                        onChange={() => {
+                          setPubIsBreaking(true);
+                          setPubIsFeatured(false);
+                        }}
+                        className="mt-0.5 text-red-500 focus:ring-red-400"
+                      />
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-red-400">
+                          <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                          <span>Breaking News Report</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          Red emergency badge for urgent, high-priority breaking events only.
+                        </p>
+                      </div>
+                    </label>
+
+                    <label
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                        !pubIsFeatured && !pubIsBreaking
+                          ? 'bg-blue-950/30 border-blue-500/60 text-blue-200'
+                          : 'bg-slate-900 border-gray-800 text-gray-400 hover:border-gray-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="articleProminence"
+                        checked={!pubIsFeatured && !pubIsBreaking}
+                        onChange={() => {
+                          setPubIsFeatured(false);
+                          setPubIsBreaking(false);
+                        }}
+                        className="mt-0.5 text-blue-500 focus:ring-blue-400"
+                      />
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+                          <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>Standard Editorial</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          Regular journalistic article without special prominence banner.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
                 <div className="pt-2">
                   <button
                     type="submit"
@@ -1367,7 +1476,18 @@ export default function AdminDashboardPage() {
                         {publishedArticles.slice(0, 5).map((art) => (
                           <tr key={art.id || art.slug} className="hover:bg-slate-800/40 transition">
                             <td className="p-3.5 font-bold text-white">
-                              <div className="line-clamp-1">{art.title}</div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="line-clamp-1">{art.title}</span>
+                                {art.is_breaking ? (
+                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-red-950 text-red-400 border border-red-800/80 inline-flex items-center gap-0.5">
+                                    <AlertCircle className="w-2.5 h-2.5" /> Breaking
+                                  </span>
+                                ) : (art.is_featured || art.tags?.some((t: string) => /featured/i.test(t))) ? (
+                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800/80 inline-flex items-center gap-0.5">
+                                    <Sparkles className="w-2.5 h-2.5" /> Featured
+                                  </span>
+                                ) : null}
+                              </div>
                               <span className="text-[10px] text-gray-500 font-mono">/news/{art.slug}</span>
                             </td>
                             <td className="p-3.5 whitespace-nowrap">
@@ -1514,9 +1634,24 @@ export default function AdminDashboardPage() {
                               </span>
                             </td>
                             <td className="p-3.5 whitespace-nowrap">
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
-                                Live On Site
-                              </span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
+                                  Live On Site
+                                </span>
+                                {art.is_breaking ? (
+                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-red-950 text-red-400 border border-red-800/80 inline-flex items-center gap-1">
+                                    <AlertCircle className="w-2.5 h-2.5" /> Breaking
+                                  </span>
+                                ) : (art.is_featured || art.tags?.some((t: string) => /featured/i.test(t))) ? (
+                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800/80 inline-flex items-center gap-1">
+                                    <Sparkles className="w-2.5 h-2.5" /> Featured News
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-semibold text-gray-500">
+                                    Standard
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="p-3.5 text-right font-mono text-gray-300 font-semibold whitespace-nowrap">
                               {art.views_count.toLocaleString()}

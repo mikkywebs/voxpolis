@@ -1074,6 +1074,7 @@ export default function NewsDetailPage() {
             sourceName={article!.source_name}
             sourceUrl={article!.source_url}
             isBreaking={article!.is_breaking}
+            isFeatured={article!.is_featured || article!.tags?.some((t) => /featured/i.test(t))}
             viewsCount={realViews}
             createdAt={article!.created_at}
             author={extractedAuthor || article!.author}

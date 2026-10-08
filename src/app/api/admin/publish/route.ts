@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
       country_code = 'NG',
       image_url,
       category = 'politics',
-      is_breaking = true,
+      is_breaking = false,
+      is_featured = true,
       tags = [],
     } = body;
 
@@ -64,6 +65,14 @@ export async function POST(request: NextRequest) {
 
     const pollQuestion = generateCivicPollQuestion(cleanTitle, cleanSnippet);
 
+    const tagList: string[] = Array.isArray(tags) && tags.length > 0 ? [...tags] : ['Politics', countryName, 'Voxpolis'];
+    if (is_featured && !tagList.some((t) => /featured/i.test(t))) {
+      tagList.unshift('Featured News');
+    }
+    if (is_breaking && !tagList.includes('Breaking')) {
+      tagList.unshift('Breaking');
+    }
+
     const articleData = {
       slug,
       title: displayTitle,
@@ -78,7 +87,7 @@ export async function POST(request: NextRequest) {
       source_name: 'Voxpolis',
       source_url: `https://voxpolis.app/news/${slug}`,
       is_breaking: !!is_breaking,
-      tags: Array.isArray(tags) && tags.length > 0 ? tags : ['Politics', countryName, 'Voxpolis'],
+      tags: Array.from(new Set(tagList)),
       views_count: 0,
       total_reading_time_seconds: Math.max(120, Math.round(content.trim().split(/\s+/).length / 3)),
       created_at: new Date().toISOString(),

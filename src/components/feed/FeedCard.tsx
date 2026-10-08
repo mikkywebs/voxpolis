@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl, formatCleanSnippet } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
-import { ExternalLink, AlertCircle, Eye } from 'lucide-react';
+import { ExternalLink, AlertCircle, Eye, Sparkles } from 'lucide-react';
 
 interface FeedCardProps {
   article: ArticleData;
@@ -101,12 +101,17 @@ export default function FeedCard({ article, index, onCardClick }: FeedCardProps)
           </div>
         </div>
 
-        {article.is_breaking && (
-          <div className="inline-flex items-center gap-1 mb-2 px-2.5 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
+        {article.is_breaking ? (
+          <div className="inline-flex items-center gap-1 mb-2 px-2.5 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">
             <AlertCircle className="w-3 h-3" />
             <span>Breaking</span>
           </div>
-        )}
+        ) : (article.is_featured || article.tags?.some((t) => /featured/i.test(t))) ? (
+          <div className="inline-flex items-center gap-1 mb-2 px-2.5 py-0.5 bg-amber-500/15 border border-amber-500/40 text-amber-600 dark:text-amber-400 text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">
+            <Sparkles className="w-3 h-3" />
+            <span>Featured News</span>
+          </div>
+        ) : null}
 
         <Link href={articleUrl} onClick={handleRecordClick}>
           <h2 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-snug line-clamp-2">

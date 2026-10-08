@@ -1,6 +1,6 @@
 'use client';
 
-import { ExternalLink, AlertCircle, Clock, Eye } from 'lucide-react';
+import { ExternalLink, AlertCircle, Clock, Eye, Sparkles } from 'lucide-react';
 import { formatExactTimestamp, formatCleanSnippet, BREAKING_NEWS_FALLBACK, getStandardFallbackImage } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
 
@@ -12,6 +12,7 @@ interface ArticleImageHeaderProps {
   sourceName: string;
   sourceUrl: string;
   isBreaking?: boolean;
+  isFeatured?: boolean;
   viewsCount?: number;
   totalReadingTimeSeconds?: number;
   createdAt?: string;
@@ -26,6 +27,7 @@ export default function ArticleImageHeader({
   sourceName,
   sourceUrl,
   isBreaking,
+  isFeatured,
   viewsCount = 0,
   totalReadingTimeSeconds = 180,
   createdAt,
@@ -49,14 +51,19 @@ export default function ArticleImageHeader({
 
   return (
     <div className="mb-6 space-y-4">
-      {/* Breaking Badge & Meta Bar */}
+      {/* Breaking / Featured Badge & Meta Bar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        {isBreaking && (
+        {isBreaking ? (
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600 text-white font-bold text-xs rounded-full uppercase tracking-wider shadow-sm animate-pulse">
             <AlertCircle className="w-3.5 h-3.5" />
             <span>Breaking Report</span>
           </div>
-        )}
+        ) : isFeatured ? (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/15 border border-amber-500/40 text-amber-500 dark:text-amber-400 font-bold text-xs rounded-full uppercase tracking-wider shadow-sm">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Featured News</span>
+          </div>
+        ) : null}
 
         <div className="flex items-center gap-3 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800/80 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">
           {viewsCount > 0 && (
