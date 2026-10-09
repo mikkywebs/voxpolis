@@ -27,6 +27,7 @@ export default function RegionalCountrySelectorModal({
     'North America': true,
     'Western/Northern Europe': true,
     'East Asia': true,
+    'Oceania': true,
   });
 
   useEffect(() => {
@@ -153,13 +154,14 @@ export default function RegionalCountrySelectorModal({
 
           {/* Continent Filter Tabs */}
           <div className="px-4 sm:px-5 py-2 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            {(['All', 'Africa', 'Americas', 'Europe', 'Asia'] as const).map((tab) => {
+            {(['All', 'Africa', 'Americas', 'Europe', 'Asia', 'Oceania'] as const).map((tab) => {
               const countMap: Record<string, number> = {
-                All: 119,
+                All: 121,
                 Africa: 33,
                 Americas: 25,
                 Europe: 31,
                 Asia: 30,
+                Oceania: 2,
               };
               const isSelected = activeContinent === tab;
               return (

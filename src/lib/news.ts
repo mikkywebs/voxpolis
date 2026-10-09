@@ -58,22 +58,23 @@ const POLITICAL_KEYWORDS = [
   'politic', 'politics', 'government', 'governance', 'parliament', 'parliamentary',
   'congress', 'congressional', 'president', 'presidential', 'presidency', 'minister', 'ministry',
   'senate', 'senator', 'lawmaker', 'election', 'electoral', 'policy', 'policies',
-  'legislation', 'legislative', 'assembly', 'governor', 'governorship', 'diplomacy', 'diplomatic',
-  'sanction', 'treaty', 'cabinet', 'party', 'democrat', 'republican', 'mp', 'mps',
-  'constitution', 'constitutional', 'court', 'judge', 'judiciary', 'bill',
-  'prime minister', 'supreme court', 'appeal court', 'high court', 'state department',
+  'legislation', 'legislative', 'assembly', 'governor', 'governorship', 'gubernatorial', 'diplomacy', 'diplomatic',
+  'sanction', 'treaty', 'cabinet', 'democrat', 'republican',
+  'constitution', 'constitutional', 'prime minister', 'state department',
   'national assembly', 'ballot', 'vote', 'voter', 'candidate', 'campaign', 'white house',
   'downing street', 'capitol', 'foreign affairs', 'defense minister',
   'inec', 'efcc', 'icpc', 'dss', 'apc', 'pdp', 'lp', 'nnpp', 'fct', 'federal government',
-  'budget', 'appropriation', 'parliamentarian', 'civil service', 'executive order',
-  'impeachment', 'tenure', 'referendum', 'geopolitical',
+  'state government', 'budget', 'appropriation', 'parliamentarian', 'civil service', 'executive order',
+  'impeachment', 'tenure', 'referendum', 'geopolitical', 'public procurement', 'anti-corruption', 'defection',
+  'political party', 'ruling party', 'opposition party', 'party primary', 'party primaries', 'party convention', 'party chieftain',
+  'polling unit', 'campaign convoy', 'political rally',
   // Multilingual political terms (French, Spanish, Portuguese, German)
   'politique', 'politiques', 'gouvernement', 'gouvernance', 'parlement', 'assemblee',
-  'assemblee nationale', 'depute', 'deputes', 'ministre', 'ministere', 'president',
-  'presidentielle', 'senat', 'loi', 'lois', 'election', 'elections', 'electorale',
-  'parti', 'partis', 'opposition', 'decret', 'droit', 'tribunal',
+  'assemblee nationale', 'depute', 'deputes', 'ministre', 'ministere',
+  'presidentielle', 'senat', 'elections', 'electorale',
+  'parti politique', 'opposition', 'decret',
   'politica', 'gobierno', 'gobernanza', 'parlamento', 'diputado', 'presidencia',
-  'ley', 'asamblea', 'partido', 'orçamento', 'governo', 'politik', 'regierung'
+  'partido politico', 'orçamento', 'governo', 'politik', 'regierung'
 ];
 
 const FORBIDDEN_NON_POLITICAL_KEYWORDS = [
@@ -296,11 +297,88 @@ export function isPoliticalNews(title: string, snippet: string = '', tags: strin
   }
 
   // 5. Strictly exclude all items matching the non-political forbidden dictionary
+  // Use word-boundary safety for short words (<= 4 chars like 'rema') to avoid false collisions with words like 'remands'
   for (const forbidden of FORBIDDEN_NON_POLITICAL_KEYWORDS) {
-    if (text.includes(forbidden)) return false;
+    if (forbidden.length <= 4) {
+      if (new RegExp(`\\b${forbidden}\\b`, 'i').test(text)) return false;
+    } else {
+      if (text.includes(forbidden)) return false;
+    }
   }
 
-  // 6. Must contain a genuine political governance term
+  // 6. Context Check A: Personal social celebrations / lifestyle events of public figures
+  // (e.g. "Governor Attends Musician's Birthday Party", "Governor's Daughter Weds in Lavish Ceremony")
+  const isSocialLifestyleEvent = /\b(?:birthday party|wedding ceremony|lavish ceremony|burial ceremony|baby shower|marks birthday|celebrates birthday|birthday bash)\b/i.test(text);
+  if (isSocialLifestyleEvent) {
+    const hasSubstantiveGovernance = /\b(?:policy|legislation|budget|reform|bilateral|impeach|resigns?|executive order|treaty)\b/i.test(text);
+    if (!hasSubstantiveGovernance) {
+      return false;
+    }
+  }
+
+  // 7. Context Check B: Routine common street crime vs. Political violence & accountability
+  // Routine common crimes without political context should be rejected
+  const isRoutineCrime = /\b(?:armed robbery|shop robbery|robbery suspect|burglary|cultist|cultism|petty theft|ordinary theft|theft case|pickpocket|phone theft|defilement|rape suspect|ritual kill|landlord-tenant|tenant disputes?|private property disputes?)\b/i.test(text);
+  if (isRoutineCrime) {
+    const hasPoliticalViolenceOrOfficeAnchor = /\b(?:campaign|election|rally|convoy|polling unit|ballot|governor|minister|senator|lawmaker|inec|efcc|icpc|public funds|graft|treason|assassination)\b/i.test(text);
+    if (!hasPoliticalViolenceOrOfficeAnchor) {
+      return false;
+    }
+  }
+
+  // 8. Context Check C: Judicial / Legal proceedings
+  // Isolated legal terms ("court", "judge", "magistrate") do NOT suffice alone for political news.
+  const isJudicialCase = /\b(?:court|judge|magistrate|judiciary|tribunal|high court|appeal court|supreme court)\b/i.test(text);
+  if (isJudicialCase) {
+    if (isRoutineCrime) {
+      const hasStrictPoliticalAnchor = /\b(?:election|electoral|governor|minister|senator|president|lawmaker|mp|parliament|congress|inec|efcc|icpc|public funds|graft|treason)\b/i.test(text);
+      if (!hasStrictPoliticalAnchor) return false;
+    }
+
+    const hasJudicialPoliticalAnchor =
+      /\b(?:election|electoral|voting|voter|ballot|voting district|voting rights|redistricting|gerrymander|governor|governorship|gubernatorial|minister|senator|president|presidential|lawmaker|mp|parliament|congress|congressional|constitution|constitutional|unconstitutional|nullif(?:y|ies|ied)|tribunal|impeach(?:ment)?|procurement|efcc|icpc|public funds|treason|bribery|graft|anti-corruption|legislation|executive order|subpoena|defection)\b/i.test(text) ||
+      (/\b(?:strikes? down|struck down|nullif(?:y|ies|ied)|overturns?|upholds?|challenges? to)\b/i.test(text) && /\b(?:government|state law|federal law|national law|statute|executive policy|presidential decree)\b/i.test(text)) ||
+      /\b(?:sues?|lawsuit against|ruling against|rules against|rules in favou?r of|court orders?)\s+(?:the\s+)?(?:government|ministry|state|federation)\b/i.test(text);
+
+    if (!hasJudicialPoliticalAnchor) {
+      return false;
+    }
+    return true;
+  }
+
+  // 9. Context Check D: Ambiguous isolated words checked in context
+  // "party": if standalone "party", check if political party context exists
+  if (/\bpart(?:y|ies)\b/i.test(text)) {
+    const isPoliticalPartyContext = /\b(?:political party|ruling party|opposition party|party primary|party primaries|party convention|party congress|party chairman|party chieftain|party ticket|party secretariat|party caucus|apc|pdp|lp|nnpp|democrat|republican|labour party|conservative)\b/i.test(text);
+    if (isPoliticalPartyContext) return true;
+  }
+
+  // "bill": if legislative bill context exists
+  if (/\bbill\b/i.test(text)) {
+    const isLegislativeBill = /\b(?:electoral bill|reform bill|appropriation bill|finance bill|passes bill|passed bill|approves bill|signs bill|rejects bill|legislative bill|senate|parliament|assembly|congress|lawmaker)\b/i.test(text);
+    if (isLegislativeBill) return true;
+  }
+
+  // "mp" / "mps": match on word boundary
+  if (/\bmps?\b/i.test(text)) {
+    return true;
+  }
+
+  // 10. Context Check E: Macroeconomic policy & statutory regulatory decisions
+  // A. Monetary Policy: Central Bank or statutory monetary authority connected to explicit policy action
+  const hasMonetaryAuthority = /\b(?:central bank|cbn|federal reserve|the fed|bank of england|european central bank|ecb|monetary policy committee|mpc)\b/i.test(text);
+  if (hasMonetaryAuthority) {
+    const hasMonetaryPolicyAction = /\b(?:interest rates?|cash reserve|crr|monetary policy|hikes? rates?|cuts? rates?|raises? rates?|monetary easing|monetary tightening|fx guidelines?|foreign exchange directives?|curb inflation|inflation rate|monetary committee)\b/i.test(text);
+    if (hasMonetaryPolicyAction) return true;
+  }
+
+  // B. Statutory Regulatory Decisions: Identifiable regulatory commission/agency approval or tariff determination
+  const hasRegulatoryAuthorityAction = /\b(?:regulatory approval|regulator approves?|tariff approval|utility regulator|regulatory commission|nerc approves?|fcc approves?|ofgem approves?|approved by regulator)\b/i.test(text);
+  if (hasRegulatoryAuthorityAction) {
+    return true;
+  }
+
+  // 11. Must contain a genuine political governance term
   return POLITICAL_KEYWORDS.some((kw) => text.includes(kw));
 }
 
@@ -316,12 +394,12 @@ const COUNTRY_SPECIFIC_IDENTIFIERS: Record<string, string[]> = {
     'cross river', 'akwa ibom', 'bayelsa', 'ebonyi', 'imo', 'abia', 'federal government'
   ],
   US: ['united states', 'u.s.', 'usa', 'america', 'american', 'biden', 'trump', 'harris', 'congress', 'white house', 'capitol', 'senate', 'democrat', 'republican', 'pentagon', 'supreme court', 'fbi', 'gop'],
-  GB: ['united kingdom', 'u.k.', 'britain', 'british', 'london', 'downing street', 'parliament', 'starmer', 'sunak', 'labour', 'tory', 'conservative', 'westminster', 'holyrood', 'bank of england'],
+  GB: ['united kingdom', 'u.k.', 'uk', 'britain', 'british', 'london', 'downing street', 'parliament', 'starmer', 'sunak', 'labour', 'tory', 'conservative', 'westminster', 'holyrood', 'bank of england'],
   GH: ['ghana', 'ghanaian', 'accra', 'akufo-addo', 'bawumia', 'mahama', 'cedi', 'parliament of ghana'],
   ZA: ['south africa', 'south african', 'pretoria', 'cape town', 'johannesburg', 'ramaphosa', 'anc', 'da', 'eff', 'rand', 'parliament'],
   KE: ['kenya', 'kenyan', 'nairobi', 'ruto', 'odinga', 'gachagua', 'shilling', 'parliament'],
   CA: ['canada', 'canadian', 'ottawa', 'trudeau', 'poilievre', 'parliament'],
-  AU: ['australia', 'australian', 'canberra', 'albanese', 'dutton', 'parliament'],
+  AU: ['australia', 'australian', 'canberra', 'albanese', 'dutton'],
   IN: ['india', 'indian', 'delhi', 'new delhi', 'modi', 'rahul gandhi', 'bjp', 'congress party', 'lok sabha', 'rupee'],
   CN: ['china', 'chinese', 'beijing', 'xi jinping', 'communist party', 'politburo'],
   JP: ['japan', 'japanese', 'tokyo', 'kishida', 'ishiba', 'diet'],
@@ -393,7 +471,21 @@ const COUNTRY_SPECIFIC_IDENTIFIERS: Record<string, string[]> = {
   SE: ['sweden', 'swedish', 'stockholm', 'kristersson'],
   NO: ['norway', 'norwegian', 'oslo', 'store'],
   IE: ['ireland', 'irish', 'dublin', 'harris', 'dail'],
-  NZ: ['new zealand', 'luxon', 'wellington'],
+  NZ: [
+    'new zealand', 'new zealander', 'new zealanders', 'aotearoa',
+    'wellington', 'auckland', 'christchurch', 'dunedin',
+    'luxon', 'christopher luxon',
+    'hipkins', 'chris hipkins',
+    'winston peters',
+    'new zealand first', 'nz first',
+    'national party', 'the national party', 'nz national', 'national-led',
+    'national woos', 'national pledges', 'national promises', 'national vows', 'national unveils', 'national slams', 'national rules out', 'national caucus',
+    'labour party', 'the labour party', 'nz labour',
+    'act party', 'the act party', 'act new zealand', 'david seymour',
+    'green party', 'the green party', 'nz greens',
+    'te pati maori', 'maori party',
+    'nz'
+  ],
 };
 
 const FOREIGN_WIRE_PREFIXES = [
@@ -443,10 +535,17 @@ export function isRelevantToCountry(title: string, snippet: string = '', country
     `${normalizedCountryName}an`,
     `${normalizedCountryName}ese`,
     `${normalizedCountryName}i`,
-  ])).filter((k) => k.length >= 3);
+  ])).filter((k) => k.length >= 2);
 
-  const hasTargetKeywordInTitle = targetKeywords.some((kw) => cleanTitle.includes(kw));
-  const hasTargetKeywordInSnippet = targetKeywords.some((kw) => cleanSnippet.includes(kw));
+  const matchesKeyword = (text: string, kw: string): boolean => {
+    if (kw.length <= 3) {
+      return new RegExp(`\\b${kw}\\b`, 'i').test(text);
+    }
+    return text.includes(kw);
+  };
+
+  const hasTargetKeywordInTitle = targetKeywords.some((kw) => matchesKeyword(cleanTitle, kw));
+  const hasTargetKeywordInSnippet = targetKeywords.some((kw) => matchesKeyword(cleanSnippet, kw));
 
   // If article title is about foreign topic and target country is not the primary subject in title, skip!
   if (isForeignTopic && !hasTargetKeywordInTitle) {
@@ -461,7 +560,10 @@ export function isRelevantToCountry(title: string, snippet: string = '', country
   // Check if article belongs primarily to another major country
   for (const [otherCode, otherKeywords] of Object.entries(COUNTRY_SPECIFIC_IDENTIFIERS)) {
     if (otherCode !== code) {
-      const mentionsOtherCountryInTitle = otherKeywords.slice(0, 3).some((kw) => cleanTitle.includes(normalizeForMatching(kw)));
+      const mentionsOtherCountryInTitle = otherKeywords.slice(0, 4).some((kw) => {
+        const normKw = normalizeForMatching(kw);
+        return matchesKeyword(cleanTitle, normKw);
+      });
       if (mentionsOtherCountryInTitle && !hasTargetKeywordInTitle) {
         return false;
       }

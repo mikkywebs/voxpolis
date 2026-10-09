@@ -46,6 +46,9 @@ const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
   AU: [
     { name: 'ABC News Australia', url: 'https://www.abc.net.au/news/feed/51120/rss.xml' },
   ],
+  NZ: [
+    { name: 'RNZ Politics', url: 'https://www.rnz.co.nz/rss/political.xml' },
+  ],
   IN: [
     { name: 'NDTV India', url: 'https://feeds.feedburner.com/ndtvnews-india-news' },
   ],

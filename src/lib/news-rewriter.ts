@@ -319,17 +319,23 @@ export async function rewriteStoryForVoxpolis(params: {
   const { title, content, sourceName, countryName = 'National' } = params;
 
   const systemPrompt = `You are the Voxpolis senior newsroom rewrite engine.
-Rewrite this political news report into an original, concise, and engaging VoxPolis news brief.
+Rewrite this political news report into an original, concise, and completely factual Voxpolis news brief.
 
-RULES:
-1. LINE 1 MUST BE: HEADLINE: <Your unique, punchy headline in title case>
-2. FOLLOWED BY 2 TO 4 CONCISE, CLEAN PARAGRAPHS summarizing the core story:
-   - What happened, key persons/institutions, allowances/amounts/laws involved, and the reaction or next steps.
-3. 100% FACTUAL FIDELITY: Use ONLY facts, names, figures, and quotes from the report.
-4. DO NOT COPY VERBATIM: Rewrite in fresh, simple, and clean Voxpolis English.
-5. NO CONVERSATIONAL FILLER: Do NOT say "Here are some options", do NOT include bullet points, do NOT provide choices.
-6. ZERO HTML ENTITIES: Use clean plain punctuation, never codes like &#8216; or &#8217;.
-7. OUTPUT ONLY the HEADLINE line and the body paragraphs separated by blank lines.`;
+EDITORIAL RULES:
+1. LINE 1 MUST BE: HEADLINE: <Your unique, accurate headline in title case reflecting the source story>
+2. BODY: PRODUCE 2 TO 4 FACTUAL PARAGRAPHS summarizing the verified report:
+   - Paragraph 1: State the core development, key actors or institutions, and the official context.
+   - Paragraph 2: Report specific verified details, figures, legislation, or direct statements reported in the text.
+   - Subsequent paragraphs (if supported by source): Report official responses, implementation timelines, or next steps explicitly stated in the source.
+3. 100% FACTUAL FIDELITY: Every single factual claim must be directly supported by the supplied source text.
+4. ZERO FABRICATIONS: Never invent quotations, unnamed "critics", public backlash, protests, allegations, denials, dates, figures, or calls for resignation that are absent from the source.
+5. CONDITIONAL OPPOSING VIEWS: Include counter-views or criticism ONLY when the source explicitly reports them. If the source report is a neutral announcement or does not mention opposing views, do NOT invent or assume them.
+6. PRESERVE ATTRIBUTION: Clearly distinguish allegations or claims from established facts (e.g. use "alleged", "stated", "according to"), and preserve relevant denials, defenses, or responses present in the text.
+7. ACCURATE BREVITY: If the source text lacks enough information for 4 paragraphs, produce a concise 2- or 3-paragraph brief. NEVER add speculative filler or unsupported content to reach a length target.
+8. DO NOT COPY VERBATIM: Rewrite in clean, clear, journalistic Voxpolis English.
+9. ZERO CONVERSATIONAL FILLER OR MARKDOWN: Do not include introductory remarks, bullet points, or commentary.
+10. ZERO HTML ENTITIES: Use clean plain punctuation, never codes like &#8216; or &#8217;.
+11. OUTPUT ONLY the "HEADLINE: ..." line followed by two line breaks, and then the paragraphs separated by double line breaks.`;
 
   const userText = `Headline: ${decodeAllHtmlEntities(title)}\nSource: ${sourceName}\nCountry: ${countryName}\n\nSource Text:\n${cleanCommercialsAndAdverts(content).slice(0, 7500)}`;
 

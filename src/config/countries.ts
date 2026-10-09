@@ -3,7 +3,7 @@ export interface LanguageOption {
   name: string;
 }
 
-export type Continent = 'Africa' | 'Americas' | 'Europe' | 'Asia';
+export type Continent = 'Africa' | 'Americas' | 'Europe' | 'Asia' | 'Oceania';
 
 export interface CountryConfig {
   code: string;
@@ -177,6 +177,9 @@ export const ALL_COUNTRIES: CountryConfig[] = [
   { code: 'LB', name: 'Lebanon', flag: '🇱🇧', capital: 'Beirut', lat: 33.8938, lon: 35.5018, continent: 'Asia', region: 'Middle East', languages: [{ code: 'ar', name: 'Arabic' }, { code: 'fr', name: 'French' }] },
   { code: 'TR', name: 'Türkiye', flag: '🇹🇷', capital: 'Ankara', lat: 39.9334, lon: 32.8597, continent: 'Asia', region: 'Middle East', languages: [{ code: 'tr', name: 'Turkish' }] },
   { code: 'SY', name: 'Syria', flag: '🇸🇾', capital: 'Damascus', lat: 33.5138, lon: 36.2765, continent: 'Asia', region: 'Middle East', languages: [{ code: 'en', name: 'English' }, { code: 'ar', name: 'Arabic' }] },
+  // --- OCEANIA ---
+  { code: 'AU', name: 'Australia', flag: '🇦🇺', capital: 'Canberra', lat: -35.2809, lon: 149.1300, continent: 'Oceania', region: 'Oceania', languages: [{ code: 'en', name: 'English' }] },
+  { code: 'NZ', name: 'New Zealand', flag: '🇳🇿', capital: 'Wellington', lat: -41.2865, lon: 174.7762, continent: 'Oceania', region: 'Oceania', languages: [{ code: 'en', name: 'English' }] },
 ];
 
 export const SUPPORTED_COUNTRIES = ALL_COUNTRIES;
@@ -209,6 +212,7 @@ export function getGroupedRegions(): RegionGroup[] {
     'South Asia': '🌏',
     'Southeast Asia': '🌏',
     'Middle East': '🕌',
+    'Oceania': '🌏',
   };
 
   const result: RegionGroup[] = [];
