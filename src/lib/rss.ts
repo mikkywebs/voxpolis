@@ -152,6 +152,15 @@ async function fetchOgImageFromSource(url: string): Promise<string | undefined> 
   return undefined;
 }
 
+export function isCurrentMonthArticle(dateStr?: string): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  // Strictly current calendar month of current year (e.g. October 2026)
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
+
 export async function fetchRssArticlesForCountry(
   countryCode: string,
   language: string = 'en'
@@ -162,11 +171,11 @@ export async function fetchRssArticlesForCountry(
   const explicitFeeds = COUNTRY_RSS_MAP[code] || [];
   const targetFeeds: RssFeedConfig[] = [...explicitFeeds];
 
-  // 1. Primary Google News Search in English with valid parameters (US:en)
+  // 1. Primary Google News Search in English with strictly recent scope (when:30d)
   const cleanCountryName = country.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   targetFeeds.push({
     name: `${country.name} Political Dispatch`,
-    url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' politics')}&hl=en-US&gl=US&ceid=US:en`,
+    url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' politics when:30d')}&hl=en-US&gl=US&ceid=US:en`,
   });
 
   // 2. Multilingual queries if the country speaks French, Spanish, Portuguese, or German
@@ -174,22 +183,22 @@ export async function fetchRssArticlesForCountry(
   if (primaryLang === 'fr' || language === 'fr') {
     targetFeeds.push({
       name: `${country.name} Actualités Politiques`,
-      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' politique')}&hl=fr&gl=FR&ceid=FR:fr`,
+      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' politique when:30d')}&hl=fr&gl=FR&ceid=FR:fr`,
     });
   } else if (primaryLang === 'es' || language === 'es') {
     targetFeeds.push({
       name: `${country.name} Noticias Políticas`,
-      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' política')}&hl=es&gl=ES&ceid=ES:es`,
+      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' política when:30d')}&hl=es&gl=ES&ceid=ES:es`,
     });
   } else if (primaryLang === 'pt' || language === 'pt') {
     targetFeeds.push({
       name: `${country.name} Notícias Políticas`,
-      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' política')}&hl=pt-BR&gl=BR&ceid=BR:pt-419`,
+      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' política when:30d')}&hl=pt-BR&gl=BR&ceid=BR:pt-419`,
     });
   } else if (primaryLang === 'de' || language === 'de') {
     targetFeeds.push({
       name: `${country.name} Politik`,
-      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' politik')}&hl=de&gl=DE&ceid=DE:de`,
+      url: `https://news.google.com/rss/search?q=${encodeURIComponent(cleanCountryName + ' politik when:30d')}&hl=de&gl=DE&ceid=DE:de`,
     });
   }
 
@@ -260,6 +269,8 @@ export async function fetchRssArticlesForCountry(
   const uniqueArticles: ArticleData[] = [];
 
   for (const art of fetchedResults) {
+    // Strictly purge articles older than the current calendar month (e.g. October 2026)
+    if (!isCurrentMonthArticle(art.created_at)) continue;
     // Strictly skip articles that are about another country or not political
     if (!isPoliticalNews(art.title, art.snippet, art.tags)) continue;
     if (!isRelevantToCountry(art.title, art.snippet, code)) continue;
@@ -349,6 +360,11 @@ function parseRssXmlToArticles(
     const rawDesc = getTag('description') || getTag('summary');
     const pubDateStr = getTag('pubDate') || getTag('dc:date') || getTag('updated');
     const pubDate = pubDateStr ? new Date(pubDateStr).toISOString() : new Date().toISOString();
+
+    // Strictly purge articles older than the current calendar month
+    if (!isCurrentMonthArticle(pubDate)) {
+      return;
+    }
 
     const sourceTag = getTag('source');
 

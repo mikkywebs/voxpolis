@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchRssArticlesForCountry } from '@/lib/rss';
+import { fetchRssArticlesForCountry, isCurrentMonthArticle } from '@/lib/rss';
 import { getCountryByCode } from '@/config/countries';
 import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion, isColumnistOrOpinion, isPoliticalNews, isRelevantToCountry } from '@/lib/news';
 import { isValidContentImage } from '@/lib/pipeline/extractor';
@@ -435,13 +435,20 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 5. Merge database-published articles (at the very top) with wire and rewritten articles
+  // 5. Merge database-published articles (at the very top) with rewritten articles AND verified current-month wire stories
+  const eligibleWireArticles = uniqueArticles.filter(
+    (u) =>
+      !dbCountryArticles.some((d) => d.slug === u.slug || d.title.toLowerCase() === u.title.toLowerCase()) &&
+      !rewrittenArticles.some((r) => r.slug === u.slug || r.title.toLowerCase() === u.title.toLowerCase())
+  );
+
   const combinedCountryArticles: ArticleData[] = [
     ...dbCountryArticles,
     ...rewrittenArticles.filter(
       (r) => !dbCountryArticles.some((d) => d.slug === r.slug || d.title.toLowerCase() === r.title.toLowerCase())
     ),
-  ];
+    ...eligibleWireArticles,
+  ].filter((a) => isCurrentMonthArticle(a.created_at));
 
   // If both database and wire articles are empty, fallback to country localized template
   if (combinedCountryArticles.length === 0) {

@@ -413,7 +413,7 @@ export default function LeftWidgetRail({
           </div>
 
           <p className="text-xs text-gray-600 dark:text-neutral-400 leading-relaxed">
-            Support verifiable civic reporting with VoxPolis Premium. Ad-free updates, full archive access, and policy intelligence.
+            Support independent political journalism with VoxPolis Premium. Ad-free updates and full archive access.
           </p>
 
           <Link

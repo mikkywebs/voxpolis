@@ -1,5 +1,5 @@
 import { getCountryByCode } from '@/config/countries';
-import { fetchRssArticlesForCountry } from './rss';
+import { fetchRssArticlesForCountry, isCurrentMonthArticle } from './rss';
 import { decodeAllHtmlEntities } from './news-rewriter';
 
 export interface ArticleData {
@@ -1109,6 +1109,7 @@ export async function fetchArticlesForCountry(
       const seen = new Set<string>();
       const unique: ArticleData[] = [];
       for (const a of combined) {
+        if (!isCurrentMonthArticle(a.created_at)) continue;
         if (!isPoliticalNews(a.title, a.snippet, a.tags)) continue;
         if (!isRelevantToCountry(a.title, a.snippet, code)) continue;
 

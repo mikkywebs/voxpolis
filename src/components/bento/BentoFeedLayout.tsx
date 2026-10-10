@@ -62,7 +62,7 @@ export default function BentoFeedLayout({
   // Grid below Row 1: Definite limit with clean pagination (6 cards per page, max 10 pages)
   const CARDS_PER_PAGE = 6;
   const MAX_PAGES = 10;
-  const feedPool = articles.slice(6);
+  const feedPool = articles.length > 6 ? articles.slice(6) : (articles.length > 2 ? articles.slice(2) : articles);
   const totalPages = Math.min(MAX_PAGES, Math.max(1, Math.ceil(feedPool.length / CARDS_PER_PAGE)));
   const startIndex = (currentPage - 1) * CARDS_PER_PAGE;
   const currentGridCards = feedPool.slice(startIndex, startIndex + CARDS_PER_PAGE);
@@ -90,11 +90,12 @@ export default function BentoFeedLayout({
       {/* 3. Main Bento Feed Area */}
       <main className="flex-1 max-w-[1440px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
         {loading ? (
-          <div className="w-full h-96 rounded-3xl bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 animate-pulse flex flex-col items-center justify-center gap-3 text-gray-400">
-            <Loader2 className="w-7 h-7 animate-spin text-blue-500" />
-            <span className="text-xs font-semibold">
-              Loading verified civic intelligence for {selectedCountry.name}...
-            </span>
+          <div className="w-full h-96 rounded-3xl bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 flex flex-col items-center justify-center gap-4">
+            <img
+              src="/voxpolis-loader-logo.png"
+              alt="Voxpolis"
+              className="w-16 h-16 object-contain animate-pulse"
+            />
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row items-start gap-6 relative">
@@ -131,7 +132,7 @@ export default function BentoFeedLayout({
                   <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-neutral-800">
                     <h3 className="text-base font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
                       <Newspaper className="w-4 h-4 text-blue-500" />
-                      <span>National Newsroom Dispatch · {selectedCountry.name}</span>
+                      <span>National News · {selectedCountry.name}</span>
                     </h3>
                     <span className="text-xs text-gray-400 font-semibold">
                       Showing {startIndex + 1}–{Math.min(startIndex + CARDS_PER_PAGE, feedPool.length)} of {feedPool.length}
@@ -216,7 +217,7 @@ export default function BentoFeedLayout({
                         <div className="flex items-center gap-2">
                           <span className="text-xl">{feed.country.flag}</span>
                           <h4 className="text-sm font-extrabold text-gray-900 dark:text-white">
-                            {feed.country.name} Intelligence Desk
+                            {feed.country.name}
                           </h4>
                         </div>
                         <Link
