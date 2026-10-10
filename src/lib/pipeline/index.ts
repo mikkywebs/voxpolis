@@ -187,10 +187,10 @@ export async function processSourceUrlThroughPipeline(
   const wordCount = rewritePayload.body_markdown.trim().split(/\s+/).filter(Boolean).length;
   const readMinutes = Math.max(1, Math.ceil(wordCount / 220));
 
-  // Featured Image: source og:image or first content image if valid, else site default breaking news asset
+  // Featured Image: source og:image or first content image if valid
   const featuredImage = (scraped.image_url && scraped.image_url.startsWith('http'))
     ? scraped.image_url
-    : '/breaking-news-banner.png';
+    : undefined;
 
   const publishedRecord: PipelineArticleRecord = {
     id: `vox-art-${slug}`,

@@ -22,6 +22,7 @@ const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
     { name: 'DailyPost Nigeria', url: 'https://dailypost.ng/category/politics/feed/' },
     { name: 'Vanguard Nigeria', url: 'https://www.vanguardngr.com/category/politics/feed/' },
     { name: 'Premium Times Nigeria', url: 'https://www.premiumtimesng.com/category/news/politics/feed' },
+    { name: 'TheCable Nigeria', url: 'https://www.thecable.ng/category/politics/feed' },
   ],
   US: [
     { name: 'Politico', url: 'https://rss.politico.com/politics-news.xml' },
@@ -33,12 +34,16 @@ const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
   ],
   GH: [
     { name: 'GhanaWeb Politics', url: 'https://www.ghanaweb.com/GhanaHomePage/rss/feed.php?cat=politics' },
+    { name: 'Citi Newsroom Ghana', url: 'https://citinewsroom.com/category/news/politics/feed/' },
+    { name: 'MyJoyOnline Ghana', url: 'https://www.myjoyonline.com/category/news/politics/feed/' },
   ],
   ZA: [
     { name: 'Daily Maverick SA', url: 'https://www.dailymaverick.co.za/section/south-africa/feed/' },
+    { name: 'News24 South Africa', url: 'https://feeds.24.com/articles/news24/SouthAfrica/rss' },
   ],
   KE: [
     { name: 'Capital FM Kenya', url: 'https://www.capitalfm.co.ke/news/category/kenya/politics/feed/' },
+    { name: 'The Star Kenya', url: 'https://www.the-star.co.ke/rss/politics' },
   ],
   CA: [
     { name: 'CBC News Politics', url: 'https://www.cbc.ca/cxml/rss/rss-politics.xml' },
@@ -102,6 +107,49 @@ function generateSlug(title: string): string {
     .replace(/\s+/g, '-')
     .replace(/^-+|-+$/g, '');
   return clean.slice(0, 80);
+}
+
+async function fetchOgImageFromSource(url: string): Promise<string | undefined> {
+  if (
+    !url ||
+    typeof url !== 'string' ||
+    !url.startsWith('http') ||
+    url.includes('news.google.com') ||
+    url.includes('voxpolis.app')
+  ) {
+    return undefined;
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 VoxpolisBot/1.0',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+
+    clearTimeout(timeoutId);
+    if (!res.ok) return undefined;
+
+    const html = await res.text();
+    const ogMatch =
+      html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
+      html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
+
+    if (ogMatch && ogMatch[1]) {
+      const candidate = decodeHtmlEntities(ogMatch[1]).replace(/&amp;/g, '&').trim();
+      if (isValidContentImage(candidate)) {
+        return candidate;
+      }
+    }
+  } catch {}
+  return undefined;
 }
 
 export async function fetchRssArticlesForCountry(
@@ -223,6 +271,23 @@ export async function fetchRssArticlesForCountry(
     }
   }
 
+  // Concurrent OpenGraph image resolution for direct-publisher articles that don't have an enclosure in RSS XML
+  const missingImages = uniqueArticles
+    .filter((a) => !a.original_image_url && a.source_url && !a.source_url.includes('news.google.com'))
+    .slice(0, 8);
+
+  if (missingImages.length > 0) {
+    await Promise.allSettled(
+      missingImages.map(async (art) => {
+        const ogImage = await fetchOgImageFromSource(art.source_url);
+        if (ogImage) {
+          art.original_image_url = ogImage;
+          art.image_mode = 'original';
+        }
+      })
+    );
+  }
+
   return uniqueArticles.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -325,21 +390,29 @@ function parseRssXmlToArticles(
       return;
     }
 
-    // Direct content image extraction
+    // Direct content image extraction from RSS XML
     let imageUrl: string | undefined = undefined;
-    const enclosureMatch = itemXml.match(/<(?:enclosure|media:content)[^>]+url=["']([^"']+)["']/i);
-    if (enclosureMatch && enclosureMatch[1].match(/https?:\/\//i)) {
-      imageUrl = enclosureMatch[1];
+    const enclosureMatch =
+      itemXml.match(/<(?:enclosure|media:content|media:thumbnail)[^>]+url=["']([^"']+)["']/i) ||
+      itemXml.match(/<media:content[^>]+url=["']([^"']+)["']/i);
+
+    if (enclosureMatch && enclosureMatch[1].match(/^https?:\/\//i)) {
+      imageUrl = enclosureMatch[1].trim();
     } else {
-      const imgMatch = (rawEncoded || rawDesc).match(/<img[^>]+src=["']([^"']+)["']/i);
+      const combinedText = `${rawEncoded} ${rawDesc} ${itemXml}`;
+      const imgMatch =
+        combinedText.match(/<img[^>]+(?:src|data-src|data-original)=["']([^"']+)["']/i) ||
+        combinedText.match(/<image>[\s\S]*?<url>([^<]+)<\/url>/i);
       if (imgMatch && imgMatch[1].match(/^https?:\/\//i)) {
-        imageUrl = imgMatch[1];
+        imageUrl = imgMatch[1].trim();
       }
     }
 
-    // Validate image: if it's a known placeholder or site logo, omit it so crisp fallback visual is used
-    if (imageUrl && !isValidContentImage(imageUrl)) {
-      imageUrl = undefined;
+    if (imageUrl) {
+      imageUrl = decodeHtmlEntities(imageUrl).replace(/&amp;/g, '&').trim();
+      if (!isValidContentImage(imageUrl)) {
+        imageUrl = undefined;
+      }
     }
 
     // Extract full real article paragraphs

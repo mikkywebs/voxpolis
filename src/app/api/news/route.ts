@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
           language: dbArticle.language || language,
           category: dbArticle.category || 'politics',
           image_mode: 'original' as const,
-          original_image_url: dbArticle.original_image_url || '/breaking-news-banner.png',
+          original_image_url: dbArticle.original_image_url || undefined,
           source_name: dbArticle.source_name || 'Voxpolis',
           source_url: dbArticle.source_url || `https://voxpolis.app/news/${dbArticle.slug}`,
           is_breaking: dbArticle.is_breaking === true,

@@ -73,7 +73,7 @@ export default function NewsIndexPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ARTICLES_PER_PAGE = 12;
 
-  const totalPages = Math.ceil(articles.length / ARTICLES_PER_PAGE);
+  const totalPages = Math.min(10, Math.ceil(articles.length / ARTICLES_PER_PAGE));
 
   const startIndex = (currentPage - 1) * ARTICLES_PER_PAGE;
   const currentArticles = articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);

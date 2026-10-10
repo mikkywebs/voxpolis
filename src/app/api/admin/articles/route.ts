@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         country_slug: getCountrySlug(cObj),
         source_name: art.source_name || 'Voxpolis',
         source_url: art.source_url || `/news/${art.slug}`,
-        original_image_url: art.original_image_url || '/breaking-news-banner.png',
+        original_image_url: art.original_image_url || undefined,
         views_count: art.views_count || 0,
         is_breaking: art.is_breaking || false,
         is_featured: (art.tags && Array.isArray(art.tags) && art.tags.some((t: string) => /featured/i.test(t))) || false,

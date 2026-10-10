@@ -5,28 +5,42 @@ export function isValidContentImage(url?: string): boolean {
 
   const lower = url.toLowerCase();
 
+  // Reject tracking pixels, placeholders, site icons, and explicit logo directories
   const REJECT_PATTERNS = [
-    'punchng.com',
     'default-logo',
     'site-logo',
     'brand-logo',
-    'favicon',
-    'placeholder',
-    'avatar',
     'header-logo',
     'footer-logo',
     'punch-logo',
     'rss-logo',
-    'wordpress/assets',
     'wp-content/uploads/logo',
+    'favicon',
+    'placeholder',
+    'avatar',
+    'wordpress/assets',
     'icon-192',
+    'icon-512',
     'apple-touch-icon',
     'default_news',
     'no-image',
-    'logo',
+    'no_image',
+    '1x1.',
+    'pixel.gif',
+    'blank.gif',
   ];
 
-  return !REJECT_PATTERNS.some((pattern) => lower.includes(pattern));
+  if (REJECT_PATTERNS.some((pattern) => lower.includes(pattern))) {
+    return false;
+  }
+
+  // Reject explicit standalone logo files (e.g. /logo.png, _logo.jpg, -logo.svg)
+  // without falsely rejecting genuine words like dialogue, catalog, technology, or CDN image paths
+  if (/(?:^|[\/_\.-])logo(?:[\/_\.-]|\.(?:png|jpg|jpeg|svg|webp|gif))/i.test(lower)) {
+    return false;
+  }
+
+  return true;
 }
 
 function cleanHtmlTags(html: string): string {

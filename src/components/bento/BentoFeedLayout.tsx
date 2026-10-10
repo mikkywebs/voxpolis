@@ -59,10 +59,11 @@ export default function BentoFeedLayout({
   // Row 1: Hero Slider (2 cols, uses articles 0-4) + Adjacent Card (1 col, uses article 5 or 1)
   const adjacentStory = articles[5] || articles[1] || articles[0];
 
-  // Grid below Row 1: Definite limit with clean pagination (6 cards per page)
+  // Grid below Row 1: Definite limit with clean pagination (6 cards per page, max 10 pages)
   const CARDS_PER_PAGE = 6;
+  const MAX_PAGES = 10;
   const feedPool = articles.slice(6);
-  const totalPages = Math.max(1, Math.ceil(feedPool.length / CARDS_PER_PAGE));
+  const totalPages = Math.min(MAX_PAGES, Math.max(1, Math.ceil(feedPool.length / CARDS_PER_PAGE)));
   const startIndex = (currentPage - 1) * CARDS_PER_PAGE;
   const currentGridCards = feedPool.slice(startIndex, startIndex + CARDS_PER_PAGE);
 
