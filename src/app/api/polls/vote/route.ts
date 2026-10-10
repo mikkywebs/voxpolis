@@ -16,23 +16,47 @@ export async function POST(req: Request) {
     const isUuid = (str?: string) =>
       typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
-    if (pollId && isUuid(pollId) && userId && isUuid(userId)) {
+    if (pollId && isUuid(pollId)) {
       try {
-        await supabaseAdmin.from('poll_votes').upsert([
-          {
-            poll_id: pollId,
-            user_id: userId,
-            vote,
-          },
-        ]);
+        if (userId && isUuid(userId)) {
+          await supabaseAdmin.from('poll_votes').upsert([
+            {
+              poll_id: pollId,
+              user_id: userId,
+              vote,
+            },
+          ]);
+        }
 
-        if (vote === 'agree') {
-          await supabaseAdmin.rpc('increment_poll_agree', { row_id: pollId });
-        } else {
-          await supabaseAdmin.rpc('increment_poll_disagree', { row_id: pollId });
+        const { data: pollRow } = await supabaseAdmin
+          .from('polls')
+          .select('id, agree_count, disagree_count')
+          .eq('id', pollId)
+          .maybeSingle();
+
+        if (pollRow) {
+          const nextAgree = vote === 'agree' ? (pollRow.agree_count || 0) + 1 : (pollRow.agree_count || 0);
+          const nextDisagree = vote === 'disagree' ? (pollRow.disagree_count || 0) + 1 : (pollRow.disagree_count || 0);
+
+          await supabaseAdmin
+            .from('polls')
+            .update({
+              agree_count: nextAgree,
+              disagree_count: nextDisagree,
+            })
+            .eq('id', pollId);
+
+          return NextResponse.json({
+            success: true,
+            pollId,
+            vote,
+            agree: nextAgree,
+            disagree: nextDisagree,
+            savedAt: new Date().toISOString(),
+          });
         }
       } catch (err) {
-        // Non-fatal if custom RPC does not exist
+        // Fallback gracefully
       }
     }
 

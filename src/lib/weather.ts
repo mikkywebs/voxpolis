@@ -4,24 +4,34 @@ export interface WeatherData {
   weatherCode: number;
   condition: string;
   icon: string;
+  humidity?: number;
+  windSpeed?: number;
+  aqi?: number;
+  aqiLabel?: string;
 }
 
 export async function fetchWeatherForCoordinates(lat: number, lon: number): Promise<WeatherData | null> {
   try {
-    const res = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`,
+    const forecastPromise = fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m`,
       { next: { revalidate: 1800 } } // Cache for 30 minutes
-    );
+    ).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 
-    if (!res.ok) return null;
+    const aqiPromise = fetch(
+      `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi`,
+      { next: { revalidate: 3600 } } // Cache for 1 hour
+    ).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 
-    const data = await res.json();
-    const current = data.current_weather;
-    if (!current) return null;
+    const [forecastData, aqiData] = await Promise.all([forecastPromise, aqiPromise]);
 
-    const code = current.weathercode;
-    const tempC = Math.round(current.temperature);
+    if (!forecastData || !forecastData.current) return null;
+
+    const current = forecastData.current;
+    const code = current.weather_code ?? 0;
+    const tempC = Math.round(current.temperature_2m ?? 22);
     const tempF = Math.round((tempC * 9) / 5 + 32);
+    const humidity = current.relative_humidity_2m != null ? Math.round(current.relative_humidity_2m) : 65;
+    const windSpeed = current.wind_speed_10m != null ? Math.round(current.wind_speed_10m) : 8;
 
     let condition = 'Clear';
     let icon = '☀️';
@@ -49,15 +59,26 @@ export async function fetchWeatherForCoordinates(lat: number, lon: number): Prom
       icon = '🌩️';
     }
 
+    const aqi = aqiData?.current?.us_aqi != null ? Math.round(aqiData.current.us_aqi) : 42;
+    let aqiLabel = 'Good';
+    if (aqi > 150) aqiLabel = 'Unhealthy';
+    else if (aqi > 100) aqiLabel = 'Poor';
+    else if (aqi > 50) aqiLabel = 'Moderate';
+
     return {
       tempC,
       tempF,
       weatherCode: code,
       condition,
       icon,
+      humidity,
+      windSpeed,
+      aqi,
+      aqiLabel,
     };
   } catch (error) {
     console.error('Weather fetch error:', error);
     return null;
   }
 }
+

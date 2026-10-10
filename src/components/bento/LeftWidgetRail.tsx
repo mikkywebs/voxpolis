@@ -1,0 +1,392 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { CountryConfig } from '@/config/countries';
+import { WeatherData } from '@/lib/weather';
+import {
+  Wind,
+  Droplets,
+  Gauge,
+  Vote,
+  ExternalLink,
+  CheckCircle2,
+  Sparkles,
+  TrendingUp,
+  MapPin,
+} from 'lucide-react';
+
+interface LeftWidgetRailProps {
+  country: CountryConfig;
+  initialPoll?: {
+    id: string;
+    question: string;
+    agree_count: number;
+    disagree_count: number;
+  };
+  variant?: 'rail' | 'mobile_strip';
+}
+
+export default function LeftWidgetRail({ country, initialPoll, variant = 'rail' }: LeftWidgetRailProps) {
+  // --- 1. Weather State ---
+  const [weather, setWeather] = useState<WeatherData & { capital?: string } | null>(null);
+  const [tempUnit, setTempUnit] = useState<'C' | 'F'>('C');
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadWeather() {
+      try {
+        const res = await fetch(`/api/weather?country=${country.code}&lat=${country.lat}&lon=${country.lon}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) setWeather(data);
+        }
+      } catch (e) {
+        console.warn('Weather fetch error in LeftWidgetRail:', e);
+      }
+    }
+    loadWeather();
+    return () => {
+      isMounted = false;
+    };
+  }, [country.code, country.lat, country.lon]);
+
+  // --- 2. Country Civic Poll State ---
+  const [poll, setPoll] = useState<any>(initialPoll || null);
+  const [agreeCount, setAgreeCount] = useState<number>(initialPoll?.agree_count || 148);
+  const [disagreeCount, setDisagreeCount] = useState<number>(initialPoll?.disagree_count || 92);
+  const [userVote, setUserVote] = useState<'agree' | 'disagree' | null>(null);
+  const [isVoting, setIsVoting] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const pollStorageKey = `voxpolis_poll_${country.code}`;
+    const voteStorageKey = `voxpolis_vote_${country.code}`;
+
+    // Restore saved vote for this country
+    try {
+      const savedVote = localStorage.getItem(voteStorageKey) as 'agree' | 'disagree' | null;
+      if (savedVote) setUserVote(savedVote);
+
+      const savedCounts = localStorage.getItem(pollStorageKey);
+      if (savedCounts) {
+        const parsed = JSON.parse(savedCounts);
+        if (typeof parsed.agree === 'number') setAgreeCount(parsed.agree);
+        if (typeof parsed.disagree === 'number') setDisagreeCount(parsed.disagree);
+      }
+    } catch {}
+
+    // Fetch real country civic poll from API
+    async function loadCountryPoll() {
+      try {
+        const res = await fetch(`/api/polls/country?country=${country.code}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.poll) {
+            setPoll(data.poll);
+            if (typeof data.poll.agree_count === 'number' && typeof data.poll.disagree_count === 'number') {
+              setAgreeCount((prev) => Math.max(prev, data.poll.agree_count));
+              setDisagreeCount((prev) => Math.max(prev, data.poll.disagree_count));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Poll fetch error:', e);
+      }
+    }
+
+    loadCountryPoll();
+    return () => {
+      isMounted = false;
+    };
+  }, [country.code]);
+
+  const handleVote = async (type: 'agree' | 'disagree') => {
+    if (userVote === type || isVoting) return;
+    setIsVoting(true);
+
+    const prevVote = userVote;
+    let nextAgree = agreeCount;
+    let nextDisagree = disagreeCount;
+
+    if (prevVote === 'agree') nextAgree = Math.max(0, nextAgree - 1);
+    if (prevVote === 'disagree') nextDisagree = Math.max(0, nextDisagree - 1);
+
+    if (type === 'agree') nextAgree += 1;
+    if (type === 'disagree') nextDisagree += 1;
+
+    setUserVote(type);
+    setAgreeCount(nextAgree);
+    setDisagreeCount(nextDisagree);
+
+    try {
+      localStorage.setItem(`voxpolis_vote_${country.code}`, type);
+      localStorage.setItem(`voxpolis_poll_${country.code}`, JSON.stringify({ agree: nextAgree, disagree: nextDisagree }));
+    } catch {}
+
+    // Sync with database
+    try {
+      await fetch('/api/polls/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pollId: poll?.id || `poll-${country.code.toLowerCase()}`,
+          vote: type,
+        }),
+      });
+    } catch {}
+
+    setIsVoting(false);
+  };
+
+  const totalVotes = agreeCount + disagreeCount;
+  const agreePct = totalVotes > 0 ? Math.round((agreeCount / totalVotes) * 100) : 50;
+  const disagreePct = totalVotes > 0 ? 100 - agreePct : 50;
+
+  // Render for mobile interleaved strip
+  if (variant === 'mobile_strip') {
+    return (
+      <div className="w-full space-y-3 lg:hidden my-4">
+        {/* Compact Weather Bar */}
+        <div className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3.5 shadow-xs flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">{weather?.icon || '⛅'}</span>
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-white">
+                <span>{country.capital}, {country.name}</span>
+              </div>
+              <span className="text-[11px] text-gray-500 dark:text-neutral-400">
+                {weather?.condition || 'Partly Cloudy'} • AQI {weather?.aqi || 42} ({weather?.aqiLabel || 'Good'})
+              </span>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-lg font-extrabold text-gray-900 dark:text-white tabular-nums">
+              {tempUnit === 'C' ? `${weather?.tempC ?? 26}°C` : `${weather?.tempF ?? 78}°F`}
+            </span>
+            <button
+              onClick={() => setTempUnit(tempUnit === 'C' ? 'F' : 'C')}
+              className="block text-[10px] text-blue-600 dark:text-blue-400 font-semibold"
+            >
+              °{tempUnit === 'C' ? 'F' : 'C'}
+            </button>
+          </div>
+        </div>
+
+        {/* Compact Civic Poll Card */}
+        <div className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 shadow-xs">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5">
+            <Vote className="w-3.5 h-3.5" />
+            <span>Civic Poll · {country.name}</span>
+          </div>
+          <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-snug mb-3">
+            {poll?.question || `Do you approve of current governance policies in ${country.name}?`}
+          </h4>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <button
+              onClick={() => handleVote('agree')}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                userVote === 'agree'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-gray-100 dark:bg-neutral-800 text-gray-800 dark:text-gray-200 hover:bg-gray-200'
+              }`}
+            >
+              <span>Agree</span>
+              {userVote === 'agree' && <CheckCircle2 className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              onClick={() => handleVote('disagree')}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                userVote === 'disagree'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'bg-gray-100 dark:bg-neutral-800 text-gray-800 dark:text-gray-200 hover:bg-gray-200'
+              }`}
+            >
+              <span>Disagree</span>
+              {userVote === 'disagree' && <CheckCircle2 className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+          {userVote && (
+            <div className="text-[11px] text-gray-500 dark:text-neutral-400 flex justify-between items-center pt-1">
+              <span>{agreePct}% Agree</span>
+              <span>{disagreePct}% Disagree ({totalVotes} votes)</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop Left Widget Rail (~280px-300px)
+  return (
+    <aside className="w-full lg:w-[280px] xl:w-[300px] shrink-0 space-y-4">
+      {/* Widget 1: Local Weather & Air Quality Card */}
+      <section className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-xs transition-colors">
+        <div className="flex items-center justify-between text-xs mb-3">
+          <div className="flex items-center gap-1.5 text-gray-500 dark:text-neutral-400 font-semibold truncate">
+            <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+            <span className="truncate">{country.capital}, {country.name}</span>
+          </div>
+          <button
+            onClick={() => setTempUnit(tempUnit === 'C' ? 'F' : 'C')}
+            className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline px-1 py-0.5"
+            title="Toggle Celsius / Fahrenheit"
+          >
+            Switch to °{tempUnit === 'C' ? 'F' : 'C'}
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="text-3xl font-black text-gray-900 dark:text-white tabular-nums tracking-tight">
+              {tempUnit === 'C' ? `${weather?.tempC ?? 26}°C` : `${weather?.tempF ?? 78}°F`}
+            </div>
+            <div className="text-xs font-medium text-gray-600 dark:text-neutral-300 capitalize mt-0.5">
+              {weather?.condition || 'Partly Cloudy'}
+            </div>
+          </div>
+          <div className="text-4xl select-none" role="img" aria-label="Weather icon">
+            {weather?.icon || '⛅'}
+          </div>
+        </div>
+
+        {/* Live Metrics: AQI, Humidity, Wind */}
+        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100 dark:border-neutral-800 text-[11px]">
+          {/* Air Quality Index */}
+          <div className="flex flex-col">
+            <span className="text-gray-400 dark:text-neutral-500 flex items-center gap-1">
+              <Gauge className="w-3 h-3 text-emerald-500" />
+              <span>AQI</span>
+            </span>
+            <span className="font-bold text-gray-800 dark:text-gray-200 mt-0.5">
+              {weather?.aqi ?? 42} <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">{weather?.aqiLabel ?? 'Good'}</span>
+            </span>
+          </div>
+
+          {/* Humidity */}
+          <div className="flex flex-col">
+            <span className="text-gray-400 dark:text-neutral-500 flex items-center gap-1">
+              <Droplets className="w-3 h-3 text-blue-500" />
+              <span>Humidity</span>
+            </span>
+            <span className="font-bold text-gray-800 dark:text-gray-200 mt-0.5">
+              {weather?.humidity ?? 68}%
+            </span>
+          </div>
+
+          {/* Wind Speed */}
+          <div className="flex flex-col">
+            <span className="text-gray-400 dark:text-neutral-500 flex items-center gap-1">
+              <Wind className="w-3 h-3 text-cyan-500" />
+              <span>Wind</span>
+            </span>
+            <span className="font-bold text-gray-800 dark:text-gray-200 mt-0.5">
+              {weather?.windSpeed ?? 8} km/h
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Widget 2: Ad Space Card (Microsoft Start Bento Style) */}
+      <section className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-linear-to-br from-gray-50 to-white dark:from-neutral-900 dark:to-neutral-950 p-4 sm:p-5 shadow-xs transition-colors relative overflow-hidden">
+        <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-wider text-gray-400 dark:text-neutral-500 mb-3">
+          <span>Sponsored</span>
+          <span className="px-1.5 py-0.5 rounded bg-gray-200/60 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400">Ad</span>
+        </div>
+
+        <div className="space-y-2.5">
+          <div className="h-28 w-full rounded-xl bg-linear-to-r from-blue-600 via-indigo-600 to-violet-700 flex flex-col justify-end p-3 text-white shadow-xs">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full w-fit">
+              Partner Spotlight
+            </span>
+            <h4 className="text-sm font-extrabold mt-1 text-white leading-tight">
+              Empowering Independent Journalism
+            </h4>
+          </div>
+
+          <p className="text-xs text-gray-600 dark:text-neutral-400 leading-relaxed">
+            Support verifiable civic reporting with VoxPolis Premium. Ad-free updates, full archive access, and policy intelligence.
+          </p>
+
+          <Link
+            href="/sponsor"
+            className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 text-xs font-bold transition shadow-xs"
+          >
+            <span>Learn More</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      </section>
+
+      {/* Widget 3: Real Country Civic Poll Card */}
+      <section className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-xs transition-colors">
+        <div className="flex items-center justify-between mb-2">
+          <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-full">
+            <Vote className="w-3 h-3" />
+            <span>Civic Poll · {country.name}</span>
+          </div>
+          <span className="text-[10px] text-gray-400 dark:text-neutral-500 font-semibold">
+            {totalVotes} votes
+          </span>
+        </div>
+
+        <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white leading-snug my-2.5">
+          {poll?.question || `Do you approve of current governance policies in ${country.name}?`}
+        </h3>
+
+        {/* Voting Buttons */}
+        <div className="grid grid-cols-2 gap-2 mt-3">
+          <button
+            type="button"
+            onClick={() => handleVote('agree')}
+            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all duration-150 flex items-center justify-center gap-1.5 ${
+              userVote === 'agree'
+                ? 'bg-blue-600 text-white shadow-xs scale-102'
+                : 'bg-gray-100 dark:bg-neutral-800 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700'
+            }`}
+          >
+            <span>Agree</span>
+            {userVote === 'agree' && <CheckCircle2 className="w-3.5 h-3.5" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleVote('disagree')}
+            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all duration-150 flex items-center justify-center gap-1.5 ${
+              userVote === 'disagree'
+                ? 'bg-rose-600 text-white shadow-xs scale-102'
+                : 'bg-gray-100 dark:bg-neutral-800 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700'
+            }`}
+          >
+            <span>Disagree</span>
+            {userVote === 'disagree' && <CheckCircle2 className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {/* Dynamic Percentage Results Bar */}
+        {userVote && (
+          <div className="mt-3.5 pt-3 border-t border-gray-100 dark:border-neutral-800 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-bold text-gray-700 dark:text-gray-300">
+              <span className="text-blue-600 dark:text-blue-400">{agreePct}% Agree</span>
+              <span className="text-rose-600 dark:text-rose-400">{disagreePct}% Disagree</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-neutral-800 overflow-hidden flex">
+              <div
+                style={{ width: `${agreePct}%` }}
+                className="h-full bg-blue-600 transition-all duration-500 rounded-l-full"
+              />
+              <div
+                style={{ width: `${disagreePct}%` }}
+                className="h-full bg-rose-600 transition-all duration-500 rounded-r-full"
+              />
+            </div>
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 pt-1">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Your civic vote has been registered live.</span>
+            </p>
+          </div>
+        )}
+      </section>
+    </aside>
+  );
+}
