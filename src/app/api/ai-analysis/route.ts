@@ -4,8 +4,6 @@ export async function POST(req: Request) {
   try {
     const { title, snippet, content } = await req.json();
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-
     // Sanitize input texts from unwanted RSS/News payload strings
     const cleanTitle = (title || '')
       .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
@@ -23,22 +21,7 @@ export async function POST(req: Request) {
       .replace(/appeared first on .*/gi, '')
       .trim();
 
-    if (apiKey) {
-      try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model: 'claude-3-5-sonnet-20241022',
-            max_tokens: 600,
-            messages: [
-              {
-                role: 'user',
-                content: `You are an elite, objective political analyst writing for Voxpolis.
+    const prompt = `You are an elite, objective political analyst writing for Voxpolis.
 Read the following news report details and provide a comprehensive, engaging 2-to-3 paragraph factual summary and policy analysis.
 
 Instructions:
@@ -51,22 +34,96 @@ Instructions:
 Article Details:
 Title: ${cleanTitle}
 Summary Snippet: ${cleanSnippet}
-Full Context: ${cleanContent}`,
-              },
-            ],
+Full Context: ${cleanContent}`;
+
+    // 1. Try Gemini
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey && geminiKey.trim() !== '') {
+      const models = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3.5-flash-lite'];
+      for (const model of models) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey.trim()}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 600 },
+            }),
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const data = await res.json();
+            const txt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (txt && txt.length > 80) {
+              return NextResponse.json({ analysis: txt });
+            }
+          }
+        } catch {}
+      }
+    }
+
+    // 2. Fallback to Kimi
+    const kimiKey = process.env.KIMI_API_KEY;
+    if (kimiKey && kimiKey.trim() !== '') {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const res = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${kimiKey.trim()}`,
+          },
+          body: JSON.stringify({
+            model: 'moonshot-v1-8k',
+            temperature: 0.2,
+            messages: [{ role: 'user', content: prompt }],
           }),
         });
-
-        if (response.ok) {
-          const data = await response.json();
-          const text = data.content?.[0]?.text;
-          if (text) {
-            return NextResponse.json({ analysis: text.trim() });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const txt = data.choices?.[0]?.message?.content?.trim();
+          if (txt && txt.length > 80) {
+            return NextResponse.json({ analysis: txt });
           }
         }
-      } catch (err) {
-        console.warn('Anthropic API call error, falling back to local analysis generator.', err);
-      }
+      } catch {}
+    }
+
+    // 3. Fallback to DeepSeek
+    const dsKey = process.env.DEEPSEEK_API_KEY;
+    if (dsKey && dsKey.trim() !== '') {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${dsKey.trim()}`,
+          },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            temperature: 0.2,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const txt = data.choices?.[0]?.message?.content?.trim();
+          if (txt && txt.length > 80) {
+            return NextResponse.json({ analysis: txt });
+          }
+        }
+      } catch {}
     }
 
     // Default factual analysis generator strictly scoped to article text without AI meta tags

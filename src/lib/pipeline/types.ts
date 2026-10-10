@@ -15,7 +15,7 @@ export interface ListicleItem {
   source?: string;
 }
 
-export interface AnthropicRewritePayload {
+export interface AIRewritePayload {
   content_type: ContentType;
   headline: string;
   dek: string;
@@ -32,6 +32,8 @@ export interface AnthropicRewritePayload {
   completeness: CompletenessStatus;
   incomplete_reason?: string | null;
 }
+
+export type AnthropicRewritePayload = AIRewritePayload;
 
 export interface ScrapedSourcePage {
   source_url: string;

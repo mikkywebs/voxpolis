@@ -4,14 +4,14 @@
  * Implements the Okpebholo Model:
  * 1. Unique, active, engaging VoxPolis headline.
  * 2. Unique URL slug generated from the VoxPolis headline (never copied from wire).
- * 3. Strictly 4 factual paragraphs:
- *    - Paragraph 1 (The Hook): What happened, who did it, and the institutional/court/official setting.
- *    - Paragraph 2 (Details & Quotes): Specific findings, rulings, quotes, statistics, or figures from the text.
- *    - Paragraph 3 (The Counter-View): What the opposing side, plaintiff, or public critics argued or alleged.
- *    - Paragraph 4 (The Outcome/Impact): Legal, electoral, or governance next steps reported in the story.
+ * 3. Strictly 2 to 4 factual paragraphs.
  * 4. 100% FACTUAL FIDELITY: Uses ONLY facts, names, figures, and quotes from the original news source.
  * 5. ZERO ADDITIONS: Never invents facts, never hallucinates, and never adds robotic filler.
+ * 6. ZERO VERBATIM COPY: Strict 8-consecutive-word overlap blocker.
+ * 7. FAIL-CLOSED ARCHITECTURE: Never serves raw or condensed source text if AI fails.
  */
+
+import { findConsecutiveWordOverlaps } from './pipeline/overlap';
 
 export interface RewrittenStory {
   title: string;
@@ -81,10 +81,9 @@ export function cleanCommercialsAndAdverts(text: string): string {
 
 /**
  * Multi-AI Rewriter:
- * Priority 1: Gemini (gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3.1-flash-lite)
+ * Priority 1: Google Gemini (gemini-flash-latest, gemini-flash-lite-latest, gemini-3.5-flash-lite)
  * Priority 2: Kimi (Moonshot)
  * Priority 3: DeepSeek
- * Priority 4: Anthropic Claude
  */
 async function callGeminiRewriter(systemPrompt: string, userText: string): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -94,15 +93,14 @@ async function callGeminiRewriter(systemPrompt: string, userText: string): Promi
 
   const models = [
     'gemini-3.5-flash-lite',
-    'gemini-3.6-flash',
-    'gemini-3.1-flash-lite',
+    'gemini-flash-lite-latest',
     'gemini-flash-latest',
   ];
 
   for (const model of models) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 14000);
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
 
       const res = await fetch(url, {
@@ -111,7 +109,7 @@ async function callGeminiRewriter(systemPrompt: string, userText: string): Promi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: `${systemPrompt}\n\n${userText}` }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 1000 },
+          generationConfig: { temperature: 0.15, maxOutputTokens: 1200 },
         }),
       });
 
@@ -147,7 +145,7 @@ async function callKimiRewriter(systemPrompt: string, userText: string): Promise
       },
       body: JSON.stringify({
         model: 'moonshot-v1-8k',
-        temperature: 0.2,
+        temperature: 0.15,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userText },
@@ -181,7 +179,7 @@ async function callDeepSeekRewriter(systemPrompt: string, userText: string): Pro
       },
       body: JSON.stringify({
         model: 'deepseek-chat',
-        temperature: 0.2,
+        temperature: 0.15,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userText },
@@ -199,115 +197,9 @@ async function callDeepSeekRewriter(systemPrompt: string, userText: string): Pro
   return null;
 }
 
-async function callAnthropicRewriter(systemPrompt: string, userText: string): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey.trim() === '') return null;
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 14000);
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey.trim(),
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1200,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userText }],
-      }),
-    });
-
-    clearTimeout(timeoutId);
-    if (res.ok) {
-      const data = await res.json();
-      const txt = data.content?.[0]?.text?.trim();
-      if (txt && txt.length > 150) return txt;
-    }
-  } catch {}
-  return null;
-}
-
-/**
- * Algorithmic Source Condenser (used when external AI APIs are unreachable)
- * STRICT RULE: Only uses sentences present in the source. Never adds fake sentences.
- */
-function algorithmicFactualCondenser(
-  rawTitle: string,
-  rawContent: string,
-  sourceName: string
-): { title: string; paragraphs: string[] } {
-  // 1. Clean headline: decode entities, remove publisher prefixes, suffixes, brackets
-  let cleanTitle = decodeAllHtmlEntities(rawTitle || '')
-    .replace(/^BREAKING:\s*/i, '')
-    .replace(/^JUST IN:\s*/i, '')
-    .replace(/\s*[-–—|]\s*(Daily Trust|Vanguard|Punch|The Nation|Channels|Premium Times|Reuters|BBC|CNN|TheCable).*$/i, '')
-    .replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')
-    .trim();
-
-  // 2. Parse candidate paragraphs from source text
-  const cleanBody = decodeAllHtmlEntities(cleanCommercialsAndAdverts(rawContent));
-  const rawParas = cleanBody
-    .split(/\n\s*\n/)
-    .map((p) => p.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
-    .filter((p) => p.length > 35);
-
-  let finalParas: string[] = [];
-
-  if (rawParas.length > 4) {
-    // Distribute sentence selection across the entire story arc (Lead, Development, Statements/Quotes, Outcome)
-    const allSentences: string[] = [];
-    for (const p of rawParas) {
-      const sList = p.match(/[^.!?]+[.!?]+/g) || [p];
-      for (const s of sList) {
-        const tr = s.trim();
-        if (tr.length > 25 && !/whatsapp|telegram|newsletter|advert|copyright|read also|click here/i.test(tr)) {
-          allSentences.push(tr);
-        }
-      }
-    }
-
-    if (allSentences.length >= 4) {
-      const chunkSize = Math.ceil(allSentences.length / 4);
-      for (let i = 0; i < 4; i++) {
-        const quadrant = allSentences.slice(i * chunkSize, (i + 1) * chunkSize);
-        if (quadrant.length > 0) {
-          finalParas.push(quadrant.slice(0, 2).join(' '));
-        }
-      }
-    } else {
-      finalParas = rawParas.slice(0, 4);
-    }
-  } else if (rawParas.length >= 2) {
-    finalParas = rawParas;
-  } else if (rawParas.length === 1) {
-    const sList = rawParas[0].match(/[^.!?]+[.!?]+/g) || [rawParas[0]];
-    const cleanSentences = sList.map((s) => s.trim()).filter((s) => s.length > 25);
-    if (cleanSentences.length >= 2) {
-      const mid = Math.ceil(cleanSentences.length / 2);
-      finalParas = [
-        cleanSentences.slice(0, mid).join(' '),
-        cleanSentences.slice(mid).join(' '),
-      ];
-    } else {
-      finalParas = rawParas;
-    }
-  } else {
-    finalParas = [cleanTitle];
-  }
-
-  return {
-    title: cleanTitle,
-    paragraphs: finalParas.slice(0, 4),
-  };
-}
-
 /**
  * Main export: Rewrite any incoming political news story
+ * FAIL-CLOSED: Returns isAiRewritten=false and empty content if AI rewrite fails or has overlap.
  */
 export async function rewriteStoryForVoxpolis(params: {
   title: string;
@@ -332,12 +224,13 @@ EDITORIAL RULES:
 5. CONDITIONAL OPPOSING VIEWS: Include counter-views or criticism ONLY when the source explicitly reports them. If the source report is a neutral announcement or does not mention opposing views, do NOT invent or assume them.
 6. PRESERVE ATTRIBUTION: Clearly distinguish allegations or claims from established facts (e.g. use "alleged", "stated", "according to"), and preserve relevant denials, defenses, or responses present in the text.
 7. ACCURATE BREVITY: If the source text lacks enough information for 4 paragraphs, produce a concise 2- or 3-paragraph brief. NEVER add speculative filler or unsupported content to reach a length target.
-8. DO NOT COPY VERBATIM: Rewrite in clean, clear, journalistic Voxpolis English.
+8. CRITICAL ZERO-COPY RULE: NEVER copy 8 or more consecutive words from the source headline or text. You must completely recast all phrasing into original Voxpolis reporting while strictly preserving 100% of facts, names, figures, and dates.
 9. ZERO CONVERSATIONAL FILLER OR MARKDOWN: Do not include introductory remarks, bullet points, or commentary.
 10. ZERO HTML ENTITIES: Use clean plain punctuation, never codes like &#8216; or &#8217;.
 11. OUTPUT ONLY the "HEADLINE: ..." line followed by two line breaks, and then the paragraphs separated by double line breaks.`;
 
-  const userText = `Headline: ${decodeAllHtmlEntities(title)}\nSource: ${sourceName}\nCountry: ${countryName}\n\nSource Text:\n${cleanCommercialsAndAdverts(content).slice(0, 7500)}`;
+  const cleanContent = cleanCommercialsAndAdverts(content).slice(0, 7500);
+  const userText = `Headline: ${decodeAllHtmlEntities(title)}\nSource: ${sourceName}\nCountry: ${countryName}\n\nSource Text:\n${cleanContent}`;
 
   let rawOutput: string | null = null;
   let providerUsed = 'none';
@@ -356,12 +249,6 @@ EDITORIAL RULES:
   if (!rawOutput) {
     rawOutput = await callDeepSeekRewriter(systemPrompt, userText);
     if (rawOutput) providerUsed = 'DeepSeek';
-  }
-
-  // 4. Fallback to Claude
-  if (!rawOutput) {
-    rawOutput = await callAnthropicRewriter(systemPrompt, userText);
-    if (rawOutput) providerUsed = 'Claude';
   }
 
   // If AI rewrite succeeded:
@@ -384,6 +271,30 @@ EDITORIAL RULES:
 
     if (paras.length >= 2) {
       const strictly4Paras = paras.slice(0, 4);
+      const candidateContent = strictly4Paras.join('\n\n');
+
+      // STRICT 8-WORD CONSECUTIVE OVERLAP CHECK
+      const fullSourceToCheck = `${decodeAllHtmlEntities(title)}\n${cleanContent}`;
+      const bodyOverlaps = findConsecutiveWordOverlaps(fullSourceToCheck, candidateContent, 8);
+      const headlineOverlaps = findConsecutiveWordOverlaps(decodeAllHtmlEntities(title), headline, 8);
+
+      if (bodyOverlaps.length > 0 || headlineOverlaps.length > 0) {
+        console.warn(
+          `[VoxPolis AI] Blocked article rewrite due to consecutive 8+ word overlap with source:`,
+          bodyOverlaps[0] || headlineOverlaps[0]
+        );
+        // Fail-closed: do not return copied or overlapping content
+        return {
+          title: '',
+          slug: '',
+          content: '',
+          paragraphs: [],
+          snippet: '',
+          isAiRewritten: false,
+          provider: 'none',
+        };
+      }
+
       const cleanHeadline = headline.endsWith(' - Voxpolis') ? headline : `${headline} - Voxpolis`;
       const pureHeadline = headline.replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
       const slug = generateVoxpolisSlug(pureHeadline);
@@ -391,7 +302,7 @@ EDITORIAL RULES:
       return {
         title: cleanHeadline,
         slug,
-        content: strictly4Paras.join('\n\n'),
+        content: candidateContent,
         paragraphs: strictly4Paras,
         snippet: strictly4Paras[0] || '',
         isAiRewritten: true,
@@ -400,19 +311,14 @@ EDITORIAL RULES:
     }
   }
 
-  // Algorithmic Fallback (Source Facts Only, zero robotic filler)
-  const fallback = algorithmicFactualCondenser(title, content, sourceName);
-  const cleanHeadline = fallback.title.endsWith(' - Voxpolis') ? fallback.title : `${fallback.title} - Voxpolis`;
-  const pureHeadline = fallback.title.replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
-  const slug = generateVoxpolisSlug(pureHeadline);
-
+  // FAIL-CLOSED: Never return raw or condensed source text
   return {
-    title: cleanHeadline,
-    slug,
-    content: fallback.paragraphs.join('\n\n'),
-    paragraphs: fallback.paragraphs,
-    snippet: fallback.paragraphs[0] || '',
+    title: '',
+    slug: '',
+    content: '',
+    paragraphs: [],
+    snippet: '',
     isAiRewritten: false,
-    provider: 'Factual Source Condenser',
+    provider: 'none',
   };
 }

@@ -1,8 +1,8 @@
 import { fetchAndExtractSourcePage } from './extractor';
-import { rewriteWithAnthropic } from './anthropic';
+import { rewriteWithAI } from './ai';
 import { validateQualityGates } from './gates';
 import { generateUniqueSlug } from './slug';
-import { PipelineArticleRecord } from './types';
+import { PipelineArticleRecord, AIRewritePayload } from './types';
 
 // In-Memory Storage maps for Source URLs and Unique Slugs
 const articlesBySourceUrl = new Map<string, PipelineArticleRecord>();
@@ -74,8 +74,40 @@ export async function processSourceUrlThroughPipeline(
     return incompleteRecord;
   }
 
-  // 3. CLASSIFY & REWRITE: Anthropic Claude Engine
-  const rewritePayload = await rewriteWithAnthropic(scraped, countryIso);
+  // 3. CLASSIFY & REWRITE: Multi-Model AI Engine (Gemini Primary, Kimi, DeepSeek)
+  let rewritePayload: AIRewritePayload;
+  try {
+    rewritePayload = await rewriteWithAI(scraped, countryIso);
+  } catch (err: any) {
+    const failedRecord: PipelineArticleRecord = {
+      id: `pipeline-err-${Date.now()}`,
+      slug: `error-${Date.now()}`,
+      source_url: normUrl,
+      source_name: sourceName,
+      source_published_at: scraped.source_published_at,
+      content_type: 'single_story',
+      headline: rssHeadline || 'Rewrite Failed',
+      dek: '',
+      body_markdown: '',
+      executive_summary: '',
+      fact_analysis: [],
+      why_it_matters: '',
+      legislative_scope: null,
+      items: [],
+      actors: [],
+      tags: [],
+      country_code: countryIso,
+      language: 'en',
+      category: 'politics',
+      word_count: 0,
+      read_minutes: 0,
+      created_at: new Date().toISOString(),
+      status: 'rejected',
+      incomplete_reason: `AI rewrite execution failed: ${err?.message || err}`,
+    };
+    articlesBySourceUrl.set(normUrl, failedRecord);
+    return failedRecord;
+  }
   const targetCountry = rewritePayload.country_iso || countryIso || 'NG';
 
   if (rewritePayload.completeness === 'incomplete') {
@@ -103,7 +135,7 @@ export async function processSourceUrlThroughPipeline(
       read_minutes: 0,
       created_at: new Date().toISOString(),
       status: 'incomplete',
-      incomplete_reason: rewritePayload.incomplete_reason || 'Anthropic rewrite marked content as incomplete',
+      incomplete_reason: rewritePayload.incomplete_reason || 'AI rewrite marked content as incomplete',
     };
 
     articlesBySourceUrl.set(normUrl, incompleteRecord);

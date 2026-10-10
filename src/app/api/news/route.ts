@@ -5,6 +5,7 @@ import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, ge
 import { isValidContentImage } from '@/lib/pipeline/extractor';
 import { rewriteStoryForVoxpolis, decodeAllHtmlEntities } from '@/lib/news-rewriter';
 import { register301Redirect, get301Redirect } from '@/lib/pipeline/redirects';
+import { findConsecutiveWordOverlaps } from '@/lib/pipeline/overlap';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -163,7 +164,7 @@ export async function GET(request: NextRequest) {
             .slice(0, 10);
 
           newsDataArticles = await Promise.all(
-            filteredItems.map(async (item: any, idx: number) => {
+            filteredItems.map(async (item: any, idx: number): Promise<ArticleData | null> => {
               const cleanTitle = (item.title || 'Political Update')
                 .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
                 .replace(/The post .* appeared first on .*/gi, '')
@@ -183,6 +184,19 @@ export async function GET(request: NextRequest) {
                 sourceName,
                 countryName: country.name,
               });
+
+              if (!rewritten.isAiRewritten || !rewritten.slug || !rewritten.content || rewritten.content.trim() === '') {
+                return null;
+              }
+
+              const overlaps = findConsecutiveWordOverlaps(
+                `${cleanTitle}\n${rawContent}\n${rawDesc}`,
+                rewritten.content,
+                8
+              );
+              if (overlaps.length > 0) {
+                return null;
+              }
 
               // Register redirect from old raw wire slug to new VoxPolis slug
               const rawSlug = cleanTitle
@@ -228,6 +242,7 @@ export async function GET(request: NextRequest) {
               };
             })
           );
+          newsDataArticles = newsDataArticles.filter((a): a is ArticleData => a !== null);
         }
       }
     } catch (err) {
@@ -266,28 +281,26 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 4. Ensure EVERY unique article on VoxPolis is rewritten into our own concise, unique brief
-  const rewrittenArticles: ArticleData[] = await Promise.all(
-    uniqueArticles.slice(0, 15).map(async (art) => {
-      const paras = (art.content || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-      const isAlreadyClean =
-        paras.length <= 4 &&
-        !art.content.includes('&#') &&
-        !art.title.includes('&#') &&
-        !art.slug.includes('8216') &&
-        !art.slug.includes('8217') &&
-        !art.content.match(/(whatsapp group|all rights reserved|click here|read also|telegram)/i);
-
-      if (isAlreadyClean && art.slug) {
-        return art;
-      }
-
+  // 4. Ensure EVERY unique article on VoxPolis is cleanly rewritten by AI with ZERO verbatim overlap
+  const rawRewritten = await Promise.all(
+    uniqueArticles.slice(0, 15).map(async (art): Promise<ArticleData | null> => {
+      const rawSource = `${art.title}\n${art.content || ''}\n${art.snippet || ''}`;
       const rewritten = await rewriteStoryForVoxpolis({
         title: art.title,
         content: art.content || art.snippet,
         sourceName: art.source_name,
         countryName: country.name,
       });
+
+      if (!rewritten.isAiRewritten || !rewritten.slug || !rewritten.content || rewritten.content.trim() === '') {
+        return null;
+      }
+
+      const overlaps = findConsecutiveWordOverlaps(rawSource, rewritten.content, 8);
+      if (overlaps.length > 0) {
+        console.warn(`[News API] Dropped article ${rewritten.slug} due to 8+ word overlap with source`);
+        return null;
+      }
 
       if (art.slug && rewritten.slug && art.slug !== rewritten.slug) {
         register301Redirect(art.slug, rewritten.slug);
@@ -312,6 +325,8 @@ export async function GET(request: NextRequest) {
       };
     })
   );
+
+  const rewrittenArticles: ArticleData[] = rawRewritten.filter((a): a is ArticleData => a !== null);
 
   // If specific slug was requested, check collected feed articles
   if (slugParam) {
@@ -391,19 +406,27 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'Non-political report excluded from Voxpolis' }, { status: 404 });
       }
 
-      const paras = (foundInFeeds.content || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-      if (paras.length > 4 || foundInFeeds.title.includes('&#') || (foundInFeeds.content && foundInFeeds.content.length > 1600)) {
-        const rewritten = await rewriteStoryForVoxpolis({
-          title: foundInFeeds.title,
-          content: foundInFeeds.content,
-          sourceName: foundInFeeds.source_name,
-          countryName: country.name,
-        });
-        foundInFeeds.title = rewritten.title;
-        foundInFeeds.slug = rewritten.slug;
-        foundInFeeds.content = rewritten.content;
-        foundInFeeds.snippet = rewritten.snippet;
+      const rawSource = `${foundInFeeds.title}\n${foundInFeeds.content || ''}\n${foundInFeeds.snippet || ''}`;
+      const rewritten = await rewriteStoryForVoxpolis({
+        title: foundInFeeds.title,
+        content: foundInFeeds.content || foundInFeeds.snippet,
+        sourceName: foundInFeeds.source_name,
+        countryName: country.name,
+      });
+
+      if (!rewritten.isAiRewritten || !rewritten.slug || !rewritten.content) {
+        return NextResponse.json({ success: false, error: 'Article rewrite in progress' }, { status: 404 });
       }
+
+      const overlaps = findConsecutiveWordOverlaps(rawSource, rewritten.content, 8);
+      if (overlaps.length > 0) {
+        return NextResponse.json({ success: false, error: 'Article quality review in progress' }, { status: 404 });
+      }
+
+      foundInFeeds.title = rewritten.title;
+      foundInFeeds.slug = rewritten.slug;
+      foundInFeeds.content = rewritten.content;
+      foundInFeeds.snippet = rewritten.snippet;
       return NextResponse.json({
         success: true,
         article: foundInFeeds,

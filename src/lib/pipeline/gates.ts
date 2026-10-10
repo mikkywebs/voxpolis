@@ -1,23 +1,15 @@
-import { AnthropicRewritePayload, GateValidationResult, ScrapedSourcePage } from './types';
-
-function extractSentenceSpans(text: string, wordLen: number = 20): string[] {
-  const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
-  const spans: string[] = [];
-  for (let i = 0; i <= words.length - wordLen; i += 5) {
-    spans.push(words.slice(i, i + wordLen).join(' '));
-  }
-  return spans;
-}
+import { AIRewritePayload, GateValidationResult, ScrapedSourcePage } from './types';
+import { findConsecutiveWordOverlaps } from './overlap';
 
 export function validateQualityGates(
-  payload: AnthropicRewritePayload,
+  payload: AIRewritePayload,
   scraped: ScrapedSourcePage
 ): GateValidationResult {
   const errors: string[] = [];
 
-  // Gate 0: Completeness flag from Anthropic
+  // Gate 0: Completeness flag from AI rewriter
   if (payload.completeness === 'incomplete') {
-    errors.push(`Anthropic flagged brief as incomplete: ${payload.incomplete_reason || 'Source missing details'}`);
+    errors.push(`AI rewriter flagged brief as incomplete: ${payload.incomplete_reason || 'Source missing details'}`);
   }
 
   // Gate 1: Word Count for Single Story (minimum 220 words)
@@ -75,15 +67,31 @@ export function validateQualityGates(
     errors.push('country_iso / country code is missing');
   }
 
-  // Gate 7: No 20+ word verbatim span copy from source
-  const sourceSpans = extractSentenceSpans(scraped.extracted_full_text, 20);
-  const bodyTextLower = payload.body_markdown.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+  // Gate 7: Zero Copyright / Verbatim Overlap gate (Strict 8-word consecutive overlap ceiling)
+  const sourceText = `${scraped.source_headline}\n${scraped.extracted_full_text}`;
 
-  for (const span of sourceSpans) {
-    if (span.length > 50 && bodyTextLower.includes(span)) {
-      errors.push(`Verbatim 20+ word copy detected from source: "${span.slice(0, 60)}..."`);
-      break;
-    }
+  // Check body markdown against source text
+  const bodyOverlaps = findConsecutiveWordOverlaps(sourceText, payload.body_markdown, 8);
+  if (bodyOverlaps.length > 0) {
+    errors.push(
+      `Consecutive 8+ word overlap detected between body and source (${bodyOverlaps.length} span(s) found, e.g. "${bodyOverlaps[0].span}")`
+    );
+  }
+
+  // Check headline against source text
+  const headlineOverlaps = findConsecutiveWordOverlaps(sourceText, payload.headline, 8);
+  if (headlineOverlaps.length > 0) {
+    errors.push(
+      `Consecutive 8+ word overlap detected between headline and source: "${headlineOverlaps[0].span}"`
+    );
+  }
+
+  // Check executive summary / dek against source text
+  const summaryOverlaps = findConsecutiveWordOverlaps(sourceText, `${payload.dek} ${payload.executive_summary}`, 8);
+  if (summaryOverlaps.length > 0) {
+    errors.push(
+      `Consecutive 8+ word overlap detected between summary/dek and source: "${summaryOverlaps[0].span}"`
+    );
   }
 
   return {

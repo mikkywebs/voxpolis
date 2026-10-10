@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { synthesize4ParagraphBrief } from '@/lib/news';
+import { findConsecutiveWordOverlaps } from '@/lib/pipeline/overlap';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -137,44 +138,6 @@ async function callDeepSeek(systemPrompt: string, userText: string): Promise<str
   return null;
 }
 
-async function callAnthropic(systemPrompt: string, userText: string): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey.trim() === '') return null;
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 14000);
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey.trim(),
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1200,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userText }],
-      }),
-    });
-
-    clearTimeout(timeoutId);
-    if (res.ok) {
-      const data = await res.json();
-      const txt = data.content?.[0]?.text?.trim();
-      if (txt && txt.length > 150) return txt;
-    } else {
-      const errTxt = await res.text();
-      console.warn('[VoxPolis AI] Anthropic HTTP', res.status, errTxt.slice(0, 300));
-    }
-  } catch (err: any) {
-    console.warn('[VoxPolis AI] Anthropic call error:', err?.message || err);
-  }
-  return null;
-}
-
 async function rewriteWithMultiAiEngine(
   paragraphs: string[],
   sourceUrl: string,
@@ -194,9 +157,11 @@ STRICT EDITORIAL RULES:
 5. CONDITIONAL OPPOSING VIEWS: Include opposing stances, criticisms, or counter-arguments ONLY when the source explicitly reports them. If none are reported, summarize the factual context without inventing conflict.
 6. PRESERVE ATTRIBUTION: Clearly distinguish allegations from verified facts (e.g., "alleged", "stated", "according to"), and retain relevant responses or denials reported in the text.
 7. ACCURATE BREVITY: If the source lacks enough verified information for 4 paragraphs, produce a shorter 2- or 3-paragraph brief. Never add unsupported content or robotic filler to lengthen the story.
-8. NO WIRE FILLER OR MARKDOWN: Eliminate wire repetitiveness or generic boilerplate. Output ONLY the "HEADLINE: ..." line followed by two line breaks, and then the paragraphs separated by double line breaks.`;
+8. CRITICAL ZERO-COPY RULE: NEVER copy 8 or more consecutive words from the headline or source text. Completely recast and rephrase all sentences into your own words.
+9. NO WIRE FILLER OR MARKDOWN: Eliminate wire repetitiveness or generic boilerplate. Output ONLY the "HEADLINE: ..." line followed by two line breaks, and then the paragraphs separated by double line breaks.`;
 
-  const userText = `Headline: ${headline}\nPublisher: ${sourceName}\nURL: ${sourceUrl}\n\nRaw Source Text:\n${paragraphs.join('\n\n').slice(0, 8500)}`;
+  const cleanSourceText = paragraphs.join('\n\n').slice(0, 8500);
+  const userText = `Headline: ${headline}\nPublisher: ${sourceName}\nURL: ${sourceUrl}\n\nRaw Source Text:\n${cleanSourceText}`;
 
   let rawOutput: string | null = null;
   let providerUsed = 'none';
@@ -217,22 +182,9 @@ STRICT EDITORIAL RULES:
     if (rawOutput) providerUsed = 'DeepSeek';
   }
 
-  // 4. Fallback to Anthropic Claude (e.g. from local .env.local)
+  // Fail-closed: Never serve algorithmic fallback or unrewritten text
   if (!rawOutput) {
-    rawOutput = await callAnthropic(systemPrompt, userText);
-    if (rawOutput) providerUsed = 'Claude';
-  }
-
-  // 5. Ultimate Newsroom Fallback: Algorithmic 4-Paragraph Synthesizer (never dump raw wire or commercials)
-  if (!rawOutput) {
-    const fallbackContent = synthesize4ParagraphBrief(headline, '', paragraphs, sourceName, 'National');
-    const fallbackParas = fallbackContent.split(/\n\s*\n/).filter((p) => p.length > 25);
-    return {
-      content: fallbackContent,
-      paragraphs: fallbackParas,
-      headline,
-      providerUsed: 'Algorithmic Engine',
-    };
+    return null;
   }
 
   let rewrittenHeadline: string | undefined = undefined;
@@ -250,8 +202,24 @@ STRICT EDITORIAL RULES:
     .filter((p) => p.length > 30);
 
   if (paras.length >= 2) {
+    const candidateContent = paras.join('\n\n');
+    const fullSource = `${headline}\n${cleanSourceText}`;
+
+    const bodyOverlaps = findConsecutiveWordOverlaps(fullSource, candidateContent, 8);
+    const titleOverlaps = rewrittenHeadline
+      ? findConsecutiveWordOverlaps(headline, rewrittenHeadline, 8)
+      : [];
+
+    if (bodyOverlaps.length > 0 || titleOverlaps.length > 0) {
+      console.warn(
+        `[News Extract AI] Blocked article rewrite due to consecutive 8+ word overlap with source:`,
+        bodyOverlaps[0] || titleOverlaps[0]
+      );
+      return null;
+    }
+
     return {
-      content: paras.join('\n\n'),
+      content: candidateContent,
       paragraphs: paras,
       headline: rewrittenHeadline,
       providerUsed,
