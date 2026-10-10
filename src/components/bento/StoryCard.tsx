@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl, formatCleanSnippet } from '@/lib/news';
+import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
 import UniversalEngagementBar from './UniversalEngagementBar';
-import { Eye, AlertCircle, Sparkles, ExternalLink, Zap } from 'lucide-react';
+import { Eye, AlertCircle, Sparkles, ExternalLink } from 'lucide-react';
 
 interface StoryCardProps {
   article: ArticleData;
   index?: number;
   countryCode?: string;
-  variant?: 'standard' | 'adjacent' | 'brief' | 'native_ad';
+  variant?: 'standard' | 'adjacent';
   onCardClick?: () => void;
 }
 
@@ -71,11 +71,11 @@ export default function StoryCard({
     return (
       <article className="col-span-1 rounded-3xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden shadow-xs hover:shadow-md transition duration-200 flex flex-col justify-between h-[380px] sm:h-[420px] md:h-[450px] p-5">
         <div className="flex flex-col">
-          {/* Photo */}
+          {/* Photo Header */}
           <Link
             href={articleUrl}
             onClick={handleRecordClick}
-            className="block overflow-hidden rounded-2xl bg-gray-100 dark:bg-neutral-800 h-44 sm:h-48 shrink-0 relative group"
+            className="block overflow-hidden rounded-2xl bg-gray-100 dark:bg-neutral-800 h-44 sm:h-52 shrink-0 relative group"
           >
             {/* eslint-disable-next-html-element-suppression */}
             <img
@@ -93,7 +93,7 @@ export default function StoryCard({
           </Link>
 
           {/* Time & Views */}
-          <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-neutral-400 mt-3 mb-1.5 font-medium">
+          <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-neutral-400 mt-3 mb-2 font-medium">
             <span>{formattedTime}</span>
             {effectiveViews > 0 && (
               <span className="flex items-center gap-1 font-semibold text-gray-500 dark:text-neutral-400 bg-gray-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
@@ -103,9 +103,9 @@ export default function StoryCard({
             )}
           </div>
 
-          {/* Headline */}
+          {/* Headline (No additional snippet text underneath) */}
           <Link href={articleUrl} onClick={handleRecordClick}>
-            <h3 className="text-base font-extrabold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition leading-snug line-clamp-3">
+            <h3 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition leading-snug line-clamp-3">
               {displayTitle}
             </h3>
           </Link>
@@ -131,75 +131,7 @@ export default function StoryCard({
     );
   }
 
-  // 2. BRIEF / QUICK TAKE CARD
-  if (variant === 'brief') {
-    return (
-      <article className="col-span-1 rounded-3xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-xs hover:shadow-md transition duration-200 flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between text-xs mb-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-extrabold text-[10px] uppercase tracking-wider border border-indigo-200 dark:border-indigo-800">
-              <Zap className="w-3 h-3" />
-              <span>Civic Brief</span>
-            </span>
-            <span className="text-[11px] text-gray-400 dark:text-neutral-500 font-medium">{formattedTime}</span>
-          </div>
-
-          <Link href={articleUrl} onClick={handleRecordClick}>
-            <h3 className="text-base font-extrabold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition leading-snug line-clamp-2 mb-2">
-              {displayTitle}
-            </h3>
-          </Link>
-
-          <p className="text-xs text-gray-600 dark:text-neutral-400 line-clamp-3 leading-relaxed">
-            {formatCleanSnippet(decodeAllHtmlEntities(article.snippet))}
-          </p>
-        </div>
-
-        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-neutral-800 flex items-center justify-between">
-          <UniversalEngagementBar
-            articleId={article.id}
-            articleSlug={article.slug}
-            countryCode={countryCode || article.country_code}
-          />
-          <span className="text-[11px] font-bold text-gray-400 dark:text-neutral-500 uppercase tracking-wider">
-            {article.source_name}
-          </span>
-        </div>
-      </article>
-    );
-  }
-
-  // 3. NATIVE AD BLENDED CARD
-  if (variant === 'native_ad') {
-    return (
-      <article className="col-span-1 rounded-3xl border border-dashed border-gray-300 dark:border-neutral-700 bg-gray-50/60 dark:bg-neutral-900/60 p-5 shadow-xs flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 dark:text-neutral-500 uppercase tracking-wider mb-2.5">
-            <span>Sponsored Focus</span>
-            <span className="bg-gray-200 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-neutral-400">Promoted</span>
-          </div>
-          <h3 className="text-base font-extrabold text-gray-900 dark:text-white leading-snug mb-2">
-            Civic Policy Research & Analytics Edition
-          </h3>
-          <p className="text-xs text-gray-600 dark:text-neutral-400 leading-relaxed">
-            Discover unbiased insights and comprehensive policy briefs directly sourced from verified global reporting desks.
-          </p>
-        </div>
-        <div className="mt-4 pt-3 border-t border-gray-200/60 dark:border-neutral-800 flex items-center justify-between">
-          <Link
-            href="/sponsor"
-            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-          >
-            <span>Learn More</span>
-            <ExternalLink className="w-3 h-3" />
-          </Link>
-          <span className="text-[11px] text-gray-400">VoxPolis Network</span>
-        </div>
-      </article>
-    );
-  }
-
-  // 4. STANDARD PHOTO NEWS CARD (Default in Bento feed)
+  // 2. STANDARD PHOTO NEWS CARD (Clean, uniform card with image, title & engagement bar)
   return (
     <article className="col-span-1 rounded-3xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-xs hover:shadow-md transition duration-200 flex flex-col justify-between group">
       <div>
@@ -250,17 +182,12 @@ export default function StoryCard({
           </div>
         ) : null}
 
-        {/* Title */}
+        {/* Title (No snippet text underneath as requested by user) */}
         <Link href={articleUrl} onClick={handleRecordClick}>
-          <h3 className="text-base font-extrabold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-snug line-clamp-2 mb-2">
+          <h3 className="text-base font-extrabold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-snug line-clamp-3 mb-1">
             {displayTitle}
           </h3>
         </Link>
-
-        {/* Snippet */}
-        <p className="text-xs text-gray-600 dark:text-neutral-400 line-clamp-3 leading-relaxed">
-          {formatCleanSnippet(decodeAllHtmlEntities(article.snippet))}
-        </p>
       </div>
 
       {/* Universal Engagement Bar at Bottom (Likes, Dislikes, Comments) */}
