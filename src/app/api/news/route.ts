@@ -226,7 +226,7 @@ export async function GET(request: NextRequest) {
                 source_name: sourceName,
                 source_url: item.link || 'https://voxpolis.app',
                 is_breaking: idx === 0,
-                tags: item.keywords || ['Politics', country.name],
+                tags: item.keywords && Array.isArray(item.keywords) && item.keywords.length > 0 ? item.keywords : [country.name],
                 views_count: 0,
                 total_reading_time_seconds: 180,
                 created_at: item.pubDate || new Date().toISOString(),
@@ -282,6 +282,8 @@ export async function GET(request: NextRequest) {
   }
 
   // 4. Ensure EVERY unique article on VoxPolis is cleanly rewritten by AI with ZERO verbatim overlap
+  const failedRewriteSlugs = new Set<string>();
+
   const rawRewritten = await Promise.all(
     uniqueArticles.slice(0, 15).map(async (art): Promise<ArticleData | null> => {
       const rawSource = `${art.title}\n${art.content || ''}\n${art.snippet || ''}`;
@@ -293,12 +295,15 @@ export async function GET(request: NextRequest) {
       });
 
       if (!rewritten.isAiRewritten || !rewritten.slug || !rewritten.content || rewritten.content.trim() === '') {
+        failedRewriteSlugs.add(art.slug);
         return null;
       }
 
       const overlaps = findConsecutiveWordOverlaps(rawSource, rewritten.content, 8);
       if (overlaps.length > 0) {
         console.warn(`[News API] Dropped article ${rewritten.slug} due to 8+ word overlap with source`);
+        failedRewriteSlugs.add(art.slug);
+        if (rewritten.slug) failedRewriteSlugs.add(rewritten.slug);
         return null;
       }
 
@@ -438,6 +443,7 @@ export async function GET(request: NextRequest) {
   // 5. Merge database-published articles (at the very top) with rewritten articles AND verified current-month wire stories
   const eligibleWireArticles = uniqueArticles.filter(
     (u) =>
+      !failedRewriteSlugs.has(u.slug) &&
       !dbCountryArticles.some((d) => d.slug === u.slug || d.title.toLowerCase() === u.title.toLowerCase()) &&
       !rewrittenArticles.some((r) => r.slug === u.slug || r.title.toLowerCase() === u.title.toLowerCase())
   );

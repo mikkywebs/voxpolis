@@ -67,7 +67,7 @@ const POLITICAL_KEYWORDS = [
   'state government', 'budget', 'appropriation', 'parliamentarian', 'civil service', 'executive order',
   'impeachment', 'tenure', 'referendum', 'geopolitical', 'public procurement', 'anti-corruption', 'defection',
   'political party', 'ruling party', 'opposition party', 'party primary', 'party primaries', 'party convention', 'party chieftain',
-  'polling unit', 'campaign convoy', 'political rally',
+  'polling unit', 'campaign convoy', 'political rally', 'minimum wage', 'new zealand first',
   // Multilingual political terms (French, Spanish, Portuguese, German)
   'politique', 'politiques', 'gouvernement', 'gouvernance', 'parlement', 'assemblee',
   'assemblee nationale', 'depute', 'deputes', 'ministre', 'ministere',
@@ -77,6 +77,10 @@ const POLITICAL_KEYWORDS = [
   'partido politico', 'orçamento', 'governo', 'politik', 'regierung'
 ];
 
+export function escapeRegExp(str: string): string {
+  return (str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const FORBIDDEN_NON_POLITICAL_KEYWORDS = [
   // 1. Sports & Athletics (STRICTLY BANNED on Voxpolis)
   'super eagles', 'super falcons', 'akor adams', 'osimhen', 'lookman', 'boniface', 'iwobi', 'chukwueze', 'nwabali',
@@ -85,7 +89,7 @@ const FORBIDDEN_NON_POLITICAL_KEYWORDS = [
   'arsenal', 'chelsea', 'manchester united', 'manchester city', 'liverpool', 'real madrid', 'barcelona', 'bayern', 'psg',
   'goal', 'goals', 'scored', 'scoreline', 'penalty', 'penalties', 'half-time', 'halftime', 'full-time',
   'striker', 'midfielder', 'defender', 'goalkeeper', 'coach', 'head coach', 'referee', 'stoppage time', 'fixture', 'fixtures',
-  'qualifier', 'qualifiers', 'friendly match', 'stadium', 'rescues super eagles', 'super eagles draw',
+  'qualifier', 'qualifiers', 'friendly match', 'rescues super eagles', 'super eagles draw',
   'basketball', 'nba', 'athletics', 'olympics', 'paralympics', 'marathon', 'boxing', 'heavyweight', 'tennis', 'wimbledon', 'golf',
 
   // 2. Entertainment, Pop Culture & Celebrities (STRICTLY BANNED)
@@ -296,11 +300,24 @@ export function isPoliticalNews(title: string, snippet: string = '', tags: strin
     return false;
   }
 
+  // 4b. Comprehensive Sports & Athletics Filter with Governance Shield
+  // Blocks routine match previews, rosters, season campaigns, club board votes, and ceremonial photo-ops across all countries
+  // Preserves genuine political reporting involving public funding, legislation, corruption, and public accountability
+  const SPORTS_DISCIPLINES = /\b(?:rugby|all blacks|black ferns|super rugby|bledisloe|rugby union|rugby league|nrl|warriors|black caps|white ferns|cricket|\bipl\b|\bbcci\b|test match|wicket|innings|the ashes|silver ferns|netball|anz premiership|america'?s cup|sailgp|yachting|supercars|bathurst|formula 1|\bf1\b|motorsport|grand prix|afl|aussie rules|brisbane lions|\bnfl\b|super bowl|quarterback|\bmlb\b|baseball|\bnhl\b|ice hockey|stanley cup|\bufc\b|\bmma\b|a-league|stadium|finals? campaign|qualifying victory)\b/i;
+
+  if (SPORTS_DISCIPLINES.test(text)) {
+    const hasPoliticalGovernanceContext = /\b(?:public funds|taxpayer|corruption|bribe|anti-corruption|serious fraud office|\bsfo\b|legislation|parliamentary inquiry|select committee|statutory|ministerial misconduct|sports integrity commission|government funding|appropriation bill|state subsidies|audit office|auditor-general|passes bill|passes law|senate committee|congressional inquiry|state budget|parliament passes|regulatory probe|public inquiry)\b/i.test(text);
+
+    if (!hasPoliticalGovernanceContext) {
+      return false;
+    }
+  }
+
   // 5. Strictly exclude all items matching the non-political forbidden dictionary
   // Use word-boundary safety for short words (<= 4 chars like 'rema') to avoid false collisions with words like 'remands'
   for (const forbidden of FORBIDDEN_NON_POLITICAL_KEYWORDS) {
     if (forbidden.length <= 4) {
-      if (new RegExp(`\\b${forbidden}\\b`, 'i').test(text)) return false;
+      if (new RegExp(`\\b${escapeRegExp(forbidden)}\\b`, 'i').test(text)) return false;
     } else {
       if (text.includes(forbidden)) return false;
     }
@@ -378,8 +395,29 @@ export function isPoliticalNews(title: string, snippet: string = '', tags: strin
     return true;
   }
 
+  // 10b. Context Check F: Disambiguate geographical place names from political office titles
+  if ((text.includes('governor') || text.includes('governo')) && text.includes('governors bay')) {
+    const strippedText = text.replace(/governors bay/g, '');
+    const hasOtherGov = POLITICAL_KEYWORDS.some((kw) => {
+      if (kw === 'governor' || kw === 'governo') return false;
+      if (kw.length <= 4) {
+        return new RegExp(`\\b${escapeRegExp(kw)}\\b`, 'i').test(strippedText);
+      }
+      return strippedText.includes(kw);
+    });
+    if (!hasOtherGov) {
+      return false;
+    }
+  }
+
   // 11. Must contain a genuine political governance term
-  return POLITICAL_KEYWORDS.some((kw) => text.includes(kw));
+  // Safely use word boundaries for short words (<= 4 chars like 'lp', 'dss', 'apc') to avoid substring false positives (e.g. 'helps')
+  return POLITICAL_KEYWORDS.some((kw) => {
+    if (kw.length <= 4) {
+      return new RegExp(`\\b${escapeRegExp(kw)}\\b`, 'i').test(text);
+    }
+    return text.includes(kw);
+  });
 }
 
 const COUNTRY_SPECIFIC_IDENTIFIERS: Record<string, string[]> = {
@@ -1083,7 +1121,7 @@ export async function fetchArticlesForCountry(
                 source_name: sourceName,
                 source_url: item.link || 'https://voxpolis.app',
                 is_breaking: idx === 0,
-                tags: item.keywords || ['Politics', country.name],
+                tags: item.keywords && Array.isArray(item.keywords) && item.keywords.length > 0 ? item.keywords : [country.name],
                 views_count: 0,
                 total_reading_time_seconds: 180,
                 created_at: item.pubDate || new Date().toISOString(),
