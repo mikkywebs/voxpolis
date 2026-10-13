@@ -1,9 +1,163 @@
+import dns from 'dns/promises';
+import net from 'net';
 import { NextRequest, NextResponse } from 'next/server';
 import { synthesize4ParagraphBrief } from '@/lib/news';
 import { findConsecutiveWordOverlaps } from '@/lib/pipeline/overlap';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// Bounded in-memory cache for extracted/rewritten URLs (30-minute TTL, max 500 entries)
+const EXTRACT_CACHE_TTL_MS = 30 * 60 * 1000;
+const EXTRACT_CACHE_MAX_ENTRIES = 500;
+const extractCache = new Map<string, { expiresAt: number; payload: Record<string, any> }>();
+
+// Per-IP sliding-window rate limiter (max 20 requests per 60 seconds)
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+const ipRequestLog = new Map<string, number[]>();
+
+function getClientIp(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return request.headers.get('x-real-ip')?.trim() || 'unknown-ip';
+}
+
+function checkExtractRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const timestamps = (ipRequestLog.get(ip) || []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  if (timestamps.length >= RATE_LIMIT_MAX_REQUESTS) {
+    ipRequestLog.set(ip, timestamps);
+    return false;
+  }
+  timestamps.push(now);
+  ipRequestLog.set(ip, timestamps);
+  if (ipRequestLog.size > 1000) {
+    const firstKey = ipRequestLog.keys().next().value;
+    if (firstKey) ipRequestLog.delete(firstKey);
+  }
+  return true;
+}
+
+function isPrivateOrReservedIp(ip: string): boolean {
+  const clean = ip.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  if (!clean) return true;
+
+  // Handle IPv4-mapped IPv6 addresses (e.g., ::ffff:127.0.0.1)
+  if (clean.startsWith('::ffff:')) {
+    return isPrivateOrReservedIp(clean.slice(7));
+  }
+
+  const version = net.isIP(clean);
+  if (version === 4) {
+    const parts = clean.split('.').map((n) => parseInt(n, 10));
+    if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) return true;
+    const [a, b, c] = parts;
+    if (a === 0 || a === 10 || a === 127) return true; // Current network, RFC1918 10/8, Loopback 127/8
+    if (a === 169 && b === 254) return true; // Link-local & Cloud Metadata 169.254/16
+    if (a === 172 && b >= 16 && b <= 31) return true; // RFC1918 172.16/12
+    if (a === 192 && b === 168) return true; // RFC1918 192.168/16
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT / Cloud internal 100.64/10
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) return true; // IETF / TEST-NET-1
+    if (a === 198 && (b === 18 || b === 19)) return true; // Benchmarking
+    if (a === 198 && b === 51 && c === 100) return true; // TEST-NET-2
+    if (a === 203 && b === 0 && c === 113) return true; // TEST-NET-3
+    if (a >= 224) return true; // Multicast & Reserved
+    return false;
+  }
+
+  if (version === 6) {
+    if (clean === '::1' || clean === '::' || clean === '0:0:0:0:0:0:0:1' || clean === '0:0:0:0:0:0:0:0') return true;
+    if (/^f[cd][0-9a-f]{2}:/i.test(clean)) return true; // Unique Local fc00::/7
+    if (/^fe[89ab][0-9a-f]:/i.test(clean)) return true; // Link-local fe80::/10
+    if (/^ff[0-9a-f]{2}:/i.test(clean)) return true; // Multicast ff00::/8
+    return false;
+  }
+
+  return true;
+}
+
+async function validateSafePublicUrl(urlStr: string): Promise<{ valid: boolean; reason?: string; parsed?: URL }> {
+  if (!urlStr || typeof urlStr !== 'string' || urlStr.length > 2048) {
+    return { valid: false, reason: 'Valid source URL required' };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(urlStr);
+  } catch {
+    return { valid: false, reason: 'Malformed URL' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { valid: false, reason: 'Invalid protocol' };
+  }
+
+  if (parsed.username || parsed.password) {
+    return { valid: false, reason: 'Credentials in URL are not permitted' };
+  }
+
+  if (parsed.port && parsed.port !== '80' && parsed.port !== '443') {
+    return { valid: false, reason: 'Non-standard ports are not permitted' };
+  }
+
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (
+    !host ||
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host.endsWith('.arpa') ||
+    host === 'voxpolis.app' ||
+    host.endsWith('.voxpolis.app') ||
+    /^\d+$/.test(host) ||
+    /^0x/i.test(host)
+  ) {
+    return { valid: false, reason: 'Restricted or internal host is not permitted' };
+  }
+
+  if (net.isIP(host) !== 0) {
+    if (isPrivateOrReservedIp(host)) {
+      return { valid: false, reason: 'Private or reserved IP addresses are not permitted' };
+    }
+    return { valid: true, parsed };
+  }
+
+  if (!host.includes('.')) {
+    return { valid: false, reason: 'Invalid public hostname' };
+  }
+
+  // Verify DNS does not resolve to private/loopback/metadata IP ranges
+  try {
+    const records = await dns.lookup(host, { all: true });
+    if (!records || records.length === 0) {
+      return { valid: false, reason: 'Unable to resolve hostname' };
+    }
+    for (const rec of records) {
+      if (isPrivateOrReservedIp(rec.address)) {
+        return { valid: false, reason: 'Hostname resolves to a restricted network address' };
+      }
+    }
+  } catch {
+    return { valid: false, reason: 'Unable to resolve hostname' };
+  }
+
+  return { valid: true, parsed };
+}
+
+function setCachedExtraction(urlKey: string, payload: Record<string, any>) {
+  if (extractCache.size >= EXTRACT_CACHE_MAX_ENTRIES) {
+    const oldestKey = extractCache.keys().next().value;
+    if (oldestKey) extractCache.delete(oldestKey);
+  }
+  extractCache.set(urlKey, {
+    expiresAt: Date.now() + EXTRACT_CACHE_TTL_MS,
+    payload,
+  });
+}
 
 /**
  * Multi-AI Editorial Rewriter Cascade:
@@ -230,27 +384,36 @@ STRICT EDITORIAL RULES:
 }
 
 export async function GET(request: NextRequest) {
+  const clientIp = getClientIp(request);
+  if (!checkExtractRateLimit(clientIp)) {
+    return NextResponse.json(
+      { success: false, error: 'Rate limit exceeded. Please try again shortly.' },
+      { status: 429 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
-  const sourceUrl = searchParams.get('url');
+  const sourceUrl = searchParams.get('url')?.trim() || '';
 
   if (!sourceUrl || !sourceUrl.startsWith('http')) {
     return NextResponse.json({ success: false, error: 'Valid source URL required' }, { status: 400 });
   }
 
-  try {
-    const parsed = new URL(sourceUrl);
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return NextResponse.json({ success: false, error: 'Invalid protocol' }, { status: 400 });
-    }
-  } catch {
-    return NextResponse.json({ success: false, error: 'Malformed URL' }, { status: 400 });
+  const urlCheck = await validateSafePublicUrl(sourceUrl);
+  if (!urlCheck.valid || !urlCheck.parsed) {
+    return NextResponse.json(
+      { success: false, error: urlCheck.reason || 'Invalid or restricted URL' },
+      { status: 400 }
+    );
   }
 
-  let sourceHost = 'News Wire';
-  try {
-    const u = new URL(sourceUrl);
-    sourceHost = u.hostname.replace(/^www\./, '');
-  } catch {}
+  const normalizedUrlKey = urlCheck.parsed.toString();
+  const cachedEntry = extractCache.get(normalizedUrlKey);
+  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+    return NextResponse.json({ ...cachedEntry.payload, cached: true });
+  }
+
+  const sourceHost = urlCheck.parsed.hostname.toLowerCase().replace(/^www\./, '');
 
   const sourceNameMap: Record<string, string> = {
     'channelstv.com': 'Channels Television',
@@ -277,8 +440,9 @@ export async function GET(request: NextRequest) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 9000);
 
-    const res = await fetch(sourceUrl, {
+    const res = await fetch(normalizedUrlKey, {
       signal: controller.signal,
+      redirect: 'manual',
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -288,66 +452,47 @@ export async function GET(request: NextRequest) {
 
     clearTimeout(timeoutId);
 
-    if (!res.ok) {
-      return NextResponse.json({ success: false, status: res.status, requiresReview: true, sourceUrl, sourceName: detectedSource });
+    // Handle up to 1 safe public redirect without allowing SSRF redirect to internal IPs
+    let finalRes = res;
+    if ([301, 302, 303, 307, 308].includes(res.status)) {
+      const locationHeader = res.headers.get('location');
+      if (!locationHeader) {
+        return NextResponse.json({ success: false, status: res.status, requiresReview: true, sourceUrl, sourceName: detectedSource });
+      }
+      const redirectTarget = new URL(locationHeader, normalizedUrlKey).toString();
+      const redirectCheck = await validateSafePublicUrl(redirectTarget);
+      if (!redirectCheck.valid) {
+        return NextResponse.json({ success: false, error: 'Unsafe redirect target blocked' }, { status: 400 });
+      }
+      const redirectController = new AbortController();
+      const redirectTimeout = setTimeout(() => redirectController.abort(), 8000);
+      finalRes = await fetch(redirectTarget, {
+        signal: redirectController.signal,
+        redirect: 'error',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      });
+      clearTimeout(redirectTimeout);
     }
 
-    let html = await res.text();
+    if (!finalRes.ok) {
+      return NextResponse.json({ success: false, status: finalRes.status, requiresReview: true, sourceUrl, sourceName: detectedSource });
+    }
 
-    // Check for DDoS-Guard / SlowAES anti-bot challenge (e.g. Premium Times)
+    const rawText = await finalRes.text();
+    const html = rawText.slice(0, 500_000); // Bound HTML size to 500 KB
+
+    // If protected by anti-bot JS challenge (e.g. SlowAES / DDoS-Guard), decline gracefully without executing remote scripts
     if (html.includes('/aes.js') || html.includes('slowAES')) {
-      try {
-        const parsedUrl = new URL(sourceUrl);
-        const aesRes = await fetch(`${parsedUrl.origin}/aes.js`, {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          },
-        });
-        if (aesRes.ok) {
-          const aesCode = await aesRes.text();
-          const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/i);
-          if (scriptMatch) {
-            let setCookie = '';
-            let targetHref = '';
-            const vmModule = await import('vm');
-            const sandbox = {
-              document: {
-                get cookie() {
-                  return setCookie;
-                },
-                set cookie(val: string) {
-                  setCookie = val;
-                },
-              },
-              location: {
-                set href(val: string) {
-                  targetHref = val;
-                },
-              },
-            };
-            vmModule.createContext(sandbox);
-            vmModule.runInContext(aesCode, sandbox);
-            vmModule.runInContext(scriptMatch[1], sandbox);
-
-            if (targetHref && setCookie) {
-              const res2 = await fetch(targetHref, {
-                headers: {
-                  Cookie: setCookie.split(';')[0],
-                  'User-Agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                },
-              });
-              if (res2.ok) {
-                html = await res2.text();
-              }
-            }
-          }
-        }
-      } catch {
-        // Silently continue with original html if challenge solver fails
-      }
+      return NextResponse.json({
+        success: false,
+        requiresReview: true,
+        sourceUrl,
+        sourceName: detectedSource,
+      });
     }
 
     // 1. Columnist & Opinion Detection: Articles identified as columnist are declined
@@ -390,7 +535,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (isColumnistUrl || isColumnistHtml) {
-      return NextResponse.json({
+      const columnistPayload = {
         success: true,
         isColumnist: true,
         author: extractedAuthor || 'Guest Columnist',
@@ -398,7 +543,9 @@ export async function GET(request: NextRequest) {
         sourceUrl,
         headline: extractedHeadline,
         message: 'This article is a columnist contribution or op-ed. Columnist articles are reserved for direct publisher reading.',
-      });
+      };
+      setCachedExtraction(normalizedUrlKey, columnistPayload);
+      return NextResponse.json(columnistPayload);
     }
 
     // Locate article content container
@@ -463,7 +610,7 @@ export async function GET(request: NextRequest) {
 
       if (aiResult) {
         const genuinelyAi = aiResult.providerUsed !== 'Algorithmic Engine';
-        return NextResponse.json({
+        const aiPayload = {
           success: true,
           isColumnist: false,
           isAiRewritten: genuinelyAi,
@@ -475,7 +622,9 @@ export async function GET(request: NextRequest) {
           author: extractedAuthor,
           sourceName: detectedSource,
           sourceUrl,
-        });
+        };
+        setCachedExtraction(normalizedUrlKey, aiPayload);
+        return NextResponse.json(aiPayload);
       }
 
       // Fallback: Strictly synthesize a clean 4-paragraph brief with zero commercials
@@ -488,7 +637,7 @@ export async function GET(request: NextRequest) {
       );
       const synthParas = synthResult.split(/\n\s*\n/).filter((p) => p.length > 25);
 
-      return NextResponse.json({
+      const synthPayload = {
         success: true,
         isColumnist: false,
         isAiRewritten: false,
@@ -500,7 +649,9 @@ export async function GET(request: NextRequest) {
         author: extractedAuthor,
         sourceName: detectedSource,
         sourceUrl,
-      });
+      };
+      setCachedExtraction(normalizedUrlKey, synthPayload);
+      return NextResponse.json(synthPayload);
     }
 
     const fallbackResult = synthesize4ParagraphBrief(
@@ -510,7 +661,7 @@ export async function GET(request: NextRequest) {
       detectedSource,
       'National'
     );
-    return NextResponse.json({
+    const fallbackPayload = {
       success: true,
       isColumnist: false,
       isAiRewritten: false,
@@ -521,12 +672,14 @@ export async function GET(request: NextRequest) {
       provider: 'Newsroom Synthesizer',
       sourceName: detectedSource,
       sourceUrl,
-    });
-  } catch (err: any) {
+    };
+    setCachedExtraction(normalizedUrlKey, fallbackPayload);
+    return NextResponse.json(fallbackPayload);
+  } catch {
     return NextResponse.json({
       success: false,
       requiresReview: true,
-      error: err.message || 'Extract failed',
+      error: 'Extract failed',
       sourceName: detectedSource,
       sourceUrl,
     });

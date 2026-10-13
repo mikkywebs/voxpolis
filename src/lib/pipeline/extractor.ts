@@ -1,5 +1,125 @@
 import { ScrapedSourcePage } from './types';
 
+function detectIpVersion(ip: string): 0 | 4 | 6 {
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+    const parts = ip.split('.').map((n) => parseInt(n, 10));
+    return parts.every((p) => !isNaN(p) && p >= 0 && p <= 255) ? 4 : 0;
+  }
+  if (ip.includes(':') && /^[0-9a-f:.]+$/i.test(ip)) {
+    return 6;
+  }
+  return 0;
+}
+
+export function isPrivateOrReservedIp(ip: string): boolean {
+  const clean = ip.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  if (!clean) return true;
+
+  if (clean.startsWith('::ffff:')) {
+    return isPrivateOrReservedIp(clean.slice(7));
+  }
+
+  const version = detectIpVersion(clean);
+  if (version === 4) {
+    const parts = clean.split('.').map((n) => parseInt(n, 10));
+    if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) return true;
+    const [a, b, c] = parts;
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) return true;
+    if (a === 198 && (b === 18 || b === 19)) return true;
+    if (a === 198 && b === 51 && c === 100) return true;
+    if (a === 203 && b === 0 && c === 113) return true;
+    if (a >= 224) return true;
+    return false;
+  }
+
+  if (version === 6) {
+    if (clean === '::1' || clean === '::' || clean === '0:0:0:0:0:0:0:1' || clean === '0:0:0:0:0:0:0:0') return true;
+    if (/^f[cd][0-9a-f]{2}:/i.test(clean)) return true;
+    if (/^fe[89ab][0-9a-f]:/i.test(clean)) return true;
+    if (/^ff[0-9a-f]{2}:/i.test(clean)) return true;
+    return false;
+  }
+
+  return true;
+}
+
+export async function validateSafePublicUrl(urlStr: string): Promise<{ valid: boolean; reason?: string; parsed?: URL }> {
+  if (!urlStr || typeof urlStr !== 'string' || urlStr.length > 2048) {
+    return { valid: false, reason: 'Valid source URL required' };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(urlStr);
+  } catch {
+    return { valid: false, reason: 'Malformed URL' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { valid: false, reason: 'Invalid protocol' };
+  }
+
+  if (parsed.username || parsed.password) {
+    return { valid: false, reason: 'Credentials in URL are not permitted' };
+  }
+
+  if (parsed.port && parsed.port !== '80' && parsed.port !== '443') {
+    return { valid: false, reason: 'Non-standard ports are not permitted' };
+  }
+
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (
+    !host ||
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host.endsWith('.arpa') ||
+    host === 'voxpolis.app' ||
+    host.endsWith('.voxpolis.app') ||
+    /^\d+$/.test(host) ||
+    /^0x/i.test(host)
+  ) {
+    return { valid: false, reason: 'Restricted or internal host is not permitted' };
+  }
+
+  if (detectIpVersion(host) !== 0) {
+    if (isPrivateOrReservedIp(host)) {
+      return { valid: false, reason: 'Private or reserved IP addresses are not permitted' };
+    }
+    return { valid: true, parsed };
+  }
+
+  if (!host.includes('.')) {
+    return { valid: false, reason: 'Invalid public hostname' };
+  }
+
+  if (typeof window === 'undefined') {
+    try {
+      const nodeRequire = eval('require') as NodeRequire;
+      const dns = nodeRequire('dns/promises');
+      const records = await dns.lookup(host, { all: true });
+      if (!records || records.length === 0) {
+        return { valid: false, reason: 'Unable to resolve hostname' };
+      }
+      for (const rec of records) {
+        if (isPrivateOrReservedIp(rec.address)) {
+          return { valid: false, reason: 'Target host resolves to a restricted network address' };
+        }
+      }
+    } catch {
+      return { valid: false, reason: 'Unable to resolve target host' };
+    }
+  }
+
+  return { valid: true, parsed };
+}
+
 export function isValidContentImage(url?: string): boolean {
   if (!url || typeof url !== 'string' || !url.startsWith('http')) return false;
 
@@ -123,11 +243,27 @@ export async function fetchAndExtractSourcePage(
   const publishedAt = rssDate || new Date().toISOString();
 
   try {
+    const urlCheck = await validateSafePublicUrl(sourceUrl);
+    if (!urlCheck.valid || !urlCheck.parsed) {
+      return {
+        source_url: sourceUrl,
+        source_name: sourceName,
+        source_published_at: publishedAt,
+        source_headline: rssHeadline,
+        extracted_full_text: '',
+        character_count: 0,
+        word_count: 0,
+        is_valid: false,
+        reject_reason: urlCheck.reason || 'Blocked unsafe or restricted source URL',
+      };
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const res = await fetch(sourceUrl, {
+    const res = await fetch(urlCheck.parsed.toString(), {
       signal: controller.signal,
+      redirect: 'error',
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 VoxpolisBot/1.0',

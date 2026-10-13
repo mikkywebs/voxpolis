@@ -224,29 +224,84 @@ export async function processSourceUrlThroughPipeline(
   articlesBySourceUrl.set(normUrl, publishedRecord);
   articlesBySlug.set(slug, publishedRecord);
 
-  // Persist to Supabase Postgres database for permanent multi-instance availability
+  // Persist to Supabase Postgres database using hardened insert-only & admin-protection rules
   try {
     const { supabaseAdmin } = await import('@/lib/supabase/admin');
-    await supabaseAdmin.from('articles').upsert(
-      {
-        slug,
-        title: publishedRecord.headline,
-        snippet: publishedRecord.dek || publishedRecord.executive_summary || publishedRecord.headline,
-        content: publishedRecord.body_markdown,
-        ai_analysis: publishedRecord.executive_summary
-          ? `• Executive Summary: ${publishedRecord.executive_summary}\n• Why It Matters: ${publishedRecord.why_it_matters}`
-          : `• News Recap: ${publishedRecord.dek}\n• Key Impact: Relevant policy updates documented by ${sourceName}.`,
-        country_code: targetCountry,
-        language: 'en',
-        category: 'politics',
-        original_image_url: featuredImage,
-        source_name: sourceName,
-        source_url: normUrl,
-        tags: publishedRecord.tags,
-        created_at: publishedRecord.created_at,
-      },
-      { onConflict: 'slug' }
+    const { isAdminPublishedArticle, isTitleDuplicate, normalizeFullTitle } = await import('@/lib/news-storage');
+    const { isPoliticalNews, isRelevantToCountry } = await import('@/lib/news');
+    const { isCurrentMonthArticle } = await import('@/lib/rss');
+
+    const sanitizedTags = (publishedRecord.tags || []).filter(
+      (t) => typeof t === 'string' && t.trim().toLowerCase() !== 'featured news'
     );
+
+    const passesGates =
+      isPoliticalNews(publishedRecord.headline, publishedRecord.dek || publishedRecord.executive_summary || '', sanitizedTags) &&
+      isRelevantToCountry(publishedRecord.headline, publishedRecord.dek || publishedRecord.executive_summary || '', targetCountry) &&
+      isCurrentMonthArticle(publishedRecord.created_at);
+
+    if (passesGates) {
+      let alreadyStored = false;
+
+      // 1. Check source_url deduplication
+      if (normUrl && normUrl.startsWith('http')) {
+        const { data: existingByUrl } = await supabaseAdmin
+          .from('articles')
+          .select('id, slug')
+          .eq('source_url', normUrl)
+          .maybeSingle();
+        if (existingByUrl) alreadyStored = true;
+      }
+
+      // 2. Check slug collision & admin protection
+      if (!alreadyStored) {
+        const { data: existingBySlug } = await supabaseAdmin
+          .from('articles')
+          .select('id, slug, source_name, tags')
+          .eq('slug', slug)
+          .maybeSingle();
+        if (existingBySlug) {
+          if (isAdminPublishedArticle(existingBySlug)) {
+            console.warn(`[Pipeline] Blocked overwrite of admin-protected article slug="${slug}"`);
+          }
+          alreadyStored = true;
+        }
+      }
+
+      // 3. Check 85% Dice title similarity against recent country articles
+      if (!alreadyStored && normalizeFullTitle(publishedRecord.headline)) {
+        const { data: recentCountryRows } = await supabaseAdmin
+          .from('articles')
+          .select('id, slug, title')
+          .eq('country_code', targetCountry)
+          .order('created_at', { ascending: false })
+          .limit(40);
+        if (recentCountryRows && recentCountryRows.some((r) => isTitleDuplicate(publishedRecord.headline, r.title, 0.85).isDuplicate)) {
+          alreadyStored = true;
+        }
+      }
+
+      // 4. Insert-only persistence (never upsert or overwrite existing rows)
+      if (!alreadyStored) {
+        await supabaseAdmin.from('articles').insert({
+          slug,
+          title: publishedRecord.headline,
+          snippet: publishedRecord.dek || publishedRecord.executive_summary || publishedRecord.headline,
+          content: publishedRecord.body_markdown,
+          ai_analysis: publishedRecord.executive_summary
+            ? `• Executive Summary: ${publishedRecord.executive_summary}\n• Why It Matters: ${publishedRecord.why_it_matters}`
+            : `• News Recap: ${publishedRecord.dek}\n• Key Impact: Relevant policy updates documented by ${sourceName}.`,
+          country_code: targetCountry,
+          language: 'en',
+          category: 'politics',
+          original_image_url: featuredImage,
+          source_name: sourceName,
+          source_url: normUrl,
+          tags: sanitizedTags,
+          created_at: publishedRecord.created_at,
+        });
+      }
+    }
   } catch (err) {
     console.warn('Could not persist pipeline article to Supabase database:', err);
   }

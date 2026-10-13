@@ -6,11 +6,15 @@ import { getCountryByCode, getCountrySlug } from '@/config/countries';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next');
+  const rawNext = searchParams.get('next');
+  const next =
+    rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('\\')
+      ? rawNext
+      : null;
 
   if (code) {
     const cookieStore = cookies();
-    let redirectPath = next || '/onboarding';
+    const redirectPath = next || '/onboarding';
     const response = NextResponse.redirect(`${origin}${redirectPath}`);
 
     const supabase = createServerClient(
@@ -43,7 +47,7 @@ export async function GET(request: Request) {
       let targetPath = '/onboarding';
       if (!hasCompletedProfile) {
         targetPath = next ? `/onboarding?next=${encodeURIComponent(next)}` : '/onboarding';
-      } else if (next && next.startsWith('/')) {
+      } else if (next) {
         targetPath = next;
       } else {
         const countryObj = getCountryByCode(user.user_metadata?.primary_country || 'NG');

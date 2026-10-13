@@ -48,10 +48,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const dynamicRoutes: MetadataRoute.Sitemap = [];
   const addedSlugs = new Set<string>();
 
-  // Add country archive routes and articles
-  for (const country of SUPPORTED_COUNTRIES.slice(0, 10)) {
-    const slug = country.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    
+  // Add country archive routes and articles in parallel to prevent build timeouts
+  const countryResults = await Promise.all(
+    SUPPORTED_COUNTRIES.slice(0, 10).map(async (country) => {
+      const slug = country.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      try {
+        const articles = await fetchArticlesForCountry(country.code);
+        return { country, slug, articles };
+      } catch (e) {
+        console.warn(`Failed to fetch sitemap articles for ${country.code}:`, e);
+        return { country, slug, articles: [] };
+      }
+    })
+  );
+
+  for (const { slug, articles } of countryResults) {
     dynamicRoutes.push({
       url: `${baseUrl}/${slug}/archive`,
       lastModified: new Date(),
@@ -59,7 +70,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     });
 
-    const articles = await fetchArticlesForCountry(country.code);
     articles.forEach((art) => {
       // Only include complete published articles
       if (art.slug && !addedSlugs.has(art.slug) && !art.content.includes('[...]')) {

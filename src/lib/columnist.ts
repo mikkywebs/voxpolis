@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export interface ColumnistSubmission {
   id: string;
@@ -19,49 +18,59 @@ export interface ColumnistSubmission {
   reviewed_at?: string;
 }
 
-const storagePath = path.join(process.cwd(), 'src/config/columnistSubmissions.json');
-
-export function getAllColumnistSubmissions(): ColumnistSubmission[] {
+export async function getAllColumnistSubmissions(): Promise<ColumnistSubmission[]> {
   try {
-    if (fs.existsSync(storagePath)) {
-      const raw = fs.readFileSync(storagePath, 'utf8');
-      return JSON.parse(raw);
+    const { data, error } = await supabaseAdmin
+      .from('columnist_submissions')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      return data as ColumnistSubmission[];
+    }
+    if (error) {
+      console.warn('[ColumnistStore] Error fetching submissions from Supabase:', error.message);
     }
   } catch (e) {
-    console.warn('Error reading columnist submissions:', e);
+    console.warn('[ColumnistStore] Error reading columnist submissions:', e);
   }
   return [];
 }
 
-export function saveColumnistSubmission(sub: ColumnistSubmission): boolean {
+export async function saveColumnistSubmission(sub: ColumnistSubmission): Promise<boolean> {
   try {
-    const list = getAllColumnistSubmissions();
-    const existingIdx = list.findIndex((item) => item.id === sub.id);
-    if (existingIdx >= 0) {
-      list[existingIdx] = sub;
-    } else {
-      list.unshift(sub);
+    const { error } = await supabaseAdmin
+      .from('columnist_submissions')
+      .insert([sub]);
+
+    if (!error) {
+      return true;
     }
-    fs.writeFileSync(storagePath, JSON.stringify(list, null, 2), 'utf8');
-    return true;
+    console.error('[ColumnistStore] Error saving columnist submission to Supabase:', error.message);
+    return false;
   } catch (e) {
-    console.error('Error saving columnist submission:', e);
+    console.error('[ColumnistStore] Error saving columnist submission:', e);
     return false;
   }
 }
 
-export function updateSubmissionStatus(id: string, status: 'published' | 'declined'): boolean {
+export async function updateSubmissionStatus(id: string, status: 'published' | 'declined'): Promise<boolean> {
   try {
-    const list = getAllColumnistSubmissions();
-    const target = list.find((item) => item.id === id);
-    if (target) {
-      target.status = status;
-      target.reviewed_at = new Date().toISOString();
-      fs.writeFileSync(storagePath, JSON.stringify(list, null, 2), 'utf8');
+    const { error } = await supabaseAdmin
+      .from('columnist_submissions')
+      .update({
+        status,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (!error) {
       return true;
     }
+    console.error('[ColumnistStore] Error updating columnist submission status in Supabase:', error.message);
+    return false;
   } catch (e) {
-    console.error('Error updating status:', e);
+    console.error('[ColumnistStore] Error updating status:', e);
+    return false;
   }
-  return false;
 }

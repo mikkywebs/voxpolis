@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { moderateComment } from '@/lib/moderation';
+import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
@@ -7,7 +8,25 @@ export const dynamic = 'force-dynamic';
 const isUuid = (str?: string): boolean =>
   typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
-export async function GET(req: Request) {
+async function getVerifiedSessionUserId(req: NextRequest): Promise<string | null> {
+  try {
+    const authHeader = req.headers?.get?.('authorization');
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      const token = authHeader.slice(7).trim();
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && data?.user?.id) return data.user.id;
+    }
+
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase.auth.getUser();
+      if (!error && data?.user?.id) return data.user.id;
+    } catch {}
+  } catch {}
+  return null;
+}
+
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const articleId = searchParams.get('articleId');
@@ -43,26 +62,38 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({ comments: [] });
-  } catch (e: any) {
-    return NextResponse.json({ comments: [], warning: e.message });
+  } catch {
+    return NextResponse.json({ comments: [] });
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { articleId, articleSlug, userId, userName, userCountryFlag, userAvatar, content, parentId } = body;
+    const { articleId, articleSlug, userId, userName, userCountryFlag, userAvatar, content, parentId } = body || {};
 
-    if (!content || (!articleId && !articleSlug)) {
+    if (typeof content !== 'string' || !content.trim() || (!articleId && !articleSlug)) {
       return NextResponse.json({ error: 'Comment content and article reference are required.' }, { status: 400 });
     }
 
+    if (content.length > 2000) {
+      return NextResponse.json({ error: 'Comment exceeds maximum length of 2,000 characters.' }, { status: 400 });
+    }
+
     // Run automated moderation pipeline
-    const mod = moderateComment(content);
+    const mod = moderateComment(content.trim());
 
     if (!mod.allowed) {
       return NextResponse.json({ error: mod.reason || 'Comment contains inappropriate content.' }, { status: 422 });
     }
+
+    const verifiedUserId = await getVerifiedSessionUserId(req);
+    const safeUserId =
+      userId && isUuid(userId) && verifiedUserId === userId ? verifiedUserId : null;
+    const safeUserName =
+      typeof userName === 'string' && userName.trim()
+        ? userName.trim().slice(0, 80)
+        : 'Contributor';
 
     const commentId = `c-${Date.now()}`;
     let dbRow: any = null;
@@ -75,9 +106,9 @@ export async function POST(req: Request) {
           .insert([
             {
               article_id: articleId,
-              user_id: (userId && isUuid(userId)) ? userId : null,
-              user_name: userName || 'Contributor',
-              user_avatar: userAvatar || undefined,
+              user_id: safeUserId,
+              user_name: safeUserName,
+              user_avatar: typeof userAvatar === 'string' ? userAvatar.slice(0, 500) : undefined,
               content: mod.censoredText,
             },
           ])
@@ -95,15 +126,15 @@ export async function POST(req: Request) {
     const resultComment = {
       id: dbRow?.id || commentId,
       parentId: parentId || null,
-      user_name: userName || 'Contributor',
-      country_flag: userCountryFlag || '🌐',
+      user_name: safeUserName,
+      country_flag: typeof userCountryFlag === 'string' && userCountryFlag.trim() ? userCountryFlag.trim().slice(0, 16) : '🌐',
       content: mod.censoredText,
       created_at: 'Just now',
       reactions: { agree: 0, disagree: 0, angry: 0, insightful: 0 },
     };
 
     return NextResponse.json({ success: true, comment: resultComment });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Failed to post comment' }, { status: 500 });
   }
 }

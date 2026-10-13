@@ -1,11 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
 
 export const dynamic = 'force-dynamic';
 
+async function verifyAdminAuth(request: NextRequest): Promise<{ authorized: boolean; status?: number; error?: string; user?: any }> {
+  try {
+    const authHeader = request.headers.get('authorization');
+    let user = null;
+
+    // 1. Check Bearer token in Authorization header
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      const token = authHeader.slice(7).trim();
+      const { data: userData, error: tokenErr } = await supabaseAdmin.auth.getUser(token);
+      if (!tokenErr && userData?.user) {
+        user = userData.user;
+      }
+    }
+
+    // 2. Check cookies via Supabase SSR client
+    if (!user) {
+      try {
+        const supabase = await createClient();
+        const { data: cookieUserData, error: cookieErr } = await supabase.auth.getUser();
+        if (!cookieErr && cookieUserData?.user) {
+          user = cookieUserData.user;
+        }
+      } catch (cookieScopeErr) {
+        // Expected when invoked outside Next.js request context or if cookies unavailable
+      }
+    }
+
+    if (!user) {
+      return { authorized: false, status: 401, error: 'Unauthorized: Authentication required' };
+    }
+
+    const { data: profile, error: profileErr } = await supabaseAdmin
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileErr || !profile || profile.is_admin !== true) {
+      return { authorized: false, status: 403, error: 'Forbidden: Administrator privileges required' };
+    }
+
+    return { authorized: true, user };
+  } catch {
+    return { authorized: false, status: 500, error: 'Authentication error' };
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyAdminAuth(request);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.error },
+        { status: auth.status || 401 }
+      );
+    }
     const { searchParams } = new URL(request.url);
     const countryCode = searchParams.get('country');
 
@@ -22,7 +77,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching admin articles:', error);
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'Failed to list published articles' }, { status: 500 });
     }
 
     const articles = (data || []).map((art) => {
@@ -54,9 +109,9 @@ export async function GET(request: NextRequest) {
       count: articles.length,
       articles,
     });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to list published articles' },
+      { success: false, error: 'Failed to list published articles' },
       { status: 500 }
     );
   }
@@ -64,6 +119,13 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await verifyAdminAuth(request);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.error },
+        { status: auth.status || 401 }
+      );
+    }
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const slug = searchParams.get('slug');
@@ -84,16 +146,16 @@ export async function DELETE(request: NextRequest) {
 
     const { error } = await query;
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'Failed to delete article' }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
       message: 'Article successfully removed from database',
     });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to delete article' },
+      { success: false, error: 'Failed to delete article' },
       { status: 500 }
     );
   }

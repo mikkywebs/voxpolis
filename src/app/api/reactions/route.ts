@@ -146,7 +146,7 @@ export async function POST(req: Request) {
     } catch {}
 
     return NextResponse.json({ success: true, reactions: current });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ success: false, error: 'Failed to update reactions' }, { status: 500 });
   }
 }

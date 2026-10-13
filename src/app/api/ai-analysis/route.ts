@@ -1,25 +1,102 @@
-import { NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: Request) {
+export const dynamic = 'force-dynamic';
+
+// Per-IP sliding-window rate limiter (max 15 requests per 60 seconds)
+const AI_RATE_WINDOW_MS = 60 * 1000;
+const AI_RATE_MAX_REQUESTS = 15;
+const aiIpLog = new Map<string, number[]>();
+
+// Bounded in-memory cache for AI analysis (30-minute TTL, max 300 entries)
+const AI_CACHE_TTL_MS = 30 * 60 * 1000;
+const AI_CACHE_MAX_ENTRIES = 300;
+const aiAnalysisCache = new Map<string, { expiresAt: number; analysis: string }>();
+
+function checkAiRateLimit(req: NextRequest): boolean {
+  const forwarded = req.headers?.get?.('x-forwarded-for');
+  const ip = forwarded ? forwarded.split(',')[0].trim() : (req.headers?.get?.('x-real-ip')?.trim() || 'unknown-ip');
+  const now = Date.now();
+  const recent = (aiIpLog.get(ip) || []).filter((t) => now - t < AI_RATE_WINDOW_MS);
+  if (recent.length >= AI_RATE_MAX_REQUESTS) {
+    aiIpLog.set(ip, recent);
+    return false;
+  }
+  recent.push(now);
+  aiIpLog.set(ip, recent);
+  if (aiIpLog.size > 1000) {
+    const firstKey = aiIpLog.keys().next().value;
+    if (firstKey) aiIpLog.delete(firstKey);
+  }
+  return true;
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const { title, snippet, content } = await req.json();
+    if (!checkAiRateLimit(req)) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please try again shortly.' },
+        { status: 429 }
+      );
+    }
 
-    // Sanitize input texts from unwanted RSS/News payload strings
-    const cleanTitle = (title || '')
+    const body = await req.json();
+    const { title, snippet, content } = body || {};
+
+    if (typeof title !== 'string' || title.trim().length < 5) {
+      return NextResponse.json(
+        { error: 'Valid article title is required' },
+        { status: 400 }
+      );
+    }
+
+    // Sanitize and bound input texts to prevent prompt/token exhaustion
+    const cleanTitle = title
+      .slice(0, 300)
       .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
       .replace(/The post .* appeared first on .*/gi, '')
       .replace(/appeared first on .*/gi, '')
       .trim();
-    const cleanSnippet = (snippet || '')
+    const cleanSnippet = (typeof snippet === 'string' ? snippet : '')
+      .slice(0, 1000)
       .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
       .replace(/The post .* appeared first on .*/gi, '')
       .replace(/appeared first on .*/gi, '')
       .trim();
-    const cleanContent = (content || '')
+    const cleanContent = (typeof content === 'string' ? content : '')
+      .slice(0, 6000)
       .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
       .replace(/The post .* appeared first on .*/gi, '')
       .replace(/appeared first on .*/gi, '')
       .trim();
+
+    if (!cleanTitle) {
+      return NextResponse.json(
+        { error: 'Valid article title is required' },
+        { status: 400 }
+      );
+    }
+
+    const cacheKey = crypto
+      .createHash('sha256')
+      .update(`${cleanTitle}\n${cleanSnippet}\n${cleanContent}`)
+      .digest('hex');
+
+    const cached = aiAnalysisCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return NextResponse.json({ analysis: cached.analysis, cached: true });
+    }
+
+    const saveCache = (analysisText: string) => {
+      if (aiAnalysisCache.size >= AI_CACHE_MAX_ENTRIES) {
+        const oldestKey = aiAnalysisCache.keys().next().value;
+        if (oldestKey) aiAnalysisCache.delete(oldestKey);
+      }
+      aiAnalysisCache.set(cacheKey, {
+        expiresAt: Date.now() + AI_CACHE_TTL_MS,
+        analysis: analysisText,
+      });
+    };
 
     const prompt = `You are an elite, objective political analyst writing for Voxpolis.
 Read the following news report details and provide a comprehensive, engaging 2-to-3 paragraph factual summary and policy analysis.
@@ -59,6 +136,7 @@ Full Context: ${cleanContent}`;
             const data = await res.json();
             const txt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
             if (txt && txt.length > 80) {
+              saveCache(txt);
               return NextResponse.json({ analysis: txt });
             }
           }
@@ -90,6 +168,7 @@ Full Context: ${cleanContent}`;
           const data = await res.json();
           const txt = data.choices?.[0]?.message?.content?.trim();
           if (txt && txt.length > 80) {
+            saveCache(txt);
             return NextResponse.json({ analysis: txt });
           }
         }
@@ -120,6 +199,7 @@ Full Context: ${cleanContent}`;
           const data = await res.json();
           const txt = data.choices?.[0]?.message?.content?.trim();
           if (txt && txt.length > 80) {
+            saveCache(txt);
             return NextResponse.json({ analysis: txt });
           }
         }
@@ -131,8 +211,9 @@ Full Context: ${cleanContent}`;
 
 This decision carries direct implications for regional governance, public oversight, and stakeholder engagement. Key administrative committees are tasked with monitoring the execution and evaluating broader societal impact.`;
 
+    saveCache(fallbackAnalysis);
     return NextResponse.json({ analysis: fallbackAnalysis });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Failed to generate analysis' }, { status: 500 });
   }
 }

@@ -1,10 +1,129 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { processSourceUrlThroughPipeline, getAllPublishedPipelineArticles } from '@/lib/pipeline';
 import { runBackfillJob } from '@/lib/pipeline/backfill';
 import { fetchArticlesForCountry } from '@/lib/news';
 
+export const dynamic = 'force-dynamic';
+
+function timingSafeMatch(candidate: string, expected: string): boolean {
+  if (!candidate || !expected) return false;
+  const candidateBuf = Buffer.from(candidate, 'utf8');
+  const expectedBuf = Buffer.from(expected, 'utf8');
+  if (candidateBuf.length !== expectedBuf.length) return false;
+  return crypto.timingSafeEqual(candidateBuf, expectedBuf);
+}
+
+async function verifyPipelineAuth(request: NextRequest): Promise<{
+  authorized: boolean;
+  status?: number;
+  error?: string;
+  mode?: 'cron' | 'admin';
+  user?: any;
+}> {
+  try {
+    // 1. Check configured CRON_SECRET (fail-closed if missing or empty; never use a hardcoded default)
+    const configuredSecret = (process.env.CRON_SECRET || '').trim();
+    const authHeader = request.headers.get('authorization');
+    const bearerToken =
+      authHeader && authHeader.toLowerCase().startsWith('bearer ')
+        ? authHeader.slice(7).trim()
+        : '';
+    const headerSecret = (request.headers.get('x-cron-secret') || '').trim();
+    let querySecret = '';
+    try {
+      querySecret = (new URL(request.url).searchParams.get('secret') || '').trim();
+    } catch {
+      // Ignore malformed URL when parsing query params
+    }
+
+    if (configuredSecret.length > 0) {
+      if (
+        (bearerToken && timingSafeMatch(bearerToken, configuredSecret)) ||
+        (headerSecret && timingSafeMatch(headerSecret, configuredSecret)) ||
+        (querySecret && timingSafeMatch(querySecret, configuredSecret))
+      ) {
+        return { authorized: true, mode: 'cron' };
+      }
+    }
+
+    // If caller explicitly supplied a cron secret header/query param and it failed (or CRON_SECRET is unset), fail closed immediately
+    if (headerSecret || querySecret) {
+      return {
+        authorized: false,
+        status: 401,
+        error:
+          configuredSecret.length === 0
+            ? 'Unauthorized: CRON_SECRET is not configured'
+            : 'Unauthorized: Invalid pipeline secret',
+      };
+    }
+
+    // 2. Otherwise verify authenticated administrator via Bearer JWT or SSR session cookies
+    let user = null;
+
+    if (bearerToken) {
+      const { data: userData, error: tokenErr } = await supabaseAdmin.auth.getUser(bearerToken);
+      if (!tokenErr && userData?.user) {
+        user = userData.user;
+      }
+    }
+
+    if (!user) {
+      try {
+        const supabase = await createClient();
+        const { data: cookieUserData, error: cookieErr } = await supabase.auth.getUser();
+        if (!cookieErr && cookieUserData?.user) {
+          user = cookieUserData.user;
+        }
+      } catch {
+        // Expected when invoked outside Next.js request context or if cookies unavailable
+      }
+    }
+
+    if (!user) {
+      return {
+        authorized: false,
+        status: 401,
+        error:
+          configuredSecret.length === 0
+            ? 'Unauthorized: CRON_SECRET is not configured and authentication is required'
+            : 'Unauthorized: Valid CRON_SECRET or administrator authentication required',
+      };
+    }
+
+    const { data: profile, error: profileErr } = await supabaseAdmin
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileErr || !profile || profile.is_admin !== true) {
+      return {
+        authorized: false,
+        status: 403,
+        error: 'Forbidden: Administrator privileges required',
+      };
+    }
+
+    return { authorized: true, mode: 'admin', user };
+  } catch {
+    return { authorized: false, status: 500, error: 'Authentication error' };
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyPipelineAuth(request);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.error },
+        { status: auth.status || 401 }
+      );
+    }
+
     const body = await request.json();
     const action = body.action || 'process_url';
 
@@ -83,54 +202,69 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ error: `Unknown action "${action}"` }, { status: 400 });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json(
-      { error: err.message || 'Pipeline execution failed' },
+      { error: 'Pipeline execution failed' },
       { status: 500 }
     );
   }
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const action = searchParams.get('action');
-  const urlParam = searchParams.get('url');
-
-  if (urlParam && urlParam.startsWith('http')) {
-    const article = await processSourceUrlThroughPipeline(urlParam, 'Direct URL Ingestion');
-    return NextResponse.json({ success: article.status === 'published', article });
-  }
-
-  if (action === 'poll_feeds') {
-    const countryCode = (searchParams.get('country') || 'NG').toUpperCase();
-    const legacyArticles = await fetchArticlesForCountry(countryCode);
-    const processed: any[] = [];
-    for (const art of legacyArticles) {
-      if (art.source_url && art.source_url.startsWith('http')) {
-        const res = await processSourceUrlThroughPipeline(
-          art.source_url,
-          art.source_name,
-          art.title,
-          art.snippet,
-          art.created_at,
-          countryCode
-        );
-        processed.push({ url: art.source_url, status: res.status, slug: res.slug });
-      }
+  try {
+    const auth = await verifyPipelineAuth(request);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.error },
+        { status: auth.status || 401 }
+      );
     }
-    return NextResponse.json({ success: true, processed_count: processed.length, processed });
-  }
 
-  if (action === 'backfill') {
-    const countryCode = searchParams.get('country') || 'NG';
-    const legacyArticles = await fetchArticlesForCountry(countryCode);
-    const backfillResult = await runBackfillJob(legacyArticles);
-    return NextResponse.json({ success: true, result: backfillResult });
-  }
+    const { searchParams } = new URL(request.url);
+    const action = searchParams.get('action');
+    const urlParam = searchParams.get('url');
 
-  const articles = getAllPublishedPipelineArticles();
-  return NextResponse.json({
-    total_published: articles.length,
-    articles,
-  });
+    if (urlParam && urlParam.startsWith('http')) {
+      const article = await processSourceUrlThroughPipeline(urlParam, 'Direct URL Ingestion');
+      return NextResponse.json({ success: article.status === 'published', article });
+    }
+
+    if (action === 'poll_feeds') {
+      const countryCode = (searchParams.get('country') || 'NG').toUpperCase();
+      const legacyArticles = await fetchArticlesForCountry(countryCode);
+      const processed: any[] = [];
+      for (const art of legacyArticles) {
+        if (art.source_url && art.source_url.startsWith('http')) {
+          const res = await processSourceUrlThroughPipeline(
+            art.source_url,
+            art.source_name,
+            art.title,
+            art.snippet,
+            art.created_at,
+            countryCode
+          );
+          processed.push({ url: art.source_url, status: res.status, slug: res.slug });
+        }
+      }
+      return NextResponse.json({ success: true, processed_count: processed.length, processed });
+    }
+
+    if (action === 'backfill') {
+      const countryCode = searchParams.get('country') || 'NG';
+      const legacyArticles = await fetchArticlesForCountry(countryCode);
+      const backfillResult = await runBackfillJob(legacyArticles);
+      return NextResponse.json({ success: true, result: backfillResult });
+    }
+
+    const articles = getAllPublishedPipelineArticles();
+    return NextResponse.json({
+      total_published: articles.length,
+      articles,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: 'Pipeline execution failed' },
+      { status: 500 }
+    );
+  }
 }

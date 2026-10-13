@@ -1,12 +1,68 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { ALL_COUNTRIES, getCountryByCode, getCountrySlug } from '@/config/countries';
 import { analyticsStore } from '@/lib/analytics-tracker';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request) {
+async function verifyAdminAuth(request: NextRequest): Promise<{ authorized: boolean; status?: number; error?: string; user?: any }> {
   try {
+    const authHeader = request.headers.get('authorization');
+    let user = null;
+
+    // 1. Check Bearer token in Authorization header
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      const token = authHeader.slice(7).trim();
+      const { data: userData, error: tokenErr } = await supabaseAdmin.auth.getUser(token);
+      if (!tokenErr && userData?.user) {
+        user = userData.user;
+      }
+    }
+
+    // 2. Check cookies via Supabase SSR client
+    if (!user) {
+      try {
+        const supabase = await createClient();
+        const { data: cookieUserData, error: cookieErr } = await supabase.auth.getUser();
+        if (!cookieErr && cookieUserData?.user) {
+          user = cookieUserData.user;
+        }
+      } catch (cookieScopeErr) {
+        // Expected when invoked outside Next.js request context or if cookies unavailable
+      }
+    }
+
+    if (!user) {
+      return { authorized: false, status: 401, error: 'Unauthorized: Authentication required' };
+    }
+
+    const { data: profile, error: profileErr } = await supabaseAdmin
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileErr || !profile || profile.is_admin !== true) {
+      return { authorized: false, status: 403, error: 'Forbidden: Administrator privileges required' };
+    }
+
+    return { authorized: true, user };
+  } catch {
+    return { authorized: false, status: 500, error: 'Authentication error' };
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const auth = await verifyAdminAuth(req);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.error },
+        { status: auth.status || 401 }
+      );
+    }
+
     // 1. Fetch live Auth users and Profiles from Supabase
     let authUsers: any[] = [];
     try {
@@ -333,7 +389,7 @@ export async function GET(req: Request) {
   } catch (error: any) {
     console.error('Admin analytics endpoint error:', error);
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to aggregate analytics' },
+      { success: false, error: 'Failed to aggregate analytics' },
       { status: 500 }
     );
   }
