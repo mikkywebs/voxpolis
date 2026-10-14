@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchRssArticlesForCountry, isCurrentMonthArticle } from '@/lib/rss';
 import { getCountryByCode } from '@/config/countries';
-import { ArticleData, generateAiAnalysisSummary, expandToJournalisticArticle, generateCivicPollQuestion, isColumnistOrOpinion, isPoliticalNews, isRelevantToCountry } from '@/lib/news';
-import { isValidContentImage } from '@/lib/pipeline/extractor';
-import { rewriteStoryForVoxpolis, decodeAllHtmlEntities } from '@/lib/news-rewriter';
-import { register301Redirect, get301Redirect } from '@/lib/pipeline/redirects';
-import { findConsecutiveWordOverlaps } from '@/lib/pipeline/overlap';
+import {
+  ArticleData,
+  generateAiAnalysisSummary,
+  isPoliticalNews,
+  getFallbackArticlesForCountry,
+} from '@/lib/news';
+import { isCurrentMonthArticle } from '@/lib/rss';
+import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
+import { get301Redirect } from '@/lib/pipeline/redirects';
+import {
+  getPipelineArticleBySlug,
+  getAllPublishedPipelineArticles,
+} from '@/lib/pipeline';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,27 +22,34 @@ export async function GET(request: NextRequest) {
   const slugParam = searchParams.get('slug');
   const countryCode = (searchParams.get('country') || 'NG').toUpperCase();
   const language = (searchParams.get('language') || 'en').toLowerCase();
+  const country = getCountryByCode(countryCode);
 
-  // If a specific slug is requested, first check permanent database
+  // 1. Single article requested by slug
   if (slugParam) {
+    const rawTargetSlug = get301Redirect(slugParam) || slugParam;
+
+    // 1a. Query durable Supabase articles table
     try {
       const { supabaseAdmin } = await import('@/lib/supabase/admin');
       const { data: dbArticle } = await supabaseAdmin
         .from('articles')
         .select('*')
-        .eq('slug', slugParam)
+        .or(`slug.eq.${rawTargetSlug},slug.eq.${slugParam}`)
         .maybeSingle();
 
       if (dbArticle) {
-        let cleanTitle = decodeAllHtmlEntities(dbArticle.title || 'Political Update');
-        let cleanSnippet = decodeAllHtmlEntities(dbArticle.snippet || '');
-        let cleanContent = decodeAllHtmlEntities(dbArticle.content || '');
+        const cleanTitle = decodeAllHtmlEntities(dbArticle.title || 'Political Update');
+        const cleanSnippet = decodeAllHtmlEntities(dbArticle.snippet || '');
+        const cleanContent = decodeAllHtmlEntities(dbArticle.content || '');
 
         if (!isPoliticalNews(cleanTitle, cleanSnippet, dbArticle.tags || [])) {
-          return NextResponse.json({ success: false, error: 'Non-political content excluded from Voxpolis' }, { status: 404 });
+          return NextResponse.json(
+            { success: false, error: 'Non-political content excluded from Voxpolis' },
+            { status: 404 }
+          );
         }
 
-        // Query if this article has a specific poll attached to it in the polls table
+        // Query if this article has a specific poll attached to it
         let attachedPoll = undefined;
         try {
           const { data: pollRow } = await supabaseAdmin
@@ -62,27 +76,90 @@ export async function GET(request: NextRequest) {
             title: cleanTitle,
             snippet: cleanSnippet,
             content: cleanContent,
-            country_code: dbArticle.country_code || 'NG',
+            country_code: dbArticle.country_code || countryCode,
             source_name: dbArticle.source_name || 'Voxpolis Desk',
             source_url: dbArticle.source_url || 'https://voxpolis.app',
             original_image_url: dbArticle.original_image_url,
             is_breaking: dbArticle.is_breaking === true,
-            is_featured: dbArticle.is_featured !== undefined ? dbArticle.is_featured : (dbArticle.tags?.some((t: string) => /featured/i.test(t)) || true),
-            tags: dbArticle.tags || ['Featured News', 'Politics', 'Voxpolis'],
+            is_featured:
+              dbArticle.is_featured !== undefined
+                ? dbArticle.is_featured
+                : (dbArticle.tags?.some((t: string) => /featured/i.test(t)) || true),
+            tags: dbArticle.tags || ['Featured News', country.name, 'Voxpolis'],
             views_count: dbArticle.views_count || 0,
             total_reading_time_seconds: dbArticle.total_reading_time_seconds || 180,
-            created_at: dbArticle.created_at || new Date().toISOString(),
-            author: dbArticle.author,
+            author:
+              dbArticle.author ||
+              dbArticle.tags?.find((t: string) => typeof t === 'string' && t.startsWith('By '))?.slice(3) ||
+              undefined,
             poll: attachedPoll,
           },
+          redirectedSlug: dbArticle.slug !== slugParam ? dbArticle.slug : undefined,
         });
       }
-    } catch {}
+    } catch (e) {
+      console.warn('Error reading article from database:', e);
+    }
+
+    // 1b. Check pipeline articles
+    const pipeArt =
+      getPipelineArticleBySlug(rawTargetSlug) || getPipelineArticleBySlug(slugParam);
+    if (pipeArt && pipeArt.status === 'published') {
+      const artData: ArticleData = {
+        id: pipeArt.id,
+        slug: pipeArt.slug,
+        title: pipeArt.headline,
+        snippet: pipeArt.dek || pipeArt.executive_summary || '',
+        content: pipeArt.body_markdown || pipeArt.executive_summary || '',
+        ai_analysis: generateAiAnalysisSummary(
+          pipeArt.headline,
+          pipeArt.dek || pipeArt.executive_summary || '',
+          pipeArt.source_name,
+          country.name
+        ),
+        country_code: pipeArt.country_code,
+        language: pipeArt.language || language,
+        category: pipeArt.category || 'politics',
+        image_mode: pipeArt.original_image_url ? 'original' : 'breaking_logo',
+        original_image_url: pipeArt.original_image_url,
+        source_name: pipeArt.source_name,
+        source_url: pipeArt.source_url,
+        is_breaking: false,
+        is_featured: false,
+        tags: pipeArt.tags || ['Politics', 'Voxpolis'],
+        views_count: 0,
+        total_reading_time_seconds: (pipeArt.read_minutes || 3) * 60,
+        created_at: pipeArt.created_at,
+      };
+      return NextResponse.json({
+        success: true,
+        article: artData,
+        redirectedSlug: pipeArt.slug !== slugParam ? pipeArt.slug : undefined,
+      });
+    }
+
+    // 1c. Check localized country civic fallback templates
+    const prefixMatch = slugParam.match(/^([a-z]{2})-/i);
+    const targetCode = prefixMatch ? prefixMatch[1].toUpperCase() : countryCode;
+    const fallbackList = getFallbackArticlesForCountry(targetCode, language);
+    const fallbackFound = fallbackList.find(
+      (a) => a.slug === rawTargetSlug || a.slug === slugParam
+    );
+    if (fallbackFound) {
+      return NextResponse.json({
+        success: true,
+        article: fallbackFound,
+      });
+    }
+
+    // 1d. Safe 404: Never fall back to unrewritten wire RSS dumps on visitor request
+    return NextResponse.json(
+      { success: false, error: 'Article not found' },
+      { status: 404 }
+    );
   }
 
-  const country = getCountryByCode(countryCode);
-
-  // 0. Fetch articles directly published to Supabase database for this country
+  // 2. Fetch Country News Feed
   let dbCountryArticles: ArticleData[] = [];
   try {
     const { supabaseAdmin } = await import('@/lib/supabase/admin');
@@ -119,13 +196,20 @@ export async function GET(request: NextRequest) {
           title: cleanTitle,
           snippet: cleanSnippet,
           content: cleanContent,
-          ai_analysis: dbArticle.ai_analysis || generateAiAnalysisSummary(cleanTitle, cleanSnippet, dbArticle.source_name || 'Voxpolis', country.name),
+          ai_analysis:
+            dbArticle.ai_analysis ||
+            generateAiAnalysisSummary(
+              cleanTitle,
+              cleanSnippet,
+              dbArticle.source_name || 'Voxpolis Desk',
+              country.name
+            ),
           country_code: dbArticle.country_code || countryCode,
           language: dbArticle.language || language,
           category: dbArticle.category || 'politics',
-          image_mode: 'original' as const,
+          image_mode: dbArticle.original_image_url ? ('original' as const) : ('breaking_logo' as const),
           original_image_url: dbArticle.original_image_url || undefined,
-          source_name: dbArticle.source_name || 'Voxpolis',
+          source_name: dbArticle.source_name || 'Voxpolis Desk',
           source_url: dbArticle.source_url || `https://voxpolis.app/news/${dbArticle.slug}`,
           is_breaking: dbArticle.is_breaking === true,
           is_featured: dbArticle.is_featured !== undefined ? dbArticle.is_featured : true,
@@ -133,13 +217,19 @@ export async function GET(request: NextRequest) {
           views_count: dbArticle.views_count || 0,
           total_reading_time_seconds: dbArticle.total_reading_time_seconds || 180,
           created_at: dbArticle.created_at || new Date().toISOString(),
-          author: dbArticle.author,
-          poll: dbPoll && dbPoll.question ? {
-            id: dbPoll.id,
-            question: dbPoll.question,
-            agree_count: dbPoll.agree_count || 0,
-            disagree_count: dbPoll.disagree_count || 0,
-          } : undefined,
+          author:
+            dbArticle.author ||
+            dbArticle.tags?.find((t: string) => typeof t === 'string' && t.startsWith('By '))?.slice(3) ||
+            undefined,
+          poll:
+            dbPoll && dbPoll.question
+              ? {
+                  id: dbPoll.id,
+                  question: dbPoll.question,
+                  agree_count: dbPoll.agree_count || 0,
+                  disagree_count: dbPoll.disagree_count || 0,
+                }
+              : undefined,
         };
       });
     }
@@ -147,319 +237,58 @@ export async function GET(request: NextRequest) {
     console.warn('Error fetching database articles for country feed:', e);
   }
 
-  const apiKey = process.env.NEWSDATA_API_KEY;
-  let newsDataArticles: ArticleData[] = [];
+  // 3. Fetch published pipeline articles for this country
+  const pipelineCountryArticles: ArticleData[] = getAllPublishedPipelineArticles()
+    .filter(
+      (p) =>
+        p.country_code.toUpperCase() === countryCode &&
+        isCurrentMonthArticle(p.created_at)
+    )
+    .map((p) => ({
+      id: p.id,
+      slug: p.slug,
+      title: p.headline,
+      snippet: p.dek || p.executive_summary || '',
+      content: p.body_markdown || p.executive_summary || '',
+      ai_analysis: generateAiAnalysisSummary(
+        p.headline,
+        p.dek || p.executive_summary || '',
+        p.source_name,
+        country.name
+      ),
+      country_code: p.country_code,
+      language: p.language || language,
+      category: p.category || 'politics',
+      image_mode: p.original_image_url ? ('original' as const) : ('breaking_logo' as const),
+      original_image_url: p.original_image_url,
+      source_name: p.source_name,
+      source_url: p.source_url,
+      is_breaking: false,
+      is_featured: false,
+      tags: p.tags || ['Politics', country.name, 'Voxpolis'],
+      views_count: 0,
+      total_reading_time_seconds: (p.read_minutes || 3) * 60,
+      created_at: p.created_at,
+      author: undefined,
+    }));
 
-  // 1. Fetch from NewsData API if valid key is configured
-  if (apiKey && apiKey !== 'pub_demo_key' && apiKey.trim() !== '') {
-    try {
-      const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&country=${countryCode.toLowerCase()}&category=politics&language=${language}`;
-      const res = await fetch(url, { cache: 'no-store' });
-      
-      if (res.ok) {
-        const data = await res.json();
-        if (data.results && Array.isArray(data.results)) {
-          const filteredItems = data.results
-            .filter((item: any) => !isColumnistOrOpinion(item.title, item.description, item.keywords || item.category, item.link))
-            .slice(0, 10);
+  // 4. Merge durable database articles with published pipeline articles (deduplicating by slug & title)
+  const seenSlugs = new Set<string>();
+  const seenTitles = new Set<string>();
+  const combinedArticles: ArticleData[] = [];
 
-          newsDataArticles = await Promise.all(
-            filteredItems.map(async (item: any, idx: number): Promise<ArticleData | null> => {
-              const cleanTitle = (item.title || 'Political Update')
-                .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
-                .replace(/The post .* appeared first on .*/gi, '')
-                .replace(/appeared first on .*/gi, '')
-                .trim();
-              const rawDesc = (item.description || item.snippet || item.title || '')
-                .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
-                .trim();
-              const rawContent = (item.content || item.description || item.title || '')
-                .replace(/ONLY AVAILABLE IN PAID PLANS/gi, '')
-                .trim();
-              const sourceName = item.source_id || `${country.name} Press`;
-
-              const rewritten = await rewriteStoryForVoxpolis({
-                title: cleanTitle,
-                content: rawContent.length > 80 ? rawContent : rawDesc,
-                sourceName,
-                countryName: country.name,
-              });
-
-              if (!rewritten.isAiRewritten || !rewritten.slug || !rewritten.content || rewritten.content.trim() === '') {
-                return null;
-              }
-
-              const overlaps = findConsecutiveWordOverlaps(
-                `${cleanTitle}\n${rawContent}\n${rawDesc}`,
-                rewritten.content,
-                8
-              );
-              if (overlaps.length > 0) {
-                return null;
-              }
-
-              // Register redirect from old raw wire slug to new VoxPolis slug
-              const rawSlug = cleanTitle
-                .toLowerCase()
-                .replace(/ - voxpolis$/i, '')
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/(^-|-$)/g, '')
-                .slice(0, 80);
-              if (rawSlug && rewritten.slug) {
-                register301Redirect(rawSlug, rewritten.slug);
-              }
-
-              const hasValidImg = isValidContentImage(item.image_url);
-
-              return {
-                id: item.article_id || `newsdata-${countryCode}-${idx}`,
-                slug: rewritten.slug,
-                title: rewritten.title,
-                snippet: rewritten.snippet,
-                content: rewritten.content,
-                ai_analysis: generateAiAnalysisSummary(rewritten.title, rewritten.snippet, sourceName, country.name),
-                country_code: countryCode,
-                language: language,
-                category: item.category?.[0] || 'politics',
-                image_mode: hasValidImg ? ('original' as const) : ('breaking_logo' as const),
-                original_image_url: hasValidImg ? item.image_url : undefined,
-                source_name: sourceName,
-                source_url: item.link || 'https://voxpolis.app',
-                is_breaking: idx === 0,
-                tags: item.keywords && Array.isArray(item.keywords) && item.keywords.length > 0 ? item.keywords : [country.name],
-                views_count: 0,
-                total_reading_time_seconds: 180,
-                created_at: item.pubDate || new Date().toISOString(),
-                poll: (() => {
-                  const q = generateCivicPollQuestion(rewritten.title, rewritten.snippet);
-                  return q ? {
-                    id: `poll-newsdata-${idx}`,
-                    question: q,
-                    agree_count: 0,
-                    disagree_count: 0,
-                  } : undefined;
-                })(),
-              };
-            })
-          );
-          newsDataArticles = newsDataArticles.filter((a): a is ArticleData => a !== null);
-        }
-      }
-    } catch (err) {
-      console.warn('NewsData API fetch encountered an error, relying on RSS feeds.', err);
+  for (const art of [...dbCountryArticles, ...pipelineCountryArticles]) {
+    const normTitle = art.title.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+    if (!seenSlugs.has(art.slug) && !seenTitles.has(normTitle)) {
+      seenSlugs.add(art.slug);
+      seenTitles.add(normTitle);
+      combinedArticles.push(art);
     }
   }
 
-  // 2. Fetch Prompt RSS Country Feeds
-  const rssArticles = await fetchRssArticlesForCountry(countryCode, language);
-
-  // 3. Combine NewsData + RSS Feeds
-  const combined = [...newsDataArticles, ...rssArticles];
-
-  // Deduplicate by story key & enforce political filtering and country relevance
-  const seenStoryKeys = new Set<string>();
-  const uniqueArticles: ArticleData[] = [];
-
-  for (const art of combined) {
-    if (!isPoliticalNews(art.title, art.snippet, art.tags)) continue;
-    if (!isRelevantToCountry(art.title, art.snippet, countryCode)) continue;
-
-    const normKey = art.title
-      .toLowerCase()
-      .replace(/ - voxpolis$/i, '')
-      .replace(/[^a-z0-9]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .split(' ')
-      .slice(0, 6)
-      .join(' ');
-
-    if (!seenStoryKeys.has(normKey) && !seenStoryKeys.has(art.slug)) {
-      seenStoryKeys.add(normKey);
-      seenStoryKeys.add(art.slug);
-      uniqueArticles.push(art);
-    }
-  }
-
-  // 4. Ensure EVERY unique article on VoxPolis is cleanly rewritten by AI with ZERO verbatim overlap
-  const failedRewriteSlugs = new Set<string>();
-
-  const rawRewritten = await Promise.all(
-    uniqueArticles.slice(0, 15).map(async (art): Promise<ArticleData | null> => {
-      const rawSource = `${art.title}\n${art.content || ''}\n${art.snippet || ''}`;
-      const rewritten = await rewriteStoryForVoxpolis({
-        title: art.title,
-        content: art.content || art.snippet,
-        sourceName: art.source_name,
-        countryName: country.name,
-      });
-
-      if (!rewritten.isAiRewritten || !rewritten.slug || !rewritten.content || rewritten.content.trim() === '') {
-        failedRewriteSlugs.add(art.slug);
-        return null;
-      }
-
-      const overlaps = findConsecutiveWordOverlaps(rawSource, rewritten.content, 8);
-      if (overlaps.length > 0) {
-        console.warn(`[News API] Dropped article ${rewritten.slug} due to 8+ word overlap with source`);
-        failedRewriteSlugs.add(art.slug);
-        if (rewritten.slug) failedRewriteSlugs.add(rewritten.slug);
-        return null;
-      }
-
-      if (art.slug && rewritten.slug && art.slug !== rewritten.slug) {
-        register301Redirect(art.slug, rewritten.slug);
-      }
-
-      return {
-        ...art,
-        title: rewritten.title,
-        slug: rewritten.slug,
-        snippet: rewritten.snippet,
-        content: rewritten.content,
-        ai_analysis: generateAiAnalysisSummary(rewritten.title, rewritten.snippet, art.source_name, country.name),
-        poll: (() => {
-          const q = generateCivicPollQuestion(rewritten.title, rewritten.snippet);
-          return q ? {
-            id: `poll-${rewritten.slug}`,
-            question: q,
-            agree_count: 0,
-            disagree_count: 0,
-          } : undefined;
-        })(),
-      };
-    })
-  );
-
-  const rewrittenArticles: ArticleData[] = rawRewritten.filter((a): a is ArticleData => a !== null);
-
-  // If specific slug was requested, check collected feed articles
-  if (slugParam) {
-    const rawTargetSlug = get301Redirect(slugParam) || slugParam;
-    const normalizedSlug = slugParam
-      .replace(/8216|8217|8218|8219/g, '')
-      .replace(/[^a-z0-9]+/gi, '-')
-      .replace(/^-+|-+$/g, '')
-      .toLowerCase();
-
-    const slugTokens = normalizedSlug.split('-').filter((t) => t.length > 3);
-
-    let foundInFeeds = rewrittenArticles.find((a) => {
-      if (a.slug === rawTargetSlug || a.slug === slugParam || a.slug === normalizedSlug) return true;
-      if (slugTokens.length >= 2) {
-        const artTokens = a.slug.split('-').filter((t) => t.length > 3);
-        const matches = slugTokens.filter((t) => artTokens.includes(t));
-        if (matches.length >= Math.min(3, slugTokens.length)) return true;
-      }
-      return false;
-    });
-
-    if (!foundInFeeds) {
-      // 1. Detect 2-letter country prefix if present
-      const prefixMatch = slugParam.match(/^([a-z]{2})-/i);
-      const prefixCode = prefixMatch ? prefixMatch[1].toUpperCase() : null;
-
-      const priorityCodes = ['NG', 'US', 'GB', 'ZA', 'GH', 'KE', 'CA', 'AU', 'IN', 'FR', 'DE', 'EG', 'SN', 'CI', 'RW', 'UG', 'TZ', 'CM', 'BJ'];
-      const candidateCodes = [
-        ...(prefixCode && prefixCode !== countryCode ? [prefixCode] : []),
-        ...priorityCodes.filter((c) => c !== countryCode && c !== prefixCode),
-      ];
-
-      for (const otherCode of candidateCodes) {
-        try {
-          const otherFeeds = await fetchRssArticlesForCountry(otherCode, language);
-          const match = otherFeeds.find((a) => {
-            if (a.slug === rawTargetSlug || a.slug === slugParam || a.slug === normalizedSlug) return true;
-            if (slugTokens.length >= 2) {
-              const artTokens = a.slug.split('-').filter((t) => t.length > 3);
-              const matches = slugTokens.filter((t) => artTokens.includes(t));
-              if (matches.length >= Math.min(3, slugTokens.length)) return true;
-            }
-            return false;
-          });
-          if (match) {
-            foundInFeeds = match;
-            break;
-          }
-        } catch {}
-      }
-
-      // 2. If still not found, check localized country reports (for fallback/digest stories)
-      if (!foundInFeeds) {
-        try {
-          const targetCode = prefixCode || countryCode;
-          const { fetchArticlesForCountry } = await import('@/lib/news');
-          const fallbackList = await fetchArticlesForCountry(targetCode, language);
-          const match = fallbackList.find((a) => {
-            if (a.slug === rawTargetSlug || a.slug === slugParam || a.slug === normalizedSlug) return true;
-            if (slugTokens.length >= 2) {
-              const artTokens = a.slug.split('-').filter((t) => t.length > 3);
-              const matches = slugTokens.filter((t) => artTokens.includes(t));
-              if (matches.length >= Math.min(3, slugTokens.length)) return true;
-            }
-            return false;
-          });
-          if (match) {
-            foundInFeeds = match;
-          }
-        } catch {}
-      }
-    }
-
-    if (foundInFeeds) {
-      if (!isPoliticalNews(foundInFeeds.title, foundInFeeds.snippet, foundInFeeds.tags)) {
-        return NextResponse.json({ success: false, error: 'Non-political report excluded from Voxpolis' }, { status: 404 });
-      }
-
-      const rawSource = `${foundInFeeds.title}\n${foundInFeeds.content || ''}\n${foundInFeeds.snippet || ''}`;
-      const rewritten = await rewriteStoryForVoxpolis({
-        title: foundInFeeds.title,
-        content: foundInFeeds.content || foundInFeeds.snippet,
-        sourceName: foundInFeeds.source_name,
-        countryName: country.name,
-      });
-
-      if (!rewritten.isAiRewritten || !rewritten.slug || !rewritten.content) {
-        return NextResponse.json({ success: false, error: 'Article rewrite in progress' }, { status: 404 });
-      }
-
-      const overlaps = findConsecutiveWordOverlaps(rawSource, rewritten.content, 8);
-      if (overlaps.length > 0) {
-        return NextResponse.json({ success: false, error: 'Article quality review in progress' }, { status: 404 });
-      }
-
-      foundInFeeds.title = rewritten.title;
-      foundInFeeds.slug = rewritten.slug;
-      foundInFeeds.content = rewritten.content;
-      foundInFeeds.snippet = rewritten.snippet;
-      return NextResponse.json({
-        success: true,
-        article: foundInFeeds,
-        redirectedSlug: foundInFeeds.slug !== slugParam ? foundInFeeds.slug : undefined,
-      });
-    }
-  }
-
-  // 5. Merge database-published articles (at the very top) with rewritten articles AND verified current-month wire stories
-  const eligibleWireArticles = uniqueArticles.filter(
-    (u) =>
-      !failedRewriteSlugs.has(u.slug) &&
-      !dbCountryArticles.some((d) => d.slug === u.slug || d.title.toLowerCase() === u.title.toLowerCase()) &&
-      !rewrittenArticles.some((r) => r.slug === u.slug || r.title.toLowerCase() === u.title.toLowerCase())
-  );
-
-  const combinedCountryArticles: ArticleData[] = [
-    ...dbCountryArticles,
-    ...rewrittenArticles.filter(
-      (r) => !dbCountryArticles.some((d) => d.slug === r.slug || d.title.toLowerCase() === r.title.toLowerCase())
-    ),
-    ...eligibleWireArticles,
-  ].filter((a) => isCurrentMonthArticle(a.created_at));
-
-  // If both database and wire articles are empty, fallback to country localized template
-  if (combinedCountryArticles.length === 0) {
-    const { fetchArticlesForCountry } = await import('@/lib/news');
-    const fallbackArticles = await fetchArticlesForCountry(countryCode, language);
+  // 5. If no published articles exist for this country, fallback to structured civic briefs
+  if (combinedArticles.length === 0) {
+    const fallbackArticles = getFallbackArticlesForCountry(countryCode, language);
     return NextResponse.json(
       { articles: fallbackArticles, cached: false },
       { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } }
@@ -467,7 +296,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { articles: combinedCountryArticles, cached: false },
+    { articles: combinedArticles, cached: false },
     { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } }
   );
 }

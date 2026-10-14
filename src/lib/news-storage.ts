@@ -25,6 +25,7 @@ export interface CandidateStoryInput {
   image_url?: string;
   tags?: string[];
   language?: string;
+  author?: string;
 }
 
 export type StorageGateFailure =
@@ -39,6 +40,7 @@ export interface PersistResult {
   status: 'persisted' | 'already_exists' | 'rejected' | 'admin_protected' | 'db_error';
   articleId?: string;
   slug?: string;
+  article?: ArticleData;
   gateFailed?: StorageGateFailure;
   reason?: string;
 }
@@ -277,6 +279,15 @@ export async function validateAndPersistCandidateStory(
         .maybeSingle();
 
       if (!urlErr && existingUrlArticle) {
+        if (isAdminPublishedArticle(existingUrlArticle)) {
+          return {
+            success: false,
+            status: 'admin_protected',
+            articleId: existingUrlArticle.id,
+            slug: existingUrlArticle.slug,
+            reason: 'Story matches an admin-published Voxpolis article by source URL. Overwrite prevented.',
+          };
+        }
         return {
           success: true,
           status: 'already_exists',
@@ -314,6 +325,15 @@ export async function validateAndPersistCandidateStory(
 
         if (duplicateMatch) {
           const dupArt = duplicateMatch.article;
+          if (isAdminPublishedArticle(dupArt)) {
+            return {
+              success: false,
+              status: 'admin_protected',
+              articleId: dupArt.id,
+              slug: dupArt.slug,
+              reason: 'Story matches an admin-published Voxpolis article. Overwrite prevented.',
+            };
+          }
           const scorePercent = Math.round(duplicateMatch.score * 100);
           return {
             success: true,
@@ -423,8 +443,9 @@ export async function validateAndPersistCandidateStory(
     (t) => typeof t === 'string' && t.trim().toLowerCase() !== 'featured news'
   );
 
+  const authorTag = input.author ? `By ${input.author}` : null;
   const cleanTags = Array.from(
-    new Set([...sanitizedWireTags, countryName, 'Politics'].filter(Boolean))
+    new Set([...sanitizedWireTags, countryName, 'Politics', ...(authorTag ? [authorTag] : [])].filter(Boolean))
   );
 
   const newArticleRow = {
@@ -432,7 +453,7 @@ export async function validateAndPersistCandidateStory(
     title: rewritten.title,
     snippet: rewritten.snippet,
     content: rewritten.content,
-    ai_analysis: aiAnalysis || `• Verified Governance Report: Sourced from ${sourceName} for ${countryName}.\n• Civic Overview: Public affairs coverage documented by Voxpolis Editorial Desk.`,
+    ai_analysis: aiAnalysis || `• Verified Governance Report: Sourced from ${sourceName}${input.author ? ` (Reported by: ${input.author})` : ''} for ${countryName}.\n• Civic Overview: Public affairs coverage documented by Voxpolis Editorial Desk.`,
     country_code: countryCode,
     language,
     category: 'politics',
@@ -464,7 +485,7 @@ export async function validateAndPersistCandidateStory(
           // Attempt 1: Query by slug
           const { data: bySlug, error: slugLookupErr } = await supabaseAdmin
             .from('articles')
-            .select('id, slug')
+            .select('*')
             .eq('slug', rewritten.slug)
             .maybeSingle();
 
@@ -474,7 +495,7 @@ export async function validateAndPersistCandidateStory(
             // Attempt 2: Query by source_url and country_code if slug did not match
             const { data: byUrl, error: urlLookupErr } = await supabaseAdmin
               .from('articles')
-              .select('id, slug')
+              .select('*')
               .eq('source_url', rawSourceUrl)
               .eq('country_code', countryCode)
               .maybeSingle();
@@ -490,6 +511,7 @@ export async function validateAndPersistCandidateStory(
               status: 'already_exists',
               articleId: conflictingArticle.id,
               slug: conflictingArticle.slug,
+              article: conflictingArticle as any,
               reason: `Article already persisted in database (ID: ${conflictingArticle.id})`,
             };
           }
@@ -520,6 +542,7 @@ export async function validateAndPersistCandidateStory(
       status: 'persisted',
       articleId: inserted.id,
       slug: inserted.slug,
+      article: { ...newArticleRow, id: inserted.id, author: input.author } as ArticleData,
     };
   } catch (err: any) {
     console.error('[NewsStorage] Database unexpected exception:', err);

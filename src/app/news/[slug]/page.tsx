@@ -169,14 +169,14 @@ export default function NewsDetailPage() {
       // 1. FAST LOCAL STORAGE CHECK: If article was previously viewed or loaded, validate format before restoring!
       try {
         const cacheVer = localStorage.getItem('voxpolis_cache_version');
-        if (cacheVer !== 'v4_clean') {
+        if (cacheVer !== 'v5_rewritten') {
           // Invalidate pre-update cached stories from old order
           Object.keys(localStorage).forEach((k) => {
             if (k.startsWith('voxpolis_article_') || k.startsWith('voxpolis_content_')) {
               localStorage.removeItem(k);
             }
           });
-          localStorage.setItem('voxpolis_cache_version', 'v4_clean');
+          localStorage.setItem('voxpolis_cache_version', 'v5_rewritten');
         }
 
         const cachedArticleJson = localStorage.getItem(`voxpolis_article_${slug}`);

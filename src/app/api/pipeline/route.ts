@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { processSourceUrlThroughPipeline, getAllPublishedPipelineArticles } from '@/lib/pipeline';
 import { runBackfillJob } from '@/lib/pipeline/backfill';
 import { fetchArticlesForCountry } from '@/lib/news';
+import { fetchRssArticlesForCountry } from '@/lib/rss';
 
 export const dynamic = 'force-dynamic';
 
@@ -177,22 +178,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'poll_feeds') {
       const countryCode = (body.country_code || 'NG').toUpperCase();
-      const legacyArticles = await fetchArticlesForCountry(countryCode);
-
-      const processed: any[] = [];
-      for (const art of legacyArticles) {
-        if (art.source_url && art.source_url.startsWith('http')) {
-          const res = await processSourceUrlThroughPipeline(
-            art.source_url,
-            art.source_name,
-            art.title,
-            art.snippet,
-            art.created_at,
-            countryCode
-          );
-          processed.push({ url: art.source_url, status: res.status, slug: res.slug });
-        }
-      }
+      const processed = await pollFeedsForCountry(countryCode);
 
       return NextResponse.json({
         success: true,
@@ -208,6 +194,54 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+async function pollFeedsForCountry(countryCode: string) {
+  const candidateArticles = await fetchRssArticlesForCountry(countryCode);
+  const processed: any[] = [];
+  for (const art of candidateArticles) {
+    if (art.source_url && art.source_url.startsWith('http')) {
+      const res = await processSourceUrlThroughPipeline(
+        art.source_url,
+        art.source_name,
+        art.title,
+        art.snippet,
+        art.created_at,
+        countryCode
+      );
+      processed.push({ url: art.source_url, status: res.status, slug: res.slug });
+    }
+  }
+
+  const apiKey = process.env.NEWSDATA_API_KEY;
+  if (apiKey && apiKey !== 'pub_demo_key' && apiKey.trim() !== '') {
+    try {
+      const ndUrl = `https://newsdata.io/api/1/news?apikey=${apiKey}&country=${countryCode.toLowerCase()}&category=politics&language=en`;
+      const ndRes = await fetch(ndUrl);
+      if (ndRes.ok) {
+        const ndData = await ndRes.json();
+        if (ndData.results && Array.isArray(ndData.results)) {
+          for (const item of ndData.results) {
+            if (item.link && item.link.startsWith('http')) {
+              const res = await processSourceUrlThroughPipeline(
+                item.link,
+                item.source_id || 'NewsData Wire',
+                item.title,
+                item.description || item.snippet,
+                item.pubDate,
+                countryCode
+              );
+              processed.push({ url: item.link, status: res.status, slug: res.slug });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error polling NewsData in pipeline:', e);
+    }
+  }
+
+  return processed;
 }
 
 export async function GET(request: NextRequest) {
@@ -231,21 +265,7 @@ export async function GET(request: NextRequest) {
 
     if (action === 'poll_feeds') {
       const countryCode = (searchParams.get('country') || 'NG').toUpperCase();
-      const legacyArticles = await fetchArticlesForCountry(countryCode);
-      const processed: any[] = [];
-      for (const art of legacyArticles) {
-        if (art.source_url && art.source_url.startsWith('http')) {
-          const res = await processSourceUrlThroughPipeline(
-            art.source_url,
-            art.source_name,
-            art.title,
-            art.snippet,
-            art.created_at,
-            countryCode
-          );
-          processed.push({ url: art.source_url, status: res.status, slug: res.slug });
-        }
-      }
+      const processed = await pollFeedsForCountry(countryCode);
       return NextResponse.json({ success: true, processed_count: processed.length, processed });
     }
 

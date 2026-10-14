@@ -42,6 +42,7 @@ export interface ScrapedSourcePage {
   source_headline: string;
   extracted_full_text: string;
   image_url?: string;
+  author?: string;
   character_count: number;
   word_count: number;
   is_valid: boolean;

@@ -233,6 +233,18 @@ function extractTitle(html: string, fallbackTitle: string): string {
   return fallbackTitle;
 }
 
+function extractAuthor(html: string): string | undefined {
+  const match =
+    html.match(/<meta[^>]+name=["']author["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+property=["']article:author["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+name=["']twitter:creator["'][^>]+content=["']([^"']+)["']/i);
+  if (match && match[1]) {
+    const val = match[1].trim();
+    if (val.length > 1 && val.length < 100) return val;
+  }
+  return undefined;
+}
+
 export async function fetchAndExtractSourcePage(
   sourceUrl: string,
   sourceName: string = 'Press Outlet',
@@ -307,6 +319,7 @@ export async function fetchAndExtractSourcePage(
 
     const headline = extractTitle(html, rssHeadline);
     const imageUrl = extractOgImage(html);
+    const author = extractAuthor(html);
     const fullText = cleanHtmlTags(html);
     const charCount = fullText.length;
     const wordCount = fullText.split(/\s+/).filter(Boolean).length;
@@ -388,6 +401,7 @@ export async function fetchAndExtractSourcePage(
       source_headline: headline,
       extracted_full_text: fullText,
       image_url: imageUrl,
+      author,
       character_count: charCount,
       word_count: wordCount,
       is_valid: true,
