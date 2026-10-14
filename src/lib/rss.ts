@@ -19,7 +19,7 @@ export interface RssFeedConfig {
 
 const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
   NG: [
-    { name: 'DailyPost Nigeria', url: 'https://dailypost.ng/category/politics/feed/' },
+    { name: 'DailyPost Nigeria', url: 'https://dailypost.ng/feed/' },
     { name: 'Vanguard Nigeria', url: 'https://www.vanguardngr.com/category/politics/feed/' },
     { name: 'Premium Times Nigeria', url: 'https://www.premiumtimesng.com/category/news/politics/feed' },
     { name: 'TheCable Nigeria', url: 'https://www.thecable.ng/category/politics/feed' },
@@ -29,13 +29,13 @@ const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
     { name: 'NPR Politics', url: 'https://feeds.npr.org/1014/rss.xml' },
   ],
   GB: [
-    { name: 'BBC Politics', url: 'http://feeds.bbci.co.uk/news/politics/rss.xml' },
+    { name: 'BBC Politics', url: 'https://feeds.bbci.co.uk/news/politics/rss.xml' },
     { name: 'The Guardian UK', url: 'https://www.theguardian.com/politics/rss' },
   ],
   GH: [
     { name: 'GhanaWeb Politics', url: 'https://www.ghanaweb.com/GhanaHomePage/rss/feed.php?cat=politics' },
     { name: 'Citi Newsroom Ghana', url: 'https://citinewsroom.com/category/news/politics/feed/' },
-    { name: 'MyJoyOnline Ghana', url: 'https://www.myjoyonline.com/category/news/politics/feed/' },
+    { name: 'MyJoyOnline Ghana', url: 'https://www.myjoyonline.com/news/politics/feed/' },
   ],
   ZA: [
     { name: 'Daily Maverick SA', url: 'https://www.dailymaverick.co.za/section/south-africa/feed/' },
@@ -53,6 +53,7 @@ const COUNTRY_RSS_MAP: Record<string, RssFeedConfig[]> = {
   ],
   NZ: [
     { name: 'RNZ Politics', url: 'https://www.rnz.co.nz/rss/political.xml' },
+    { name: 'Stuff NZ Politics', url: 'https://www.stuff.co.nz/rss/national/politics' },
   ],
   IN: [
     { name: 'NDTV India', url: 'https://feeds.feedburner.com/ndtvnews-india-news' },

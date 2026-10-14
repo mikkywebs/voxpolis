@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/pipeline?action=poll_pilot",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
