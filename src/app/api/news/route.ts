@@ -143,7 +143,11 @@ export async function GET(request: NextRequest) {
     const targetCode = prefixMatch ? prefixMatch[1].toUpperCase() : countryCode;
     const fallbackList = getFallbackArticlesForCountry(targetCode, language);
     const fallbackFound = fallbackList.find(
-      (a) => a.slug === rawTargetSlug || a.slug === slugParam
+      (a) =>
+        a.slug === rawTargetSlug ||
+        a.slug === slugParam ||
+        a.legacy_slug === rawTargetSlug ||
+        a.legacy_slug === slugParam
     );
     if (fallbackFound) {
       return NextResponse.json({

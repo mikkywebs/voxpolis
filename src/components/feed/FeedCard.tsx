@@ -101,7 +101,11 @@ export default function FeedCard({ article, index, onCardClick }: FeedCardProps)
           </div>
         </div>
 
-        {article.is_breaking ? (
+        {article.category === 'civic-overview' || article.source_name === 'Voxpolis Civic Desk' ? (
+          <div className="inline-flex items-center gap-1 mb-2 px-2.5 py-0.5 bg-sky-500/15 border border-sky-500/40 text-sky-600 dark:text-sky-400 text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">
+            <span>Civic Overview</span>
+          </div>
+        ) : article.is_breaking ? (
           <div className="inline-flex items-center gap-1 mb-2 px-2.5 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">
             <AlertCircle className="w-3 h-3" />
             <span>Breaking</span>

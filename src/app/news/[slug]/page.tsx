@@ -1038,7 +1038,7 @@ export default function NewsDetailPage() {
   // Paragraph 2: Key figures, direct quotes, and official statements
   // Paragraph 3: Counter-view, opposition responses, public reaction
   // Paragraph 4: Policy implications, oversight, and next developments
-  if (fallbackParagraphs.length > 4) {
+  if (article?.category !== 'civic-overview' && fallbackParagraphs.length > 4) {
     fallbackParagraphs = synthesize4ParagraphBrief(
       article?.title || '',
       article?.snippet || '',
@@ -1088,6 +1088,7 @@ export default function NewsDetailPage() {
             viewsCount={realViews}
             createdAt={article!.created_at}
             author={extractedAuthor || article!.author}
+            category={article!.category}
           />
 
           {/* Community Pulse immediately after header (guests and members can react) */}

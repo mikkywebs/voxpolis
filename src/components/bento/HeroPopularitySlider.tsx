@@ -118,8 +118,13 @@ export default function HeroPopularitySlider({
       </div>
 
       {/* Featured / Popular Badge */}
+      {/* Featured / Popular / Civic Overview Badge */}
       <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-        {isFeaturedStory ? (
+        {active.category === 'civic-overview' || active.source_name === 'Voxpolis Civic Desk' ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-sky-600/90 text-white shadow-xs backdrop-blur-xs">
+            <span>Civic Overview</span>
+          </span>
+        ) : isFeaturedStory ? (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-amber-500/90 text-white shadow-xs backdrop-blur-xs">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Featured Policy</span>

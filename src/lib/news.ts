@@ -5,6 +5,7 @@ import { decodeAllHtmlEntities } from './news-rewriter';
 export interface ArticleData {
   id: string;
   slug: string;
+  legacy_slug?: string;
   title: string;
   snippet: string;
   content: string;
@@ -613,82 +614,88 @@ export function isRelevantToCountry(title: string, snippet: string = '', country
 
 const LOCALIZED_NEWS_TEMPLATES: Record<string, (countryName: string, capital: string) => { title: string; snippet: string; content: string; analysis: string; pollQuestion: string }> = {
   fr: (country, capital) => ({
-    title: `🇫🇷 ${country} : Le Parlement Ouvre les Débats sur la Grande Réforme Governance et Numérique`,
-    snippet: `Les députés réunis à ${capital} ont présenté aujourd'hui une synthèse législative majeure visant à moderniser les services publics, la santé et l'économie résiliente.`,
-    content: `CAPITALE (${capital.toUpperCase()}) — Les représentants parlementaires ont officiellement ouvert aujourd'hui une session ministérielle dédiée au projet de loi de modernisation de la gouvernance publique à ${country}.
-    
-Le rapport déposé devant l'Assemblée comprend quatre piliers majeurs : la dématérialisation accélérée des démarches administratives, le renforcement de la résilience énergétique régionale, la réallocation stratégique des budgets de santé publique et la protection renforcée des infrastructures numériques critiques.
+    title: `${country} : Aperçu de la Gouvernance et de l'Architecture Constitutionnelle`,
+    snippet: `Un aperçu civique de la structure institutionnelle, des procédures parlementaires et des mécanismes de redevabilité publique à ${country}.`,
+    content: `${country} s'appuie sur un cadre constitutionnel établi qui régit l'action publique, l'administration nationale et les délibérations législatives à ${capital}.
 
-Les membres du comité ministériel ont souligné que ce texte de loi bénéficie d'un soutien transpartisan significatif et fera l'objet d'examens détaillés en commission avant son vote final prévu le mois prochain.
+L'architecture institutionnelle articule l'action exécutive, le contrôle parlementaire et l'administration territoriale pour assurer des services publics équitables.
 
-"Cette réforme répond directement aux attentes des citoyens en matière de transparence, de rapidité administrative et de souveraineté numérique," a déclaré le rapporteur de la commission lors d'un point presse à ${capital}.`,
-    analysis: `Analyse Factuelle de l'Article :
-• Fait 1 : Le Parlement à ${capital} a engagé les débats sur le projet de modernisation administrative et numérique de ${country}.
-• Fait 2 : Les dispositions clés couvrent la dématérialisation des démarches, l'efficacité budgétaire de la santé et la sécurité des données publiques.
-• Fait 3 : Le texte dispose d'un soutien multi-parti et passe en révision de commission avant le vote final.`,
-    pollQuestion: `Êtes-vous d'accord avec la priorité accordée à la dématérialisation des services publics à ${country} ?`,
+Les observateurs de la vie civique soulignent que la transparence statutaire et la participation citoyenne constituent le socle de la vitalité démocratique.
+
+Ce document est établi par Voxpolis Civic Desk à titre de référence institutionnelle générale et ne constitue pas une dépêche d'actualité en temps réel.`,
+    analysis: `Contexte du Document Civique :
+- Structure Institutionnelle : Synthèse de l'architecture constitutionnelle et des procédures législatives à ${capital}.
+- Administration Publique : Vue d'ensemble de la gouvernance nationale et de la transparence publique.
+- Portée Éducative : Document préparé par Voxpolis Civic Desk comme référence civique générale; non issu de dépêches d'actualité.`,
+    pollQuestion: `Pensez-vous que les institutions de ${country} doivent renforcer la transparence numérique des services publics ?`,
   }),
 
   es: (country, capital) => ({
-    title: `🇪🇸 ${country}: El Congreso Inicia el Debate sobre la Ley de Modernización Digital y Eficiencia`,
-    snippet: `Los parlamentarios reunidos en ${capital} presentaron hoy un paquete legislativo integral para fortalecer la infraestructura pública y los servicios de salud.`,
-    content: `SEDE PARLAMENTARIA (${capital.toUpperCase()}) — Representantes legislativos introdujeron oficialmente hoy una amplia agenda de reforma gubernamental destinada a optimizar los servicios públicos, mejorar la financiación sanitaria y consolidar la ciberseguridad en ${country}.
+    title: `${country}: Panorama de la Gobernanza y Estructura Constitucional`,
+    snippet: `Una guía cívica sobre el marco constitucional, las funciones legislativas y los canales de participación ciudadana en ${country}.`,
+    content: `${country} se fundamenta en un marco constitucional consolidado que orienta las políticas públicas y las deliberaciones parlamentarias en ${capital}.
 
-El paquete normativo aborda proyectos prioritarios como la modernización de redes de transporte, subvenciones regionales para la transición energética y auditorías de transparencia en la administración pública.
+La estructura institucional organiza la administración ejecutiva, el control legislativo y los gobiernos locales para atender las necesidades públicas.
 
-Fuentes oficiales confirmaron que las propuestas pasarán a la comisión parlamentaria para su evaluación detallada antes de la votación definitiva programada para las próximas semanas.`,
-    analysis: `Análisis Factual del Artículo:
-• Hecho 1: El Congreso en ${capital} inició la discusión sobre la reforma de gobernanza digital de ${country}.
-• Hecho 2: La iniciativa abarca infraestructura de transporte, sanidad pública e inspecciones de ciberseguridad.
-• Hecho 3: El proyecto cuenta con amplio respaldo institucional y avanza a dictamen de comisión.`,
-    pollQuestion: `¿Está de acuerdo con incrementar la inversión estatal en infraestructuras digitales públicas en ${country}?`,
+Analistas de políticas públicas señalan que la rendición de cuentas y la transparencia administrativa son esenciales para la confianza ciudadana.
+
+Esta síntesis es elaborada por Voxpolis Civic Desk como marco de referencia cívica y no constituye una cobertura de noticias de última hora.`,
+    analysis: `Contexto Cívico:
+- Estructura Institucional: Resumen del marco constitucional y procedimientos parlamentarios en ${capital}.
+- Administración Pública: Síntesis de gobernanza, transparencia y participación ciudadana en ${country}.
+- Alcance Educativo: Elaborado por Voxpolis Civic Desk como material de consulta cívica; no es un despacho de última hora.`,
+    pollQuestion: `¿Considera prioritario incrementar la transparencia digital en la administración pública de ${country}?`,
   }),
 
   de: (country, capital) => ({
-    title: `🇩🇪 ${country}: Gesetzgeber Beraten über Umfassendes Paket zur Verwaltungserneuerung`,
-    snippet: `Abgeordnete in ${capital} haben heute neue Gesetzesinitiativen zur Stärkung der digitalen Infrastruktur und der wirtschaftlichen Resilienz vorgestellt.`,
-    content: `PARLAMENTSVIERTEL (${capital.toUpperCase()}) — Die Abgeordneten haben heute offiziell einen Gesetzentwurf zur Modernisierung der öffentlichen Verwaltung in ${country} eingebracht.
+    title: `${country}: Überblick über Regierungsführung und Verfassungsstrukturen`,
+    snippet: `Ein bürgerschaftlicher Überblick über die Verfassungsordnung, parlamentarische Abläufe und Verwaltungsstrukturen in ${country}.`,
+    content: `${country} stützt sich auf eine verfassungsrechtliche Ordnung, die Gesetzgebung, öffentliche Verwaltung und demokratische Mitwirkung in ${capital} leitet.
 
-Der Entwurf umfasst verbindliche Standards für Cybersicherheit, Fördermittel für Kommunen zur digitalen Transformation sowie Leitlinien für nachhaltige Energienetze.
+Die institutionellen Mechanismen verbinden parlamentarische Aufsicht und kommunale Verwaltung zur Gewährleistung verlässlicher öffentlicher Dienstleistungen.
 
-Die Gesetzesinitiative wird nun in den zuständigen Ausschüssen detailliert geprüft, bevor die abschließende Abstimmung im Parlament ansteht.`,
-    analysis: `Faktenbasierte Analyse:
-• Fakt 1: Das Parlament in ${capital} berät über ein Gesetzpaket zur Verwaltungsmodernisierung in ${country}.
-• Fakt 2: Die Schwerpunkte liegen auf Cybersicherheitsstandards, Kommunalförderung und Netzstabilität.
-• Fakt 3: Der Entwurf befindet sich in der Ausschussberatung vor der Schlussabstimmung.`,
-    pollQuestion: `Stimmen Sie der Priorisierung digitaler Verwaltungsleistungen in ${country} zu?`,
+Politikbeobachter betonen, dass Transparenz und Bürgerbeteiligung das Fundament einer stabilen demokratischen Ordnung bilden.
+
+Diese Übersicht wurde von der Voxpolis Civic Desk als institutionelle Hintergrundinformation erstellt und stellt keine aktuelle Eilmeldung dar.`,
+    analysis: `Hintergrundinformation:
+- Verfassungsrahmen: Überblick über Gesetzgebungsprozesse und Institutionen in ${capital}.
+- Öffentliche Verwaltung: Struktur staatlicher Aufgaben und Transparenzstandards in ${country}.
+- Zweck: Bereitgestellt von Voxpolis Civic Desk als staatsbürgerliche Hintergrundinformation; keine Eilmeldung.`,
+    pollQuestion: `Sollten öffentliche Verwaltungsverfahren in ${country} digital transparenter gestaltet werden?`,
   }),
 
   ja: (country, capital) => ({
-    title: `🇯🇵 ${country}国会：デジタル行政改革と経済安全保障に関する包括法案を審議`,
-    snippet: `${capital}の国会議事堂にて、公共サービスのデジタル化推進と医療基盤の効率化を目指す主要法案が提出されました。`,
-    content: `首都（${capital.toUpperCase()}）— ${country}の国会にて本日、行政手続きの効率化、地域医療支援の最適化、ならびにデジタルインフラのセキュリティ強化を目的とした包括的改革法案が正式に上程されました。
+    title: `${country}：統治機構と憲法秩序の概要`,
+    snippet: `${country}における憲法構造、議会手続き、および公共ガバナンスの枠組みに関する市民向け解説。` ,
+    content: `${country}は、${capital}における立法手続きや行政運営を定める確立された憲法秩序に基づいて運営されています。
 
-本法案には、主要なサイバーインシデント報告の義務化、地方自治体へのデジタル移行補助金の交付、および独立したリスク監査システムの導入が含まれています。
+行政執行、議会による監視、および地方自治の連携により、公共サービスの安定的な提供が図られています。
 
-超党派による調整が進められており、各専門委員会での審議を経て、来月にも最終採決が行われる見通しです。`,
-    analysis: `記事の事実分析：
-・事実 1：${capital}の国会にて、${country}の行政・デジタル基盤改革法案の審議が開始されました。
-・事実 2：主要項目には、サイバーセキュリティ監査、地方自治体支援、および行政手続きのデジタル化が含まれます。
-・事実 3：超党派の合意に基づき、委員会審議を経て最終採決へ進みます。`,
-    pollQuestion: `${country}における行政手続きのデジタル化推進方針に賛成ですか？`,
+政策研究者らは、制度の透明性と市民参加の維持が民主的基盤の強化に不可欠であると指摘しています。
+
+本概要はVoxpolis Civic Deskにより、公共制度の理解を支援する背景資料として作成されたものであり、速報報道ではありません。`,
+    analysis: `市民解説の文脈：
+- 統治構造：${capital}における憲法秩序および立法手続きの概要。
+- 公共行政：${country}における政策執行と透明性の枠組み。
+- 目的：Voxpolis Civic Deskによる背景解説資料。速報ニュースではありません。`,
+    pollQuestion: `${country}において行政手続きのデジタル透明性を高める取り組みを支持しますか？`,
   }),
 
   en: (country, capital) => ({
-    title: `${country} National Parliament Opens Debate on Governance & Digital Administration Reform`,
-    snippet: `Lawmakers in ${capital} gathered today to introduce a comprehensive multi-year legislative summary aimed at improving public health efficiency, transit resilience, and digital oversight.`,
-    content: `PARLIAMENT BUILDING (${capital.toUpperCase()}) — Parliamentary representatives officially introduced a major governance reform package today designed to streamline public administration, expand healthcare funding protocols, and solidify cybersecurity protections across ${country}.
+    title: `${country}: Overview of Governance & Constitutional Architecture`,
+    snippet: `An educational overview of the constitutional governance framework, parliamentary procedures, and civic accountability channels in ${country}.`,
+    content: `${country} operates within an established constitutional framework that guides national governance, public administration, and legislative deliberation in ${capital}.
 
-The legislative agenda includes detailed provisions for 72-hour mandatory reporting on critical infrastructure cyber incidents, grants for municipal digital service upgrades, and independent risk audits for public sector algorithms.
+The institutional structure balances executive authority, parliamentary oversight, and municipal administration to ensure responsive public service delivery.
 
-Committee sponsors underscored that the reform package enjoys broad multi-party backing and will undergo rigorous committee evaluation before coming to a final vote next month.
+Civic observers and policy analysts emphasize that transparent statutory reporting and active public engagement remain essential for democratic vitality.
 
-"This legislation establishes clear, enforceable standards to ensure our public institutions remain resilient, transparent, and responsive to citizens," remarked the committee chair during a briefing outside parliament in ${capital}.`,
-    analysis: `Analysis of Reported Facts:
-- Fact 1: Parliamentary representatives in ${capital} introduced a comprehensive governance reform proposal for ${country}.
-- Fact 2: Key provisions address public administration efficiency, healthcare funding, transit resilience, and cybersecurity audits.
-- Fact 3: The bill has multi-party backing and moves to detailed committee review prior to a final vote.`,
-    pollQuestion: `Do you agree with prioritizing digital governance and cybersecurity standards in ${country}?`,
+This overview is prepared as background civic reference by Voxpolis Civic Desk to support public understanding of national governance institutions.`,
+    analysis: `Civic Overview Context:
+- Institutional Structure: Summary of constitutional governance architecture and legislative procedures in ${capital}.
+- Public Administration: Overview of national policy implementation, public accountability, and civic participation.
+- Educational Scope: Prepared by Voxpolis Civic Desk as background civic reference; not breaking news reporting.`,
+    pollQuestion: `Should public governance frameworks in ${country} prioritize expanding digital administrative transparency?`,
   }),
 };
 
@@ -1120,24 +1127,24 @@ export function getFallbackArticlesForCountry(countryCode: string, language: str
   return [
     {
       id: `art-${code}-1`,
-      slug: `${code.toLowerCase()}-national-parliament-debates-key-policy-reform`,
+      slug: `${code.toLowerCase()}-civic-overview-governance-and-constitutional-structure`,
+      legacy_slug: `${code.toLowerCase()}-national-parliament-debates-key-policy-reform`,
       title: localizedData.title,
       snippet: localizedData.snippet,
       content: localizedData.content,
       ai_analysis: localizedData.analysis,
       country_code: code,
       language: langCode,
-      category: 'politics',
+      category: 'civic-overview',
       image_mode: 'breaking_logo',
-      source_name: `${country.name} Official Digest`,
-      source_url: 'https://voxpolis.app',
-      is_breaking: true,
-      tags: [country.name, 'Governance', 'Parliament'],
+      source_name: 'Voxpolis Civic Desk',
+      source_url: 'https://www.voxpolis.app',
+      is_breaking: false,
+      is_featured: false,
+      tags: [country.name, 'Civic Overview', 'Governance', 'Constitution'],
       views_count: Math.floor(Math.random() * 3000) + 1250,
       total_reading_time_seconds: 190,
       created_at: new Date().toISOString(),
-      affiliate_link_label: 'Official Voxpolis Partner Digest',
-      affiliate_link_url: 'https://voxpolis.app',
       poll: {
         id: `poll-${code}-1`,
         question: localizedData.pollQuestion,
@@ -1147,28 +1154,30 @@ export function getFallbackArticlesForCountry(countryCode: string, language: str
     },
     {
       id: `art-${code}-2`,
-      slug: `${code.toLowerCase()}-infrastructure-and-energy-transition-bill`,
-      title: `${country.flag} ${country.name}: Multi-Billion Transit & Clean Energy Blueprint Approved`,
-      snippet: `Government ministry presents full technical guidelines to modernize rail networks, upgrade regional ports, and integrate grid-scale storage systems in ${country.name}.`,
-      content: `CAPITAL CITY (${country.capital.toUpperCase()}) — Government ministers officially introduced a multi-billion national infrastructure blueprint today aimed at modernizing regional transit networks, expanding clean power grids, and reinforcing trade infrastructure across ${country.name}.
+      slug: `${code.toLowerCase()}-civic-overview-public-infrastructure-and-energy-systems`,
+      legacy_slug: `${code.toLowerCase()}-infrastructure-and-energy-transition-bill`,
+      title: `${country.flag} ${country.name}: Overview of Public Infrastructure & Energy Systems`,
+      snippet: `National infrastructure guidelines and energy transition frameworks form central components of long-term economic planning and regional connectivity across ${country.name}.`,
+      content: `National infrastructure policy in ${country.name} encompasses transit modernization, power grid reliability, and strategic logistics corridors connecting regional centers with ${country.capital}.
 
-The comprehensive strategy outlines three primary implementation phases: immediate grid upgrades to absorb renewable power generation, modernization of cargo transport facilities to reduce logistics bottlenecks, and state grants for municipal clean energy adoption.
+Public capital allocation models prioritize multimodal freight networks, sustainable electricity generation, and municipal utility modernization to support domestic economic resilience.
 
-Addressing press representatives in ${country.capital}, government officials confirmed that independent environmental and economic impact assessments will be published prior to project execution.
+Civic observers and economic planners emphasize that independent environmental oversight and transparent public procurement remain key requirements for sustainable infrastructure delivery.
 
-"This long-term investment ensures sustainable economic growth and transport reliability for decades to come," stated the Ministry spokesperson.`,
-      ai_analysis: `Analysis of Reported Facts:
-- Fact 1: Government ministers unveiled a multi-billion national infrastructure plan for ${country.name}.
-- Fact 2: Key pillars include regional transit modernization, clean grid integration, and port upgrades.
-- Fact 3: Environmental and economic impact assessments will be published before implementation.`,
+Long-term development strategies across the country seek to balance capital investment needs with fiscal sustainability and equitable regional access to essential public utilities.`,
+      ai_analysis: `Civic Overview Context:
+- Infrastructure Scope: Overview of transport logistics, electrical grids, and public works planning across ${country.name}.
+- Regional Connectivity: Priorities connecting municipal economies with the national capital, ${country.capital}.
+- Educational Scope: Prepared by Voxpolis Civic Desk as background civic reference; not breaking news reporting.`,
       country_code: code,
       language: langCode,
-      category: 'infrastructure',
+      category: 'civic-overview',
       image_mode: 'breaking_logo',
-      source_name: `${country.name} Press Agency`,
-      source_url: 'https://voxpolis.app',
+      source_name: 'Voxpolis Civic Desk',
+      source_url: 'https://www.voxpolis.app',
       is_breaking: false,
-      tags: [country.name, 'Infrastructure', 'Energy'],
+      is_featured: false,
+      tags: [country.name, 'Civic Overview', 'Infrastructure', 'Energy'],
       views_count: Math.floor(Math.random() * 2000) + 920,
       total_reading_time_seconds: 160,
       created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
@@ -1181,96 +1190,102 @@ Addressing press representatives in ${country.capital}, government officials con
     },
     {
       id: `art-${code}-3`,
-      slug: `${code.toLowerCase()}-public-healthcare-and-hospital-modernization-package`,
-      title: `${country.flag} ${country.name} Cabinet Approves Major Healthcare Resilience Budget`,
-      snippet: `Public health officials announce direct capital grants to expand regional clinics, upgrade diagnostics, and reinforce pharmaceutical supply chains nationwide.`,
-      content: `MINISTRY OF HEALTH (${country.capital.toUpperCase()}) — Health authorities in ${country.name} have confirmed the official rollout of a national healthcare revitalization initiative focused on modernizing secondary hospital facilities and expanding primary care access.
+      slug: `${code.toLowerCase()}-civic-overview-healthcare-systems-and-public-policy`,
+      legacy_slug: `${code.toLowerCase()}-public-healthcare-and-hospital-modernization-package`,
+      title: `${country.flag} ${country.name}: Overview of Public Healthcare Systems & Health Policy`,
+      snippet: `An educational overview of public healthcare administration, primary medical access, and preventative health services serving communities throughout ${country.name}.`,
+      content: `The public healthcare architecture of ${country.name} integrates primary community health centers, secondary referral hospitals, and national public health surveillance.
 
-The program establishes targeted funding for decentralized emergency clinics, cold-chain medical storage, and specialized clinician retention incentives across both urban centers and rural provinces.
+Healthcare policy focuses on equitable distribution of medical personnel, securing pharmaceutical supply chains, and funding preventative care across both metropolitan centers and rural provinces.
 
-A joint parliamentary monitoring panel will oversee procurement processes to guarantee full transparency, competitive bidding, and prompt equipment deployment.
+Health system analysts highlight that sustained investment in diagnostic capacity and health workforce retention remains essential for national health security and pandemic preparedness.
 
-"Ensuring affordable, resilient healthcare for every family is the cornerstone of our national stability," noted the Director of Public Health during a press briefing today.`,
-      ai_analysis: `Analysis of Reported Facts:
-- Fact 1: Ministry of Health approved a comprehensive public healthcare revitalization grant across ${country.name}.
-- Fact 2: Key priorities include regional clinic upgrades, supply chain security, and medical staff retention.
-- Fact 3: Parliamentary oversight committee established to monitor equipment procurement.`,
+Civic discourse surrounding healthcare reform in ${country.name} centers on enhancing patient protections, reducing out-of-pocket costs, and ensuring universal access to essential care.`,
+      ai_analysis: `Civic Overview Context:
+- System Scope: Structure of primary care, hospital delivery, and health administration in ${country.name}.
+- Policy Priorities: Workforce development, medical supply chains, and health equity across provinces.
+- Educational Scope: Prepared by Voxpolis Civic Desk as background civic reference; not breaking news reporting.`,
       country_code: code,
       language: langCode,
-      category: 'health',
+      category: 'civic-overview',
       image_mode: 'breaking_logo',
-      source_name: `${country.name} National Monitor`,
-      source_url: 'https://voxpolis.app',
+      source_name: 'Voxpolis Civic Desk',
+      source_url: 'https://www.voxpolis.app',
       is_breaking: false,
-      tags: [country.name, 'Healthcare', 'Public Policy'],
+      is_featured: false,
+      tags: [country.name, 'Civic Overview', 'Healthcare', 'Public Policy'],
       views_count: Math.floor(Math.random() * 1800) + 740,
       total_reading_time_seconds: 175,
       created_at: new Date(Date.now() - 3600000 * 6).toISOString(),
       poll: {
         id: `poll-${code}-3`,
-        question: `Should the government mandate higher baseline spending on provincial public hospitals in ${country.name}?`,
+        question: `Should provincial public healthcare facilities receive dedicated statutory funding in ${country.name}?`,
         agree_count: 615,
         disagree_count: 32,
       },
     },
     {
       id: `art-${code}-4`,
-      slug: `${code.toLowerCase()}-fiscal-budget-and-economic-modernization-framework`,
-      title: `${country.flag} ${country.name} Treasury Unveils Comprehensive Fiscal Alignment Strategy`,
-      snippet: `Finance authorities introduce measures to curb inflationary pressures, streamline public debt servicing, and broaden domestic revenue collection without burdening small businesses.`,
-      content: `TREASURY HEADQUARTERS (${country.capital.toUpperCase()}) — Economic policymakers have released ${country.name}'s updated macroeconomic guideline, introducing fiscal consolidation measures designed to stabilize currency reserves and improve revenue administration.
+      slug: `${code.toLowerCase()}-civic-overview-macroeconomic-policy-and-fiscal-framework`,
+      legacy_slug: `${code.toLowerCase()}-fiscal-budget-and-economic-modernization-framework`,
+      title: `${country.flag} ${country.name}: Overview of Fiscal Governance & Economic Administration`,
+      snippet: `National budgetary guidelines, revenue administration systems, and debt management frameworks define economic governance in ${country.name}.`,
+      content: `Economic governance in ${country.name} relies on fiscal policy coordination between the national treasury, monetary authorities, and legislative budget committees.
 
-The framework proposes automated tax assessment portals for commercial entities, a reduction in non-essential executive recurrent expenditures, and dedicated credit guarantees for domestic manufacturers.
+Key macroeconomic priorities typically include stabilizing currency reserves, managing public debt obligations, and expanding domestic revenue collection without suppressing productive enterprise.
 
-Financial analysts noted that the strategy strikes a calculated balance between controlling inflation and sustaining capital investments required for long-term job creation.
+Public finance experts stress that fiscal transparency, timely statutory reporting, and disciplined procurement processes protect public creditworthiness and mitigate inflation.
 
-"Fiscal discipline combined with targeted support for local enterprise will safeguard our national economic resilience," emphasized the Treasury Secretary during the presentation.`,
-      ai_analysis: `Analysis of Reported Facts:
-- Fact 1: Finance officials presented an updated fiscal strategy aimed at debt sustainability in ${country.name}.
-- Fact 2: Policy measures focus on automated tax collection, spending efficiency, and manufacturing credits.
-- Fact 3: Economic targets prioritize currency stabilization and inflation management.`,
+Policy debates in ${country.capital} frequently address balancing short-term fiscal stabilization measures against long-term investments in social security, education, and economic diversification.`,
+      ai_analysis: `Civic Overview Context:
+- Governance Scope: Fiscal planning, revenue collection, and public debt oversight in ${country.name}.
+- Institutional Roles: Coordination between treasury departments and legislative budget committees in ${country.capital}.
+- Educational Scope: Prepared by Voxpolis Civic Desk as background civic reference; not breaking news reporting.`,
       country_code: code,
       language: langCode,
-      category: 'economy',
+      category: 'civic-overview',
       image_mode: 'breaking_logo',
-      source_name: `${country.name} Financial Dispatch`,
-      source_url: 'https://voxpolis.app',
+      source_name: 'Voxpolis Civic Desk',
+      source_url: 'https://www.voxpolis.app',
       is_breaking: false,
-      tags: [country.name, 'Economy', 'Fiscal Policy'],
+      is_featured: false,
+      tags: [country.name, 'Civic Overview', 'Economy', 'Fiscal Policy'],
       views_count: Math.floor(Math.random() * 2200) + 850,
       total_reading_time_seconds: 185,
       created_at: new Date(Date.now() - 3600000 * 10).toISOString(),
       poll: {
         id: `poll-${code}-4`,
-        question: `Do you support prioritizing domestic manufacturing tax credits over public borrowing in ${country.name}?`,
+        question: `Do you support prioritizing domestic manufacturing incentives over external public debt in ${country.name}?`,
         agree_count: 489,
         disagree_count: 45,
       },
     },
     {
       id: `art-${code}-5`,
-      slug: `${code.toLowerCase()}-regional-trade-and-diplomatic-cooperation-pact`,
-      title: `${country.flag} ${country.name} Ratifies Regional Economic and Border Trade Agreement`,
-      snippet: `Foreign affairs delegation concludes bilateral protocol lowering cross-border tariffs, harmonizing customs inspections, and establishing joint transport corridors.`,
-      content: `MINISTRY OF FOREIGN AFFAIRS (${country.capital.toUpperCase()}) — Diplomatic envoys from ${country.name} successfully concluded high-level multilateral trade talks today, agreeing on reciprocal border customs protocols to accelerate regional commerce.
+      slug: `${code.toLowerCase()}-civic-overview-regional-trade-and-diplomatic-relations`,
+      legacy_slug: `${code.toLowerCase()}-regional-trade-and-diplomatic-cooperation-pact`,
+      title: `${country.flag} ${country.name}: Overview of Regional Trade Integration & Foreign Policy`,
+      snippet: `Cross-border trade agreements, customs harmonization, and multilateral diplomacy shape ${country.name}'s regional and international cooperation.`,
+      content: `Diplomatic and trade policy in ${country.name} focuses on bilateral partnerships, multilateral treaties, and regional economic integration to facilitate cross-border trade.
 
-The ratified accord eliminates duplicate inspection procedures at critical border crossings, harmonizes phytosanitary certifications for agricultural exports, and implements integrated cargo tracking systems.
+Key areas of policy alignment include harmonized customs procedures, reduced tariff barriers on essential goods, and cooperative security protocols across transport corridors.
 
-Trade chambers and transport unions welcomed the milestone, citing significant projected reductions in cross-border transit times and clearing costs.
+Commercial bodies and regional trade analysts note that streamlined border clearance and standardized regulatory frameworks lower transaction costs for local producers.
 
-"This partnership solidifies ${country.name}'s standing as an active proponent of regional economic integration and shared prosperity," affirmed the lead diplomatic envoy.`,
-      ai_analysis: `Analysis of Reported Facts:
-- Fact 1: ${country.name} ratified a regional trade protocol to streamline cross-border customs procedures.
-- Fact 2: Accord addresses tariff reduction, cargo inspection harmonization, and transport corridors.
-- Fact 3: Commercial transport operators anticipate reduced freight transit delays and lower operating costs.`,
+As international supply chains evolve, foreign policy leaders in ${country.capital} pursue economic diplomacy aimed at attracting sustainable investment and maintaining regional stability.`,
+      ai_analysis: `Civic Overview Context:
+- International Scope: Trade treaties, regional customs cooperation, and bilateral diplomacy for ${country.name}.
+- Commercial Impact: Cross-border transport facilitation and regulatory harmonization.
+- Educational Scope: Prepared by Voxpolis Civic Desk as background civic reference; not breaking news reporting.`,
       country_code: code,
       language: langCode,
-      category: 'diplomacy',
+      category: 'civic-overview',
       image_mode: 'breaking_logo',
-      source_name: `${country.name} Diplomatic Review`,
-      source_url: 'https://voxpolis.app',
+      source_name: 'Voxpolis Civic Desk',
+      source_url: 'https://www.voxpolis.app',
       is_breaking: false,
-      tags: [country.name, 'Trade', 'Diplomacy'],
+      is_featured: false,
+      tags: [country.name, 'Civic Overview', 'Trade', 'Diplomacy'],
       views_count: Math.floor(Math.random() * 1600) + 610,
       total_reading_time_seconds: 165,
       created_at: new Date(Date.now() - 3600000 * 14).toISOString(),
@@ -1283,28 +1298,30 @@ Trade chambers and transport unions welcomed the milestone, citing significant p
     },
     {
       id: `art-${code}-6`,
-      slug: `${code.toLowerCase()}-education-and-digital-workforce-skills-program`,
-      title: `${country.flag} ${country.name} Launches National Technical & Digital Education Initiative`,
-      snippet: `Education ministry rolls out nationwide curriculum enhancements and high-speed campus connectivity to equip young graduates with competitive vocational skills.`,
-      content: `DEPARTMENT OF EDUCATION (${country.capital.toUpperCase()}) — Education authorities today launched an ambitious national skill development framework aimed at aligning vocational curricula with emerging digital and engineering industries in ${country.name}.
+      slug: `${code.toLowerCase()}-civic-overview-education-system-and-workforce-skills`,
+      legacy_slug: `${code.toLowerCase()}-education-and-digital-workforce-skills-program`,
+      title: `${country.flag} ${country.name}: Overview of Education Architecture & Workforce Skills`,
+      snippet: `Educational infrastructure, curriculum standards, and vocational training initiatives support workforce readiness and youth opportunity across ${country.name}.`,
+      content: `The educational framework of ${country.name} spans universal basic schooling, secondary curricula, and technical tertiary institutions designed to align graduate skills with economic demand.
 
-The program funds fiber-optic broadband installations across tertiary institutions, establishes accredited apprenticeship partnerships with private sector employers, and creates subsidized teacher training institutes.
+Strategic educational initiatives emphasize expanding digital literacy, updating vocational apprenticeships, and supporting teacher development across all districts.
 
-Industry leaders commended the initiative as a pragmatic response to graduate employment demands and rapidly expanding technological sectors across the continent.
+Academic researchers and industry stakeholders stress that modernizing technical curricula and expanding broadband access across rural campuses are critical for reducing youth unemployment.
 
-"Equipping our youth with verified practical competencies ensures long-term industrial self-reliance and civic vitality," the Education Minister stated during the inaugurating ceremony.`,
-      ai_analysis: `Analysis of Reported Facts:
-- Fact 1: Department of Education unveiled a nationwide technical training framework for ${country.name}.
-- Fact 2: Key provisions fund university digital connectivity, vocational standards, and apprenticeships.
-- Fact 3: Program involves direct collaboration between educational boards and private industrial partners.`,
+Civic discussions in ${country.name} emphasize the necessity of equitable education funding to ensure that young citizens in every region can access quality training and economic mobility.`,
+      ai_analysis: `Civic Overview Context:
+- Educational Scope: Structure of primary, secondary, and vocational education in ${country.name}.
+- Workforce Alignment: Technical apprenticeships, digital literacy, and youth employment priorities.
+- Educational Scope: Prepared by Voxpolis Civic Desk as background civic reference; not breaking news reporting.`,
       country_code: code,
       language: langCode,
-      category: 'education',
+      category: 'civic-overview',
       image_mode: 'breaking_logo',
-      source_name: `${country.name} Education Gazette`,
-      source_url: 'https://voxpolis.app',
+      source_name: 'Voxpolis Civic Desk',
+      source_url: 'https://www.voxpolis.app',
       is_breaking: false,
-      tags: [country.name, 'Education', 'Youth'],
+      is_featured: false,
+      tags: [country.name, 'Civic Overview', 'Education', 'Youth'],
       views_count: Math.floor(Math.random() * 1400) + 530,
       total_reading_time_seconds: 170,
       created_at: new Date(Date.now() - 3600000 * 18).toISOString(),
@@ -1317,28 +1334,30 @@ Industry leaders commended the initiative as a pragmatic response to graduate em
     },
     {
       id: `art-${code}-7`,
-      slug: `${code.toLowerCase()}-judicial-reform-and-institutional-transparency-code`,
-      title: `${country.flag} ${country.name} Judiciary Adopts New Case Tracking & Public Transparency Code`,
-      snippet: `Chief Justice and legal councils approve digital court filing standards and mandatory timelines to eliminate trial backlogs and enforce constitutional accountability.`,
-      content: `SUPREME COURT BENCH (${country.capital.toUpperCase()}) — Senior judicial officers in ${country.name} have formally instituted an updated procedural code mandating electronic case filing, public cause list access, and strict trial duration benchmarks.
+      slug: `${code.toLowerCase()}-civic-overview-judicial-system-and-constitutional-rule-of-law`,
+      legacy_slug: `${code.toLowerCase()}-judicial-reform-and-institutional-transparency-code`,
+      title: `${country.flag} ${country.name}: Overview of Judicial Architecture & Constitutional Rule of Law`,
+      snippet: `The hierarchy of courts, procedural standards, and judicial independence safeguards form the foundation of constitutional justice in ${country.name}.`,
+      content: `The judicial system of ${country.name} is structured around a constitutional hierarchy of courts, ranging from community magistrates to appellate benches and the apex supreme court.
 
-The judicial reforms are designed to eliminate prolonged commercial litigation backlogs, protect fundamental rights during pretrial custody, and publish all appellate verdicts within fourteen days of pronouncement.
+Core procedural codes protect fundamental rights during legal proceedings, mandate public access to court cause lists, and establish statutory benchmarks for dispute resolution.
 
-Civil liberties organizations and the National Bar Association welcomed the transparency code as an essential structural step toward public confidence in the judicial branch.
+Legal scholars and civil society advocates highlight that institutional independence and transparent appointment mechanisms are vital for maintaining public trust in the judicial branch.
 
-"An expeditious, transparent justice system is the highest guarantee of civic liberty and constitutional democracy," remarked the presiding judicial authority.`,
-      ai_analysis: `Analysis of Reported Facts:
-- Fact 1: Judicial council in ${country.name} established updated case tracking and public filing guidelines.
-- Fact 2: Measures require electronic court records and strict statutory duration limits for pending cases.
-- Fact 3: Legal community leaders expressed support for increased transparency in appellate rulings.`,
+Ongoing judicial administration reforms in ${country.name} focus on digitizing case filings, reducing remand backlogs, and ensuring equal access to justice for vulnerable citizens.`,
+      ai_analysis: `Civic Overview Context:
+- Legal Architecture: Court hierarchy and statutory constitutional protections in ${country.name}.
+- Judicial Standards: Due process, electronic case management, and institutional independence.
+- Educational Scope: Prepared by Voxpolis Civic Desk as background civic reference; not breaking news reporting.`,
       country_code: code,
       language: langCode,
-      category: 'judiciary',
+      category: 'civic-overview',
       image_mode: 'breaking_logo',
-      source_name: `${country.name} Legal Chronicle`,
-      source_url: 'https://voxpolis.app',
+      source_name: 'Voxpolis Civic Desk',
+      source_url: 'https://www.voxpolis.app',
       is_breaking: false,
-      tags: [country.name, 'Judiciary', 'Rule of Law'],
+      is_featured: false,
+      tags: [country.name, 'Civic Overview', 'Judiciary', 'Rule of Law'],
       views_count: Math.floor(Math.random() * 1900) + 810,
       total_reading_time_seconds: 180,
       created_at: new Date(Date.now() - 3600000 * 22).toISOString(),
@@ -1351,28 +1370,30 @@ Civil liberties organizations and the National Bar Association welcomed the tran
     },
     {
       id: `art-${code}-8`,
-      slug: `${code.toLowerCase()}-agricultural-resilience-and-food-security-plan`,
-      title: `${country.flag} ${country.name} Ministry Outlines Strategic Food Reserve & Farmer Support Plan`,
-      snippet: `Agricultural stakeholders introduce nationwide dry-season irrigation grants, subsidized organic inputs, and localized storage silos to protect consumer food affordability.`,
-      content: `MINISTRY OF AGRICULTURE (${country.capital.toUpperCase()}) — Agricultural planners have unveiled a multi-province food security strategy aimed at insulating ${country.name} from global commodity price volatility and weather disruptions.
+      slug: `${code.toLowerCase()}-civic-overview-agricultural-structure-and-food-security`,
+      legacy_slug: `${code.toLowerCase()}-agricultural-resilience-and-food-security-plan`,
+      title: `${country.flag} ${country.name}: Overview of Agricultural Structure & Food Security Framework`,
+      snippet: `Agrarian systems, smallholder farming frameworks, and strategic food reserves underpin rural livelihoods and food security in ${country.name}.`,
+      content: `Agriculture forms a foundational pillar of rural employment, domestic food supply, and economic resilience across ${country.name}.
 
-Key pillars of the program include zero-interest machinery financing for farming cooperatives, the construction of decentralized grain storage silos, and rehabilitated solar irrigation channels in key breadbasket regions.
+National agricultural frameworks address smallholder cooperative financing, localized grain storage infrastructure, and irrigation development to buffer against climate volatility.
 
-Farmers' federations emphasized that localized processing facilities will dramatically cut post-harvest food waste and stabilize market food prices for urban households.
+Agrarian economists emphasize that reducing post-harvest losses through regional processing facilities is critical for stabilizing food prices in urban retail markets.
 
-"Empowering our agricultural workforce with modern logistics and reliable irrigation ensures food sovereignty for all citizens," declared the Agriculture Director.`,
-      ai_analysis: `Analysis of Reported Facts:
-- Fact 1: Agriculture ministry in ${country.name} presented a national food reserve and irrigation program.
-- Fact 2: Strategy targets cooperative machinery financing, solar irrigation canals, and localized grain silos.
-- Fact 3: Farm federations project notable reductions in post-harvest losses and retail consumer food costs.`,
+Policy discussions in ${country.capital} focus on expanding farmer access to affordable inputs, sustainable water management, and rural transportation networks to safeguard long-term food sovereignty.`,
+      ai_analysis: `Civic Overview Context:
+- Agrarian Scope: Structure of agricultural production and rural farming systems in ${country.name}.
+- Food Security: Grain reserves, irrigation access, and supply chain logistics.
+- Educational Scope: Prepared by Voxpolis Civic Desk as background civic reference; not breaking news reporting.`,
       country_code: code,
       language: langCode,
-      category: 'agriculture',
+      category: 'civic-overview',
       image_mode: 'breaking_logo',
-      source_name: `${country.name} Agrarian Herald`,
-      source_url: 'https://voxpolis.app',
+      source_name: 'Voxpolis Civic Desk',
+      source_url: 'https://www.voxpolis.app',
       is_breaking: false,
-      tags: [country.name, 'Agriculture', 'Food Security'],
+      is_featured: false,
+      tags: [country.name, 'Civic Overview', 'Agriculture', 'Food Security'],
       views_count: Math.floor(Math.random() * 1750) + 680,
       total_reading_time_seconds: 170,
       created_at: new Date(Date.now() - 3600000 * 26).toISOString(),

@@ -18,6 +18,7 @@ interface ArticleImageHeaderProps {
   totalReadingTimeSeconds?: number;
   createdAt?: string;
   author?: string;
+  category?: string;
 }
 
 export default function ArticleImageHeader({
@@ -33,6 +34,7 @@ export default function ArticleImageHeader({
   totalReadingTimeSeconds = 180,
   createdAt,
   author,
+  category,
 }: ArticleImageHeaderProps) {
   const readingTimeMin = Math.max(1, Math.ceil(totalReadingTimeSeconds / 60));
   const formattedTimestamp = formatExactTimestamp(createdAt);
@@ -57,9 +59,13 @@ export default function ArticleImageHeader({
 
   return (
     <div className="mb-6 space-y-4">
-      {/* Breaking / Featured Badge & Meta Bar */}
+      {/* Breaking / Featured / Civic Overview Badge & Meta Bar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        {isBreaking ? (
+        {category === 'civic-overview' || sourceName.toLowerCase().includes('civic desk') ? (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-sky-500/15 border border-sky-500/40 text-sky-600 dark:text-sky-400 font-bold text-xs rounded-full uppercase tracking-wider shadow-sm">
+            <span>Civic Overview • Automated Summary</span>
+          </div>
+        ) : isBreaking ? (
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600 text-white font-bold text-xs rounded-full uppercase tracking-wider shadow-sm animate-pulse">
             <AlertCircle className="w-3.5 h-3.5" />
             <span>Breaking Report</span>
@@ -107,6 +113,12 @@ export default function ArticleImageHeader({
       <p className="text-base sm:text-lg font-medium text-gray-600 dark:text-gray-300 leading-relaxed border-l-4 border-blue-600 pl-4 py-1">
         {formatCleanSnippet(decodeAllHtmlEntities(snippet))}
       </p>
+
+      {(category === 'civic-overview' || sourceName.toLowerCase().includes('civic desk')) && (
+        <div className="p-3.5 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-xs text-sky-800 dark:text-sky-300 leading-relaxed">
+          <strong>Voxpolis Civic Desk:</strong> This briefing is an automated overview of national governance and public systems. It provides background context for civic literacy and does not represent live investigative reporting or breaking news.
+        </div>
+      )}
 
       {/* Featured Image Treatment: Source Image or Site Default Asset */}
       <div className="mt-4 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 shadow-md">
