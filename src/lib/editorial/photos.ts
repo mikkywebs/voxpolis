@@ -28,7 +28,10 @@ const ALLOWED_LICENSE = /^(public domain|pd\b|pd-|cc0|cc[ -]by(-sa)?([ -]\d(\.\d
 const BLOCKED_LICENSE = /\b(nc|nd|non-?commercial|no ?deriv|fair use|copyrighted)\b/i;
 const BAD_FILE = /(logo|\bmap\b|flag|coat of arms|emblem|seal of|signature|chart|graph|diagram|locator|banner|icon|symbol|document|screenshot|poster|cover|ballot paper|stamp|coin|banknote|cartoon|caricature|\.svg|\.pdf|\.tif)/i;
 // Titles that suggest the person is not the main subject (meetings, other leaders' photos).
-const NOT_MAIN_SUBJECT = /\b(receives?|received|meets?|meeting|met with|with|and|visit(s|ing)?|talks|summit|delegation|bilateral|greets?|welcom(es|ing)|shakes?|vs\.?|versus|family|wife|husband|funeral)\b/i;
+// Includes Portuguese/French/Spanish/German/Italian captions, which are common on Commons.
+const NOT_MAIN_SUBJECT = /\b(receives?|received|meets?|meeting|met with|with|and|visit(s|ing)?|talks|summit|delegation|bilateral|greets?|welcom(es|ing)|shakes?|vs\.?|versus|family|wife|husband|funeral|reuni[aã]o|r[ée]union|reuni[oó]n|encontro|encuentro|rencontre|treffen|incontro|entre|com|avec|con|und|mit|ampliada|cumbre|cimeira|sommet|gipfel)\b/i;
+// For institutions/places we want the building or chamber, not a portrait of an office-holder.
+const PERSON_TITLE = /\b(chairman|chairperson|chair|professor|prof|dr|mr|mrs|ms|hon|sen|president|minister|governor|senator|speaker|commissioner|portrait|headshot)\b/i;
 const PORTRAIT_HINT = /\b(portrait|official|headshot|cropped|profile)\b/i;
 
 function strip(html?: string): string {
@@ -110,11 +113,14 @@ function evaluate(page: any, subject: string, person: boolean): Verdict {
     else score += 1; // only in description
     if (cleanTitle.startsWith(full) || cleanTitle.startsWith(surname)) score += 2;
     if (PORTRAIT_HINT.test(title)) score += 3;
+    if (/\(cropped/i.test(title)) score += 1;
     if (NOT_MAIN_SUBJECT.test(title.replace(/^File:/, ''))) score -= 6;
+    if (cleanTitle.length > 90) score -= 2; // long captions are usually event photos with several people
   } else {
     // Institutions and places must match the full name, so "Electoral Commission of Afghanistan"
     // can never stand in for Nigeria's INEC.
     if (!haystack.includes(full)) return no('full name not in file');
+    if (PERSON_TITLE.test(title)) return no('a person, not the institution');
     score += 3 + (cleanTitle.includes(full) ? 3 : 0);
     if (ratio >= 1.2) score += 1;
   }
