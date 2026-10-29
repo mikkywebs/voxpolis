@@ -22,3 +22,6 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: build-placeholder
           SUPABASE_SERVICE_ROLE_KEY: build-placeholder
           NEXT_PUBLIC_SITE_URL: https://www.voxpolis.app
+      - name: Source health check (feeds + article reader)
+        run: npx --yes tsx scripts/check-sources.ts
+        continue-on-error: true
