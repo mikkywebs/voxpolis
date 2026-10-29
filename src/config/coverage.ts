@@ -24,25 +24,26 @@ export interface CoverageDesk {
 }
 
 export const COVERAGE: CoverageDesk[] = [
+  // Every outlet below was tested on 29 Oct 2026: feed readable AND article text extractable.
   // ---------- Tier 1 ----------
   {
     code: 'NG', tier: 1, maxPerRun: 3,
     feeds: [
-      { name: 'Premium Times', url: 'https://www.premiumtimesng.com/category/news/politics/feed' },
-      { name: 'TheCable', url: 'https://www.thecable.ng/category/politics/feed' },
-      { name: 'Vanguard', url: 'https://www.vanguardngr.com/category/politics/feed/' },
       { name: 'Punch', url: 'https://punchng.com/topics/politics/feed/' },
-      { name: 'Channels TV', url: 'https://www.channelstv.com/category/politics/feed/' },
+      { name: 'Vanguard', url: 'https://www.vanguardngr.com/category/politics/feed/' },
+      { name: 'Premium Times', url: 'https://www.premiumtimesng.com/category/news/politics/feed' },
       { name: 'Daily Post', url: 'https://dailypost.ng/politics/feed/' },
+      { name: 'Channels TV', url: 'https://www.channelstv.com/feed/' },
     ],
   },
   {
+    // Mix of outlets across the US political spectrum.
     code: 'US', tier: 1, maxPerRun: 3,
     feeds: [
-      { name: 'Politico', url: 'https://rss.politico.com/politics-news.xml' },
-      { name: 'NPR Politics', url: 'https://feeds.npr.org/1014/rss.xml' },
-      { name: 'The Hill', url: 'https://thehill.com/homenews/feed/' },
-      { name: 'PBS NewsHour', url: 'https://www.pbs.org/newshour/feeds/rss/politics' },
+      { name: 'CBS News', url: 'https://www.cbsnews.com/latest/rss/politics' },
+      { name: 'NBC News', url: 'https://feeds.nbcnews.com/nbcnews/public/politics' },
+      { name: 'ABC News', url: 'https://abcnews.go.com/abcnews/politicsheadlines' },
+      { name: 'Fox News', url: 'https://moxie.foxnews.com/google-publisher/politics.xml' },
     ],
   },
   {
@@ -50,63 +51,59 @@ export const COVERAGE: CoverageDesk[] = [
     feeds: [
       { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/politics/rss.xml' },
       { name: 'The Guardian', url: 'https://www.theguardian.com/politics/rss' },
-      { name: 'Sky News', url: 'https://feeds.skynews.com/feeds/rss/politics.xml' },
     ],
   },
   {
     code: 'GH', tier: 1, maxPerRun: 2,
     feeds: [
-      { name: 'Citi Newsroom', url: 'https://citinewsroom.com/category/news/politics/feed/' },
       { name: 'MyJoyOnline', url: 'https://www.myjoyonline.com/news/politics/feed/' },
-      { name: 'GhanaWeb', url: 'https://www.ghanaweb.com/GhanaHomePage/rss/feed.php?cat=politics' },
+      { name: 'Graphic Online', url: 'https://www.graphic.com.gh/news/politics.feed?type=rss' },
     ],
   },
   {
     code: 'KE', tier: 1, maxPerRun: 2,
     feeds: [
+      { name: 'The Standard', url: 'https://www.standardmedia.co.ke/rss/politics.php' },
       { name: 'Capital FM', url: 'https://www.capitalfm.co.ke/news/category/kenya/politics/feed/' },
-      { name: 'The Star', url: 'https://www.the-star.co.ke/rss/politics' },
-      { name: 'Kenyans.co.ke', url: 'https://www.kenyans.co.ke/feeds/news' },
     ],
   },
   {
     code: 'ZA', tier: 1, maxPerRun: 2,
     feeds: [
-      { name: 'Daily Maverick', url: 'https://www.dailymaverick.co.za/section/south-africa/feed/' },
-      { name: 'News24', url: 'https://feeds.24.com/articles/news24/SouthAfrica/rss' },
-      { name: 'Mail & Guardian', url: 'https://mg.co.za/politics/feed/' },
+      { name: 'Daily Maverick', url: 'https://www.dailymaverick.co.za/dmrss/' },
+      { name: 'IOL', url: 'https://iol.co.za/rss/iol/news/politics/' },
     ],
   },
   {
     code: 'IN', tier: 1, maxPerRun: 2,
     feeds: [
-      { name: 'The Hindu', url: 'https://www.thehindu.com/news/national/feeder/default.rss' },
-      { name: 'Indian Express', url: 'https://indianexpress.com/section/political-pulse/feed/' },
+      { name: 'Hindustan Times', url: 'https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml' },
       { name: 'NDTV', url: 'https://feeds.feedburner.com/ndtvnews-india-news' },
+      { name: 'Times of India', url: 'https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms' },
     ],
   },
   {
     code: 'CA', tier: 1, maxPerRun: 2,
     feeds: [
-      { name: 'CBC News', url: 'https://www.cbc.ca/cmlink/rss-politics' },
       { name: 'Global News', url: 'https://globalnews.ca/politics/feed/' },
+      { name: 'CBC News', url: 'https://www.cbc.ca/webfeed/rss/rss-politics' },
     ],
   },
   {
     code: 'AU', tier: 1, maxPerRun: 2,
     feeds: [
-      { name: 'ABC News', url: 'https://www.abc.net.au/news/feed/51120/rss.xml' },
       { name: 'The Guardian Australia', url: 'https://www.theguardian.com/australia-news/australian-politics/rss' },
+      { name: 'ABC News', url: 'https://www.abc.net.au/news/feed/51120/rss.xml' },
     ],
   },
   {
     code: 'WORLD', tier: 1, maxPerRun: 3,
     feeds: [
       { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+      { name: 'The Guardian', url: 'https://www.theguardian.com/world/rss' },
       { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
       { name: 'DW', url: 'https://rss.dw.com/rdf/rss-en-world' },
       { name: 'France 24', url: 'https://www.france24.com/en/rss' },
-      { name: 'The Guardian', url: 'https://www.theguardian.com/world/rss' },
     ],
   },
 
@@ -115,14 +112,14 @@ export const COVERAGE: CoverageDesk[] = [
     code: 'UG', tier: 2, maxPerRun: 2,
     feeds: [
       { name: 'Nile Post', url: 'https://nilepost.co.ug/feed' },
-      { name: 'ChimpReports', url: 'https://chimpreports.com/feed/' },
+      { name: 'The Independent', url: 'https://www.independent.co.ug/feed/' },
     ],
   },
   {
     code: 'ZW', tier: 2, maxPerRun: 2,
     feeds: [
       { name: 'NewZimbabwe', url: 'https://www.newzimbabwe.com/feed/' },
-      { name: 'NewsDay', url: 'https://www.newsday.co.zw/feed' },
+      { name: 'Nehanda Radio', url: 'https://nehandaradio.com/feed/' },
     ],
   },
   {
@@ -134,22 +131,21 @@ export const COVERAGE: CoverageDesk[] = [
   },
   {
     code: 'NZ', tier: 2, maxPerRun: 2,
-    feeds: [
-      { name: 'RNZ', url: 'https://www.rnz.co.nz/rss/political.xml' },
-    ],
+    feeds: [{ name: 'RNZ', url: 'https://www.rnz.co.nz/rss/political.xml' }],
   },
   {
     code: 'PK', tier: 2, maxPerRun: 2,
     feeds: [
       { name: 'Dawn', url: 'https://www.dawn.com/feeds/home' },
       { name: 'The Express Tribune', url: 'https://tribune.com.pk/feed/pakistan' },
+      { name: 'Geo News', url: 'https://www.geo.tv/rss/1/1' },
     ],
   },
   {
     code: 'PH', tier: 2, maxPerRun: 2,
     feeds: [
-      { name: 'Rappler', url: 'https://www.rappler.com/nation/feed/' },
-      { name: 'Inquirer', url: 'https://newsinfo.inquirer.net/category/nation/feed' },
+      { name: 'Philstar', url: 'https://www.philstar.com/rss/nation' },
+      { name: 'GMA News', url: 'https://data.gmanetwork.com/gno/rss/news/nation/feed.xml' },
     ],
   },
 ];

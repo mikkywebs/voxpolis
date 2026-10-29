@@ -181,7 +181,7 @@ export async function extractSourceArticle(url: string, fallbackTitle = ''): Pro
 
     const text = paragraphs.join('\n\n').slice(0, 14_000);
     const wordCount = text.split(/\s+/).filter(Boolean).length;
-    if (wordCount < 150) return empty(`Too little readable text (${wordCount} words)`, finalUrl);
+    if (wordCount < 180) return empty(`Too little readable text (${wordCount} words)`, finalUrl);
 
     const image = meta(html, 'og:image', 'og:image:url', 'twitter:image') || ld.image;
     return {

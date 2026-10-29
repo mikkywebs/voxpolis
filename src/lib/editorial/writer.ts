@@ -50,7 +50,7 @@ LENGTHS
 - meta_description: 140-158 characters, a complete sentence that makes someone want to click.
 - dek: one sentence, 18-32 words, adds information beyond the headline.
 - key_points: 3-5 items, each one full sentence under 25 words.
-- body: 4-7 paragraphs, 350-600 words total. Paragraph 1 answers who, what, when, where.
+- body: 4-7 paragraphs, 300-600 words total. Paragraph 1 answers who, what, when, where. If the source is short, write a shorter body (minimum 200 words) — never pad with invented detail.
 - analysis: 2-3 paragraphs, 150-280 words total, titled in the UI "What it means".
 - background: one paragraph, 50-110 words, the context a newcomer needs.
 - what_next: one paragraph, 30-80 words, concrete next steps or dates only if reported or certain.
@@ -121,7 +121,7 @@ export function checkPiece(piece: EditorialPiece, sourceTitle: string, sourceTex
   if (piece.body.length < 3) problems.push('body has fewer than 3 paragraphs');
 
   const bodyWords = piece.body.join(' ').split(/\s+/).filter(Boolean).length;
-  if (bodyWords < 280) problems.push(`body only ${bodyWords} words`);
+  if (bodyWords < 200) problems.push(`body only ${bodyWords} words`);
   if (piece.analysis.join(' ').split(/\s+/).filter(Boolean).length < 80) problems.push('analysis too thin');
 
   const everything = [piece.headline, piece.dek, ...piece.key_points, ...piece.body, ...piece.analysis, piece.background, piece.what_next].join('\n');

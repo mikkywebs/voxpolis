@@ -15,6 +15,9 @@ import { writeVoxpolisArticle, checkPiece, EditorialPiece } from './writer';
 const MAX_AGE_HOURS = Number(process.env.INGEST_MAX_AGE_HOURS || 36);
 const MIN_IMPORTANCE = Number(process.env.INGEST_MIN_IMPORTANCE || 4);
 const RETRY_AFTER_HOURS = 72;
+// Time budget inside one 60s serverless call: feeds ≤8s, reading articles ≤12s, AI writing ≤34s.
+const EXTRACT_BUDGET_MS = 12_000;
+const AI_BUDGET_MS = 34_000;
 
 export interface IngestOutcome {
   url: string;
@@ -169,11 +172,10 @@ async function saveArticle(piece: EditorialPiece, item: FeedItem, src: { finalUr
   return data.slug as string;
 }
 
-async function processItem(desk: CoverageDesk, item: FeedItem): Promise<IngestOutcome> {
-  const base = { url: item.url, source: item.sourceName };
-  const src = await extractSourceArticle(item.url, item.title);
-  if (!src.ok) return { ...base, outcome: 'rejected', reason: `source: ${src.reason}` };
+type Extracted = Awaited<ReturnType<typeof extractSourceArticle>>;
 
+async function writeAndSave(desk: CoverageDesk, item: FeedItem, src: Extracted): Promise<IngestOutcome> {
+  const base = { url: item.url, source: item.sourceName };
   let piece: EditorialPiece;
   try {
     piece = await writeVoxpolisArticle({
@@ -213,21 +215,38 @@ export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadline
   const ranked = rankCandidates(fresh.filter((i) => !handled.has(i.url)));
 
   const outcomes: IngestOutcome[] = [];
+  const record = async (o: IngestOutcome, t0: number) => {
+    outcomes.push(o);
+    await log(desk.code, o, Date.now() - t0);
+  };
+
+  // Step 1: read the top candidates in parallel (cheap) and keep the readable ones, in rank order.
+  const pool = ranked.slice(0, Math.max(6, max * 4));
+  const t0 = Date.now();
+  const timeUp: Extracted = { ok: false, reason: 'timed out', finalUrl: '', title: '', text: '', wordCount: 0 };
+  const extracted = await Promise.all(
+    pool.map((item) =>
+      Promise.race([
+        extractSourceArticle(item.url, item.title),
+        new Promise<Extracted>((resolve) => setTimeout(() => resolve(timeUp), EXTRACT_BUDGET_MS)),
+      ])
+    )
+  );
+  const readable: { item: FeedItem; src: Extracted }[] = [];
+  for (let i = 0; i < pool.length; i++) {
+    if (extracted[i].ok) readable.push({ item: pool[i], src: extracted[i] });
+    else await record({ url: pool[i].url, source: pool[i].sourceName, outcome: 'rejected', reason: `source: ${extracted[i].reason}` }, t0);
+  }
+
+  // Step 2: write the best readable stories with AI, in parallel rounds, until we hit the target or run out of time.
   let published = 0;
-  // Try up to 2x the target in parallel batches, so a few rejections don't leave the desk empty.
-  const pool = ranked.slice(0, max * 2);
-  for (let i = 0; i < pool.length && published < max; i += max) {
-    if (Date.now() > deadline - 30_000) break; // not enough time for another AI round
-    const batch = pool.slice(i, i + (max - published));
-    const results = await Promise.all(
-      batch.map(async (item) => {
-        const t0 = Date.now();
-        const o = await processItem(desk, item);
-        await log(desk.code, o, Date.now() - t0);
-        return o;
-      })
-    );
-    outcomes.push(...results);
+  let next = 0;
+  while (published < max && next < readable.length && Date.now() < deadline - AI_BUDGET_MS) {
+    const batch = readable.slice(next, next + (max - published));
+    next += batch.length;
+    const t1 = Date.now();
+    const results = await Promise.all(batch.map(({ item, src }) => writeAndSave(desk, item, src)));
+    for (const r of results) await record(r, t1);
     published += results.filter((r) => r.outcome === 'published').length;
   }
 

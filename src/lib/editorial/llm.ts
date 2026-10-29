@@ -14,7 +14,7 @@ export interface LLMResult {
   provider: string;
 }
 
-const TIMEOUT_MS = 42_000;
+const TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS || 32_000);
 
 async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController();
