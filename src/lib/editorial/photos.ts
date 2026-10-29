@@ -122,7 +122,7 @@ function evaluate(page: any, subject: string, person: boolean): Verdict {
 
   const artist = strip(meta.Artist?.value).slice(0, 80) || 'Unknown author';
   const url: string = (info.thumburl || info.url || '').split('?')[0];
-  if (!/^https:\/\/upload\.wikimedia\.org\//.test(url)) return no(`unexpected host: ${String(info.thumburl || info.url).slice(0, 60)}`);
+  if (!/^https:\/\/(upload|thumb)\.wikimedia\.org\//.test(url)) return no(`unexpected host: ${String(info.thumburl || info.url).slice(0, 60)}`);
 
   return {
     score,
