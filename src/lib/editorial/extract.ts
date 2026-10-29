@@ -19,8 +19,21 @@ export interface ExtractedSource {
   publishedAt?: string;
 }
 
-const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+const BROWSER_HEADERS: Record<string, string> = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-GB,en;q=0.9',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+};
+const BOT_HEADERS: Record<string, string> = {
+  'User-Agent': 'Mozilla/5.0 (compatible; VoxpolisBot/2.0; +https://www.voxpolis.app/how-we-report)',
+  Accept: 'text/html,application/xhtml+xml',
+  'Accept-Language': 'en',
+};
 
 function decodeEntities(s: string): string {
   return s
@@ -95,7 +108,7 @@ function fromJsonLd(html: string): { body?: string; free?: boolean; image?: stri
   return out;
 }
 
-async function fetchFollowingSafeRedirects(url: string): Promise<{ res?: Response; finalUrl: string; reason?: string }> {
+async function fetchFollowingSafeRedirects(url: string, headers: Record<string, string>): Promise<{ res?: Response; finalUrl: string; reason?: string }> {
   let current = url;
   for (let hop = 0; hop < 5; hop++) {
     const check = await validateSafePublicUrl(current);
@@ -108,7 +121,7 @@ async function fetchFollowingSafeRedirects(url: string): Promise<{ res?: Respons
       res = await fetch(check.parsed.toString(), {
         redirect: 'manual',
         signal: controller.signal,
-        headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml', 'Accept-Language': 'en' },
+        headers,
         cache: 'no-store',
       });
     } finally {
@@ -137,7 +150,10 @@ export async function extractSourceArticle(url: string, fallbackTitle = ''): Pro
   });
 
   try {
-    const { res, finalUrl, reason } = await fetchFollowingSafeRedirects(url);
+    let { res, finalUrl, reason } = await fetchFollowingSafeRedirects(url, BROWSER_HEADERS);
+    if (res && (res.status === 403 || res.status === 401 || res.status === 429)) {
+      ({ res, finalUrl, reason } = await fetchFollowingSafeRedirects(url, BOT_HEADERS));
+    }
     if (!res) return empty(reason || 'Fetch failed', finalUrl);
     if (!res.ok) return empty(`HTTP ${res.status}`, finalUrl);
 
