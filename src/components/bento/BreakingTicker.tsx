@@ -35,7 +35,7 @@ export default function BreakingTicker({ articles, countryCode }: BreakingTicker
 
   const activeItem = tickerItems[currentIndex] || tickerItems[0];
   const cleanTitle = decodeAllHtmlEntities((activeItem.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
-  const articleUrl = `/news/${activeItem.slug}${countryCode ? `?country=${countryCode}` : ''}`;
+  const articleUrl = `/news/${activeItem.slug}`;
   const timeFormatted = formatExactTimestamp(activeItem.created_at);
 
   return (

@@ -15,7 +15,11 @@ alter table public.articles
   add column if not exists source_published_at timestamptz,
   add column if not exists word_count integer,
   add column if not exists editorial_version smallint default 1,
-  add column if not exists status text default 'published';
+  add column if not exists status text default 'published',
+  -- Licensed photo credit (Wikimedia Commons). Publisher photos are never used.
+  add column if not exists image_credit text,
+  add column if not exists image_license text,
+  add column if not exists image_page_url text;
 
 create index if not exists articles_country_created_idx
   on public.articles (country_code, created_at desc);

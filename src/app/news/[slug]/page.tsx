@@ -9,7 +9,7 @@ import { getCountryByCode, getCountrySlug } from '@/config/countries';
 import { getArticleBySlug, getRelated } from '@/lib/articles';
 import { get301Redirect } from '@/lib/pipeline/redirects';
 import { ArticleData } from '@/lib/news';
-import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl, truncate } from '@/lib/site';
+import { SITE_NAME, SITE_URL, absoluteUrl, truncate } from '@/lib/site';
 
 export const revalidate = 600;
 
@@ -37,6 +37,11 @@ function description(a: ArticleData): string {
   return truncate(a.meta_description || a.dek || a.snippet || paragraphs(a.content)[0] || '', 158);
 }
 
+/** Licensed photo if we have one, otherwise our generated Voxpolis story card. */
+function shareImage(a: ArticleData): string {
+  return a.original_image_url && !a.original_image_url.startsWith('data:') ? a.original_image_url : `/card/${encodeURIComponent(a.slug)}`;
+}
+
 function formatDate(iso?: string) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -54,7 +59,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const a = await getArticleBySlug(params.slug);
   if (!a) return { title: 'Story not found', robots: { index: false } };
   const country = getCountryByCode(a.country_code);
-  const image = a.original_image_url || DEFAULT_OG_IMAGE;
+  const image = shareImage(a);
   const title = a.seo_title || a.title;
   return {
     title,
@@ -72,7 +77,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       modifiedTime: a.updated_at || a.created_at,
       section: `${country.name} politics`,
       tags: a.tags,
-      images: [{ url: absoluteUrl(image), alt: a.title }],
+      images: [{ url: absoluteUrl(image), alt: a.title, width: 1200, height: 630 }],
     },
     twitter: { card: 'summary_large_image', title: a.title, description: description(a), images: [absoluteUrl(image)] },
   };
@@ -91,7 +96,7 @@ export default async function ArticlePage({ params }: Props) {
   const words = [a.content, a.analysis, a.background, a.what_next].join(' ').split(/\s+/).filter(Boolean).length;
   const minutes = Math.max(1, Math.round(words / 220));
   const url = absoluteUrl(`/news/${a.slug}`);
-  const image = absoluteUrl(a.original_image_url || DEFAULT_OG_IMAGE);
+  const image = absoluteUrl(shareImage(a));
 
   const ld = {
     '@context': 'https://schema.org',
@@ -167,9 +172,16 @@ export default async function ArticlePage({ params }: Props) {
             {a.original_image_url && (
               <figure className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.original_image_url} alt={a.title} className="w-full max-h-[460px] object-cover" loading="eager" />
+                <img src={a.original_image_url} alt={a.title} className="w-full max-h-[460px] object-cover object-top" loading="eager" />
                 <figcaption className="px-3 py-2 text-[11px] text-gray-500 bg-gray-100 dark:bg-gray-900">
-                  Photo: {a.source_name}
+                  {a.image_credit ? <span className="font-semibold">File photo. </span> : <span>Photo: Voxpolis</span>}
+                  {a.image_page_url ? (
+                    <a href={a.image_page_url} target="_blank" rel="noopener license" className="hover:underline">
+                      {a.image_credit}
+                    </a>
+                  ) : (
+                    a.image_credit
+                  )}
                 </figcaption>
               </figure>
             )}
@@ -251,7 +263,7 @@ export default async function ArticlePage({ params }: Props) {
 
           <AdSlot slotLocation="below_sources" />
 
-          <div className="mt-8">
+          <div className="mt-8" id="comments">
             <ArticleInteractions
               part="bottom"
               articleId={a.id}

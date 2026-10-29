@@ -23,6 +23,7 @@ export interface EditorialPiece {
   question: string | null;
   tags: string[];
   actors: string[];
+  image_subjects: string[];
   slug_keywords: string;
   completeness: 'complete' | 'incomplete';
   incomplete_reason?: string | null;
@@ -55,10 +56,11 @@ LENGTHS
 - background: one paragraph, 50-110 words, the context a newcomer needs.
 - what_next: one paragraph, 30-80 words, concrete next steps or dates only if reported or certain.
 - tags: 3-6 short topical tags (people, institutions, issues). actors: key people/institutions named.
+- image_subjects: 2-3 search terms to find a real photo on Wikimedia Commons. Most important person's FULL name first (e.g. "Bola Tinubu"), then the main institution or building with its country (e.g. "National Assembly of Nigeria"). Only real, photographable people, buildings or places. Never abstract ideas.
 - importance: 1-10. 9-10 national turning point or global headline; 6-8 significant national story; 4-5 notable; 1-3 minor/local/routine.
 
 Return ONLY this JSON:
-{"is_political":true,"country_iso":"NG","importance":7,"headline":"","seo_title":"","meta_description":"","dek":"","key_points":[""],"body":[""],"analysis":[""],"background":"","what_next":"","question":null,"tags":[""],"actors":[""],"slug_keywords":"three to six words","completeness":"complete","incomplete_reason":null}`;
+{"is_political":true,"country_iso":"NG","importance":7,"headline":"","seo_title":"","meta_description":"","dek":"","key_points":[""],"body":[""],"analysis":[""],"background":"","what_next":"","question":null,"tags":[""],"actors":[""],"image_subjects":[""],"slug_keywords":"three to six words","completeness":"complete","incomplete_reason":null}`;
 
 export async function writeVoxpolisArticle(input: {
   sourceTitle: string;
@@ -103,6 +105,7 @@ ${input.sourceText}`;
     question: str(raw.question) || null,
     tags: arr(raw.tags).slice(0, 6),
     actors: arr(raw.actors).slice(0, 10),
+    image_subjects: arr(raw.image_subjects).slice(0, 3),
     slug_keywords: str(raw.slug_keywords),
     completeness: raw.completeness === 'incomplete' ? 'incomplete' : 'complete',
     incomplete_reason: raw.incomplete_reason || null,

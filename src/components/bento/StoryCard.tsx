@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import PhotoCredit from '@/components/article/PhotoCredit';
 import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
 import UniversalEngagementBar from './UniversalEngagementBar';
@@ -64,7 +65,7 @@ export default function StoryCard({
   const fallbackUrl = getArticleFallbackUrl(article, index);
   const formattedTime = formatExactTimestamp(article.created_at);
   const displayTitle = decodeAllHtmlEntities((article.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
-  const articleUrl = `/news/${article.slug}${countryCode || article.country_code ? `?country=${countryCode || article.country_code}` : ''}`;
+  const articleUrl = `/news/${article.slug}`;
 
   // 1. ADJACENT CARD (Placed next to Hero Slider in Row 1)
   if (variant === 'adjacent') {
@@ -87,6 +88,7 @@ export default function StoryCard({
               }}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
+            <PhotoCredit article={article} />
             <div className="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider">
               {article.source_name || 'VoxPolis'}
             </div>
@@ -151,6 +153,7 @@ export default function StoryCard({
             }}
             className="w-full h-full object-cover group-hover:scale-104 transition duration-300"
           />
+          <PhotoCredit article={article} />
         </Link>
 
         {/* Source & Timestamp */}

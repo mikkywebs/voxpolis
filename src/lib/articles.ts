@@ -2,7 +2,7 @@ import { cache } from 'react';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { ArticleData } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
-import { cleanTitle } from '@/lib/site';
+import { cleanTitle, isUsablePhoto } from '@/lib/site';
 
 /**
  * Server-side article access. Every page reads from here so the
@@ -23,8 +23,12 @@ function rowToArticle(r: any): ArticleData {
     country_code: r.country_code,
     language: r.language || 'en',
     category: r.category || 'politics',
-    image_mode: r.original_image_url ? 'original' : 'breaking_logo',
-    original_image_url: r.original_image_url || undefined,
+    // A photo is only shown when its licence credit is stored with it.
+    image_mode: isUsablePhoto(r.original_image_url, r.image_credit) ? 'original' : 'breaking_logo',
+    original_image_url: isUsablePhoto(r.original_image_url, r.image_credit) ? r.original_image_url : undefined,
+    image_credit: r.image_credit || undefined,
+    image_license: r.image_license || undefined,
+    image_page_url: r.image_page_url || undefined,
     source_name: r.source_name,
     source_url: r.source_url,
     is_breaking: !!r.is_breaking,

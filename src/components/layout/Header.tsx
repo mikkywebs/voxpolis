@@ -78,9 +78,8 @@ export default function Header({
         const { data } = await supabase.auth.getSession();
         const sessionUser = data?.session?.user;
 
+        // Only a real Supabase session counts as signed in. A saved name is just a display cache.
         const localName = localStorage.getItem('voxpolis_user_name');
-        const localEmail = localStorage.getItem('voxpolis_user_email');
-        const localActive = localStorage.getItem('voxpolis_session_active') === 'true';
 
         if (sessionUser) {
           const name = sessionUser.user_metadata?.full_name || localName || sessionUser.email?.split('@')[0] || 'Citizen';
@@ -91,13 +90,8 @@ export default function Header({
             primaryCountry: sessionUser.user_metadata?.primary_country || 'NG',
             isAdmin: sessionUser.email?.toLowerCase() === 'michael.eboh@gmail.com',
           });
-        } else if (localActive || localName) {
-          setCurrentUser({
-            id: 'local-member',
-            fullName: localName || 'Citizen',
-            email: localEmail || undefined,
-            primaryCountry: localStorage.getItem('voxpolis_primary_country') || 'NG',
-          });
+        } else {
+          setCurrentUser(null);
         }
 
         const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -111,20 +105,13 @@ export default function Header({
               primaryCountry: u.user_metadata?.primary_country || 'NG',
               isAdmin: u.email?.toLowerCase() === 'michael.eboh@gmail.com',
             });
-          } else if (!localStorage.getItem('voxpolis_session_active')) {
+          } else {
             setCurrentUser(null);
           }
         });
         authListener = sub?.subscription;
       } catch (e) {
-        const localName = localStorage.getItem('voxpolis_user_name');
-        if (localName) {
-          setCurrentUser({
-            id: 'local-member',
-            fullName: localName,
-            primaryCountry: 'NG',
-          });
-        }
+        setCurrentUser(null);
       }
     }
     resolveAuth();

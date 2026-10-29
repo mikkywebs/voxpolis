@@ -87,7 +87,7 @@ export default function AIAnalysisSection({ analysisText, readAlsoArticle }: AIA
               </h4>
             </div>
             <Link
-              href={`/news/${readAlsoArticle.slug}${readAlsoArticle.country_code ? `?country=${readAlsoArticle.country_code}` : ''}`}
+              href={`/news/${readAlsoArticle.slug}`}
               className="shrink-0 inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl shadow transition"
             >
               <span>Read Story</span>

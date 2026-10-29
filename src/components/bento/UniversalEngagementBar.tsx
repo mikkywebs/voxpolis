@@ -115,7 +115,7 @@ export default function UniversalEngagementBar({
     }).catch(() => {});
   };
 
-  const articleCommentsUrl = `/news/${articleSlug}${countryCode ? `?country=${countryCode}` : ''}#comments`;
+  const articleCommentsUrl = `/news/${articleSlug}#comments`;
 
   const isHero = variant === 'hero';
 

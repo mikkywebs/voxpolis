@@ -5,6 +5,7 @@ import { generateUniqueSlug } from '@/lib/pipeline/slug';
 import { readFeeds, looksPolitical, titleTokens, similarity, FeedItem } from './feeds';
 import { extractSourceArticle } from './extract';
 import { writeVoxpolisArticle, checkPiece, EditorialPiece } from './writer';
+import { findLicensedPhoto, LicensedPhoto } from './photos';
 
 /**
  * One ingest run for one desk:
@@ -18,6 +19,7 @@ const RETRY_AFTER_HOURS = 72;
 // Time budget inside one 60s serverless call: feeds ≤8s, reading articles ≤12s, AI writing ≤34s.
 const EXTRACT_BUDGET_MS = 12_000;
 const AI_BUDGET_MS = 34_000;
+const PHOTO_BUDGET_MS = 4_000;
 
 export interface IngestOutcome {
   url: string;
@@ -113,9 +115,9 @@ async function isDuplicateOfRecent(country: string, headline: string, sourceTitl
   return null;
 }
 
-async function saveArticle(piece: EditorialPiece, item: FeedItem, src: { finalUrl: string; imageUrl?: string; author?: string; publishedAt?: string }) {
+async function saveArticle(piece: EditorialPiece, item: FeedItem, src: { finalUrl: string; publishedAt?: string }, photo: LicensedPhoto | null) {
   const country = getCountryByCode(piece.country_iso);
-  const slug = generateUniqueSlug(piece.slug_keywords || piece.headline, item.url, src.publishedAt || item.publishedAt);
+  const slug =generateUniqueSlug(piece.slug_keywords || piece.headline, item.url, src.publishedAt || item.publishedAt);
   const content = piece.body.join('\n\n');
   const wordCount = [content, ...piece.analysis, piece.background, piece.what_next].join(' ').split(/\s+/).filter(Boolean).length;
   const tags = Array.from(new Set([...piece.tags, country.name, 'Politics']));
@@ -129,8 +131,9 @@ async function saveArticle(piece: EditorialPiece, item: FeedItem, src: { finalUr
     country_code: country.code,
     language: 'en',
     category: 'politics',
-    image_mode: src.imageUrl ? 'original' : 'breaking_logo',
-    original_image_url: src.imageUrl || null,
+    // Only licensed (Wikimedia Commons) photos. Publisher photos are never stored.
+    image_mode: photo ? 'original' : 'breaking_logo',
+    original_image_url: photo?.url || null,
     source_name: item.sourceName,
     source_url: item.url,
     is_breaking: piece.importance >= 9,
@@ -154,12 +157,19 @@ async function saveArticle(piece: EditorialPiece, item: FeedItem, src: { finalUr
     word_count: wordCount,
     editorial_version: 2,
     status: 'published',
+    image_credit: photo?.credit || null,
+    image_license: photo?.license || null,
+    image_page_url: photo?.pageUrl || null,
   };
 
   let { data, error } = await supabaseAdmin.from('articles').insert(extended).select('id, slug').single();
   if (error && /column/i.test(error.message)) {
-    // Migration not applied yet: save the core article anyway.
-    ({ data, error } = await supabaseAdmin.from('articles').insert(legacy).select('id, slug').single());
+    // Migration not applied: save the core article without a photo (a photo needs its credit columns).
+    ({ data, error } = await supabaseAdmin
+      .from('articles')
+      .insert({ ...legacy, image_mode: 'breaking_logo', original_image_url: null })
+      .select('id, slug')
+      .single());
   }
   if (error || !data) throw new Error(error?.message || 'insert failed');
 
@@ -195,8 +205,10 @@ async function writeAndSave(desk: CoverageDesk, item: FeedItem, src: Extracted):
   const dup = await isDuplicateOfRecent(piece.country_iso, piece.headline, item.title);
   if (dup) return { ...base, outcome: 'skipped', reason: `same story as /news/${dup}`, country: piece.country_iso };
 
+  const photo = await findLicensedPhoto([...piece.image_subjects, ...piece.actors.slice(0, 2)], PHOTO_BUDGET_MS);
+
   try {
-    const slug = await saveArticle(piece, item, src);
+    const slug = await saveArticle(piece, item, src, photo);
     return { ...base, outcome: 'published', slug, country: piece.country_iso, reason: piece.provider };
   } catch (e: any) {
     return { ...base, outcome: 'error', reason: `save: ${e?.message || e}`, country: piece.country_iso };

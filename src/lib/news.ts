@@ -1,6 +1,7 @@
 import { getCountryByCode } from '@/config/countries';
 import { fetchRssArticlesForCountry, isCurrentMonthArticle } from './rss';
 import { decodeAllHtmlEntities } from './news-rewriter';
+import { isUsablePhoto } from './site';
 
 export interface ArticleData {
   id: string;
@@ -42,6 +43,9 @@ export interface ArticleData {
   importance?: number;
   updated_at?: string;
   source_published_at?: string;
+  image_credit?: string;
+  image_license?: string;
+  image_page_url?: string;
   poll?: {
     id: string;
     question: string;
@@ -1430,13 +1434,14 @@ export function getArticleFallbackUrl(article: Partial<ArticleData>, seed?: numb
   return getStandardFallbackImage(seed !== undefined ? seed : (article.slug || article.id || article.title || ''));
 }
 
+/**
+ * Image for a story: its licensed photo if it has one (always with a credit),
+ * otherwise the generated Voxpolis story card. Publisher photos are never shown.
+ */
 export function getArticleImageUrl(article: Partial<ArticleData>, seed?: number | string): string {
-  if (
-    article.original_image_url &&
-    article.original_image_url.trim() !== '' &&
-    !article.original_image_url.includes('google.com/news')
-  ) {
-    return article.original_image_url.trim();
+  if (isUsablePhoto(article.original_image_url, article.image_credit)) {
+    return article.original_image_url!.trim();
   }
+  if (article.slug) return `/card/${encodeURIComponent(article.slug)}`;
   return getArticleFallbackUrl(article, seed);
 }
