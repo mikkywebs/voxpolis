@@ -7,6 +7,8 @@ const CASES: string[][] = [
   ['Keir Starmer'],
   ['William Ruto'],
   ['John Mahama'],
+  ['Kemi Badenoch'],
+  ['Donald Trump'],
   ['Cyril Ramaphosa'],
   ['Narendra Modi'],
   ['Anthony Albanese'],
@@ -19,7 +21,9 @@ async function main() {
   const lines: string[] = [];
   for (const subjects of CASES) {
     const t = Date.now();
-    const p = await findLicensedPhoto(subjects, 8000);
+    const debug: string[] = [];
+    const p = await findLicensedPhoto(subjects, 12000, debug);
+    if (!p && !subjects[0].startsWith('Zzxq')) console.log(`::notice title=Why ${subjects[0]}::${debug.slice(0, 14).join('%0A')}`);
     lines.push(`${subjects[0]} → ${p ? `${p.license} | ${p.width}x${p.height} | ${p.credit.slice(0, 70)} | ${p.url.split('/').pop()?.slice(0, 60)}` : 'none (story card used)'} [${Date.now() - t}ms]`);
   }
   lines.forEach((l) => console.log(l));

@@ -23,9 +23,13 @@ export interface LicensedPhoto {
 const API = 'https://commons.wikimedia.org/w/api.php';
 const UA = 'VoxpolisBot/2.0 (https://www.voxpolis.app/how-we-report; contact@voxpolis.app)';
 
-const ALLOWED_LICENSE = /^(public domain|pd\b|pd-|cc0|cc by(-sa)? \d(\.\d)?|cc by(-sa)?$|cc-by(-sa)?-\d)/i;
+// Licences that allow commercial reuse with attribution (or none needed).
+const ALLOWED_LICENSE = /^(public domain|pd\b|pd-|cc0|cc[ -]by(-sa)?([ -]\d(\.\d)?)?( igo)?\b|attribution|ogl|open government licence|godl)/i;
 const BLOCKED_LICENSE = /\b(nc|nd|non-?commercial|no ?deriv|fair use|copyrighted)\b/i;
-const BAD_FILE = /(logo|map|flag|coat of arms|emblem|seal of|signature|chart|graph|diagram|locator|banner|icon|symbol|document|screenshot|poster|cover|ballot paper|\.svg|\.pdf|\.tif)/i;
+const BAD_FILE = /(logo|\bmap\b|flag|coat of arms|emblem|seal of|signature|chart|graph|diagram|locator|banner|icon|symbol|document|screenshot|poster|cover|ballot paper|stamp|coin|banknote|cartoon|caricature|\.svg|\.pdf|\.tif)/i;
+// Titles that suggest the person is not the main subject (meetings, other leaders' photos).
+const NOT_MAIN_SUBJECT = /\b(receives?|received|meets?|meeting|met with|with|and|visit(s|ing)?|talks|summit|delegation|bilateral|greets?|welcom(es|ing)|shakes?|vs\.?|versus|family|wife|husband|funeral)\b/i;
+const PORTRAIT_HINT = /\b(portrait|official|headshot|cropped|profile)\b/i;
 
 function strip(html?: string): string {
   return (html || '')
@@ -75,61 +79,87 @@ async function search(query: string, signal: AbortSignal): Promise<any[]> {
   return pages.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 }
 
-function evaluate(page: any, subject: string, person: boolean): LicensedPhoto | null {
+type Verdict = { photo: LicensedPhoto | null; score: number; reason: string; title: string };
+
+function evaluate(page: any, subject: string, person: boolean): Verdict {
+  const title: string = page?.title || '';
+  const no = (reason: string): Verdict => ({ photo: null, score: -99, reason, title });
   const info = page?.imageinfo?.[0];
-  if (!info) return null;
+  if (!info) return no('no imageinfo');
   const meta = info.extmetadata || {};
-  const title: string = page.title || '';
   const license = strip(meta.LicenseShortName?.value);
-  const restrictions = strip(meta.Restrictions?.value);
 
-  if (!/^image\/(jpeg|png|webp)$/.test(info.mime || '')) return null;
-  if (BAD_FILE.test(title)) return null;
-  if (!license || !ALLOWED_LICENSE.test(license) || BLOCKED_LICENSE.test(license)) return null;
-  if (restrictions && /personality|trademark|insignia/i.test(restrictions) && !person) return null;
-  if ((info.width || 0) < 800 || (info.height || 0) < 450) return null;
+  if (!/^image\/(jpeg|png|webp)$/.test(info.mime || '')) return no(`mime ${info.mime}`);
+  if (BAD_FILE.test(title)) return no('not a photo (logo/map/flag…)');
+  if (!license || !ALLOWED_LICENSE.test(license) || BLOCKED_LICENSE.test(license)) return no(`licence "${license}"`);
+  if ((info.width || 0) < 600 || (info.height || 0) < 400) return no(`too small ${info.width}x${info.height}`);
   const ratio = info.width / info.height;
-  if (ratio < 0.65 || ratio > 2.4) return null;
+  if (ratio < 0.55 || ratio > 2.6) return no(`odd shape ${ratio.toFixed(2)}`);
 
+  const cleanTitle = normalise(title.replace(/^File:/, '').replace(/\.[a-z]+$/i, ''));
   const haystack = normalise(`${title} ${strip(meta.ImageDescription?.value)} ${strip(meta.ObjectName?.value)}`);
-  const subjectWords = normalise(subject).split(' ').filter((w) => w.length > 2);
+  const words = normalise(subject).split(' ').filter((w) => w.length > 2);
+  const full = normalise(subject);
+  let score = 0;
+
   if (person) {
-    const surname = subjectWords[subjectWords.length - 1];
-    if (!surname || !haystack.includes(surname)) return null;
-  } else if (subjectWords.length && subjectWords.filter((w) => haystack.includes(w)).length < Math.ceil(subjectWords.length / 2)) {
-    return null;
+    const surname = words[words.length - 1];
+    if (!surname || !haystack.includes(surname)) return no('name not in file');
+    if (cleanTitle.includes(full)) score += 5;
+    else if (cleanTitle.includes(surname)) score += 3;
+    else score += 1; // only in description
+    if (cleanTitle.startsWith(full) || cleanTitle.startsWith(surname)) score += 2;
+    if (PORTRAIT_HINT.test(title)) score += 3;
+    if (NOT_MAIN_SUBJECT.test(title.replace(/^File:/, ''))) score -= 6;
+  } else {
+    const hits = words.filter((w) => haystack.includes(w)).length;
+    if (words.length && hits < Math.ceil(words.length * 0.6)) return no('subject not in file');
+    score += hits + (cleanTitle.includes(full) ? 3 : 0);
+    if (ratio >= 1.2) score += 1;
   }
+  if (score < 3) return no(`weak match (score ${score})`);
 
   const artist = strip(meta.Artist?.value).slice(0, 80) || 'Unknown author';
-  const url: string = info.thumburl || info.url;
-  if (!/^https:\/\/upload\.wikimedia\.org\//.test(url)) return null;
+  const url: string = (info.thumburl || info.url || '').split('?')[0];
+  if (!/^https:\/\/upload\.wikimedia\.org\//.test(url)) return no('unexpected host');
 
   return {
-    url,
-    width: info.thumbwidth || info.width,
-    height: info.thumbheight || info.height,
-    license,
-    credit: `Photo: ${artist} / ${license} via Wikimedia Commons`,
-    pageUrl: info.descriptionurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(title)}`,
-    subject,
+    score,
+    reason: 'ok',
+    title,
+    photo: {
+      url,
+      width: info.thumbwidth || info.width,
+      height: info.thumbheight || info.height,
+      license,
+      credit: `Photo: ${artist} / ${license} via Wikimedia Commons`,
+      pageUrl: info.descriptionurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(title)}`,
+      subject,
+    },
   };
 }
 
+async function bestFor(subject: string, signal: AbortSignal, debug?: string[]): Promise<LicensedPhoto | null> {
+  const person = looksLikePerson(subject);
+  const queries = person ? [`intitle:"${subject}"`, `"${subject}"`] : [`intitle:"${subject}"`, subject];
+  for (const q of queries) {
+    const verdicts = (await search(q, signal)).map((p) => evaluate(p, subject, person));
+    verdicts.forEach((v) => debug?.push(`  [${q}] ${v.title.slice(0, 70)} → ${v.reason}${v.photo ? ` (score ${v.score})` : ''}`));
+    const best = verdicts.filter((v) => v.photo).sort((a, b) => b.score - a.score)[0];
+    if (best?.photo) return best.photo;
+  }
+  return null;
+}
+
 /** Try each subject in order (most specific first). Gives up quietly after `budgetMs`. */
-export async function findLicensedPhoto(subjects: string[], budgetMs = 4500): Promise<LicensedPhoto | null> {
+export async function findLicensedPhoto(subjects: string[], budgetMs = 4500, debug?: string[]): Promise<LicensedPhoto | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), budgetMs);
   try {
     const unique = Array.from(new Set(subjects.map((s) => s.trim()).filter((s) => s.length > 2))).slice(0, 4);
     for (const subject of unique) {
-      const person = looksLikePerson(subject);
-      const pages = await search(person ? `"${subject}"` : subject, controller.signal);
-      // Prefer landscape photos; they crop better in cards and social previews.
-      const candidates = pages
-        .map((p) => evaluate(p, subject, person))
-        .filter((p): p is LicensedPhoto => !!p)
-        .sort((a, b) => Number(b.width / b.height >= 1.2) - Number(a.width / a.height >= 1.2));
-      if (candidates[0]) return candidates[0];
+      const photo = await bestFor(subject, controller.signal, debug);
+      if (photo) return photo;
     }
     return null;
   } catch {
