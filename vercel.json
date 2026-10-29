@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/pipeline?action=poll_pilot",
+      "path": "/api/ingest?desk=NG",
       "schedule": "0 6 * * *"
     }
   ]

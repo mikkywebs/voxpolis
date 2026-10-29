@@ -248,3 +248,9 @@ export function getCountryBySlug(slug: string): CountryConfig {
   });
   return found || getCountryByCode('US');
 }
+
+/** Strict lookup: returns undefined for unknown slugs (so the page can 404 instead of showing the US). */
+export function findCountryBySlug(slug: string): CountryConfig | undefined {
+  const s = (slug || '').toLowerCase();
+  return ALL_COUNTRIES.find((c) => getCountrySlug(c) === s);
+}

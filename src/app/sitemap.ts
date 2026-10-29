@@ -1,102 +1,35 @@
-import { MetadataRoute } from 'next';
-import { SUPPORTED_COUNTRIES } from '@/config/countries';
-import { fetchArticlesForCountry } from '@/lib/news';
-import { getAllPublishedPipelineArticles } from '@/lib/pipeline';
+import type { MetadataRoute } from 'next';
+import { getCountryByCode, getCountrySlug } from '@/config/countries';
+import { getCountriesWithArticles, getSitemapEntries } from '@/lib/articles';
+import { SITE_URL } from '@/lib/site';
+
+export const revalidate = 900;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://voxpolis.app';
+  const [articles, countries] = await Promise.all([getSitemapEntries(), getCountriesWithArticles()]);
 
-  const staticRoutes: MetadataRoute.Sitemap = [
-    {
-      url: `${baseUrl}`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 1.0,
-    },
-    {
-      url: `${baseUrl}/about`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/contact`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/privacy`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
+  const staticPages: MetadataRoute.Sitemap = [
+    { url: SITE_URL, changeFrequency: 'hourly', priority: 1 },
+    ...['about', 'contact', 'corrections', 'privacy', 'terms'].map((p) => ({
+      url: `${SITE_URL}/${p}`,
+      changeFrequency: 'monthly' as const,
       priority: 0.3,
-    },
-    {
-      url: `${baseUrl}/terms`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.3,
-    },
-    {
-      url: `${baseUrl}/archive`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.8,
-    },
+    })),
   ];
 
-  const dynamicRoutes: MetadataRoute.Sitemap = [];
-  const addedSlugs = new Set<string>();
+  const countryPages: MetadataRoute.Sitemap = countries.map((c) => ({
+    url: `${SITE_URL}/${getCountrySlug(getCountryByCode(c.code))}`,
+    lastModified: new Date(c.latest),
+    changeFrequency: 'hourly',
+    priority: 0.9,
+  }));
 
-  // Add country archive routes and articles in parallel to prevent build timeouts
-  const countryResults = await Promise.all(
-    SUPPORTED_COUNTRIES.slice(0, 10).map(async (country) => {
-      const slug = country.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      try {
-        const articles = await fetchArticlesForCountry(country.code);
-        return { country, slug, articles };
-      } catch (e) {
-        console.warn(`Failed to fetch sitemap articles for ${country.code}:`, e);
-        return { country, slug, articles: [] };
-      }
-    })
-  );
+  const articlePages: MetadataRoute.Sitemap = articles.map((a) => ({
+    url: `${SITE_URL}/news/${a.slug}`,
+    lastModified: new Date(a.updated_at || a.created_at),
+    changeFrequency: 'weekly',
+    priority: 0.7,
+  }));
 
-  for (const { slug, articles } of countryResults) {
-    dynamicRoutes.push({
-      url: `${baseUrl}/${slug}/archive`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.8,
-    });
-
-    articles.forEach((art) => {
-      // Only include complete published articles
-      if (art.slug && !addedSlugs.has(art.slug) && !art.content.includes('[...]')) {
-        addedSlugs.add(art.slug);
-        dynamicRoutes.push({
-          url: `${baseUrl}/news/${art.slug}`,
-          lastModified: new Date(art.created_at || Date.now()),
-          changeFrequency: 'weekly',
-          priority: 0.8,
-        });
-      }
-    });
-  }
-
-  // Include complete published pipeline articles
-  const pipeArticles = getAllPublishedPipelineArticles();
-  for (const pArt of pipeArticles) {
-    if (pArt.slug && pArt.status === 'published' && !addedSlugs.has(pArt.slug)) {
-      addedSlugs.add(pArt.slug);
-      dynamicRoutes.push({
-        url: `${baseUrl}/news/${pArt.slug}`,
-        lastModified: new Date(pArt.created_at || Date.now()),
-        changeFrequency: 'weekly',
-        priority: 0.8,
-      });
-    }
-  }
-
-  return [...staticRoutes, ...dynamicRoutes];
+  return [...staticPages, ...countryPages, ...articlePages];
 }
