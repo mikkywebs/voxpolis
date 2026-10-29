@@ -112,16 +112,17 @@ function evaluate(page: any, subject: string, person: boolean): Verdict {
     if (PORTRAIT_HINT.test(title)) score += 3;
     if (NOT_MAIN_SUBJECT.test(title.replace(/^File:/, ''))) score -= 6;
   } else {
-    const hits = words.filter((w) => haystack.includes(w)).length;
-    if (words.length && hits < Math.ceil(words.length * 0.6)) return no('subject not in file');
-    score += hits + (cleanTitle.includes(full) ? 3 : 0);
+    // Institutions and places must match the full name, so "Electoral Commission of Afghanistan"
+    // can never stand in for Nigeria's INEC.
+    if (!haystack.includes(full)) return no('full name not in file');
+    score += 3 + (cleanTitle.includes(full) ? 3 : 0);
     if (ratio >= 1.2) score += 1;
   }
   if (score < 3) return no(`weak match (score ${score})`);
 
   const artist = strip(meta.Artist?.value).slice(0, 80) || 'Unknown author';
   const url: string = (info.thumburl || info.url || '').split('?')[0];
-  if (!/^https:\/\/upload\.wikimedia\.org\//.test(url)) return no('unexpected host');
+  if (!/^https:\/\/upload\.wikimedia\.org\//.test(url)) return no(`unexpected host: ${String(info.thumburl || info.url).slice(0, 60)}`);
 
   return {
     score,
