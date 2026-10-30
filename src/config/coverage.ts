@@ -6,7 +6,8 @@
  * search demand, and ad value. Everything else is picked up by the
  * WORLD desk, where the AI assigns the country.
  *
- * Tier 1 → polled every hour.  Tier 2 → every 3 hours.
+ * Tier 1 → polled every hour.  Tier 2 → every 6 hours.
+ * Quality over volume: only importance 6+ stories, 1-2 per desk per run.
  * Feeds must be direct publisher feeds (not Google News redirect links),
  * otherwise the article page can't be read and rewritten.
  */
@@ -27,7 +28,7 @@ export const COVERAGE: CoverageDesk[] = [
   // Every outlet below was tested on 29 Oct 2026: feed readable AND article text extractable.
   // ---------- Tier 1 ----------
   {
-    code: 'NG', tier: 1, maxPerRun: 3,
+    code: 'NG', tier: 1, maxPerRun: 2,
     feeds: [
       { name: 'Punch', url: 'https://punchng.com/topics/politics/feed/' },
       { name: 'Vanguard', url: 'https://www.vanguardngr.com/category/politics/feed/' },
@@ -38,7 +39,7 @@ export const COVERAGE: CoverageDesk[] = [
   },
   {
     // Mix of outlets across the US political spectrum.
-    code: 'US', tier: 1, maxPerRun: 3,
+    code: 'US', tier: 1, maxPerRun: 2,
     feeds: [
       { name: 'CBS News', url: 'https://www.cbsnews.com/latest/rss/politics' },
       { name: 'NBC News', url: 'https://feeds.nbcnews.com/nbcnews/public/politics' },
@@ -47,35 +48,35 @@ export const COVERAGE: CoverageDesk[] = [
     ],
   },
   {
-    code: 'GB', tier: 1, maxPerRun: 3,
+    code: 'GB', tier: 1, maxPerRun: 2,
     feeds: [
       { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/politics/rss.xml' },
       { name: 'The Guardian', url: 'https://www.theguardian.com/politics/rss' },
     ],
   },
   {
-    code: 'GH', tier: 1, maxPerRun: 2,
+    code: 'GH', tier: 1, maxPerRun: 1,
     feeds: [
       { name: 'MyJoyOnline', url: 'https://www.myjoyonline.com/news/politics/feed/' },
       { name: 'Graphic Online', url: 'https://www.graphic.com.gh/news/politics.feed?type=rss' },
     ],
   },
   {
-    code: 'KE', tier: 1, maxPerRun: 2,
+    code: 'KE', tier: 1, maxPerRun: 1,
     feeds: [
       { name: 'The Standard', url: 'https://www.standardmedia.co.ke/rss/politics.php' },
       { name: 'Capital FM', url: 'https://www.capitalfm.co.ke/news/category/kenya/politics/feed/' },
     ],
   },
   {
-    code: 'ZA', tier: 1, maxPerRun: 2,
+    code: 'ZA', tier: 1, maxPerRun: 1,
     feeds: [
       { name: 'Daily Maverick', url: 'https://www.dailymaverick.co.za/dmrss/' },
       { name: 'IOL', url: 'https://iol.co.za/rss/iol/news/politics/' },
     ],
   },
   {
-    code: 'IN', tier: 1, maxPerRun: 2,
+    code: 'IN', tier: 1, maxPerRun: 1,
     feeds: [
       { name: 'Hindustan Times', url: 'https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml' },
       { name: 'NDTV', url: 'https://feeds.feedburner.com/ndtvnews-india-news' },
@@ -83,21 +84,21 @@ export const COVERAGE: CoverageDesk[] = [
     ],
   },
   {
-    code: 'CA', tier: 1, maxPerRun: 2,
+    code: 'CA', tier: 1, maxPerRun: 1,
     feeds: [
       { name: 'Global News', url: 'https://globalnews.ca/politics/feed/' },
       { name: 'CBC News', url: 'https://www.cbc.ca/webfeed/rss/rss-politics' },
     ],
   },
   {
-    code: 'AU', tier: 1, maxPerRun: 2,
+    code: 'AU', tier: 1, maxPerRun: 1,
     feeds: [
       { name: 'The Guardian Australia', url: 'https://www.theguardian.com/australia-news/australian-politics/rss' },
       { name: 'ABC News', url: 'https://www.abc.net.au/news/feed/51120/rss.xml' },
     ],
   },
   {
-    code: 'WORLD', tier: 1, maxPerRun: 3,
+    code: 'WORLD', tier: 1, maxPerRun: 2,
     feeds: [
       { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
       { name: 'The Guardian', url: 'https://www.theguardian.com/world/rss' },
@@ -109,32 +110,32 @@ export const COVERAGE: CoverageDesk[] = [
 
   // ---------- Tier 2 ----------
   {
-    code: 'UG', tier: 2, maxPerRun: 2,
+    code: 'UG', tier: 2, maxPerRun: 1,
     feeds: [
       { name: 'Nile Post', url: 'https://nilepost.co.ug/feed' },
       { name: 'The Independent', url: 'https://www.independent.co.ug/feed/' },
     ],
   },
   {
-    code: 'ZW', tier: 2, maxPerRun: 2,
+    code: 'ZW', tier: 2, maxPerRun: 1,
     feeds: [
       { name: 'NewZimbabwe', url: 'https://www.newzimbabwe.com/feed/' },
       { name: 'Nehanda Radio', url: 'https://nehandaradio.com/feed/' },
     ],
   },
   {
-    code: 'IE', tier: 2, maxPerRun: 2,
+    code: 'IE', tier: 2, maxPerRun: 1,
     feeds: [
       { name: 'RTÉ News', url: 'https://www.rte.ie/feeds/rss/?index=/news/politics/' },
       { name: 'TheJournal.ie', url: 'https://www.thejournal.ie/feed/' },
     ],
   },
   {
-    code: 'NZ', tier: 2, maxPerRun: 2,
+    code: 'NZ', tier: 2, maxPerRun: 1,
     feeds: [{ name: 'RNZ', url: 'https://www.rnz.co.nz/rss/political.xml' }],
   },
   {
-    code: 'PK', tier: 2, maxPerRun: 2,
+    code: 'PK', tier: 2, maxPerRun: 1,
     feeds: [
       { name: 'Dawn', url: 'https://www.dawn.com/feeds/home' },
       { name: 'The Express Tribune', url: 'https://tribune.com.pk/feed/pakistan' },
@@ -142,7 +143,7 @@ export const COVERAGE: CoverageDesk[] = [
     ],
   },
   {
-    code: 'PH', tier: 2, maxPerRun: 2,
+    code: 'PH', tier: 2, maxPerRun: 1,
     feeds: [
       { name: 'Philstar', url: 'https://www.philstar.com/rss/nation' },
       { name: 'GMA News', url: 'https://data.gmanetwork.com/gno/rss/news/nation/feed.xml' },

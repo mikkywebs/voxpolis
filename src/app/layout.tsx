@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import Script from 'next/script';
 import './globals.css';
 import CookieConsentBanner from '@/components/layout/CookieConsentBanner';
 import StickyFooterAd from '@/components/layout/StickyFooterAd';
 import ScrollToTopButton from '@/components/layout/ScrollToTopButton';
 import NetworkErrorOverlay from '@/components/common/NetworkErrorOverlay';
+import AdScripts from '@/components/ads/AdScripts';
 import { getAdsenseClient, getMonetag } from '@/config/ads';
 import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 
@@ -57,16 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <CookieConsentBanner />
         <StickyFooterAd />
         <NetworkErrorOverlay />
-        {adsense && (
-          <Script
-            id="adsense"
-            async
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsense}`}
-            crossOrigin="anonymous"
-            strategy="afterInteractive"
-          />
-        )}
-        {monetag && <Script id="monetag" src={monetag.src} data-zone={monetag.zone} strategy="lazyOnload" />}
+        <AdScripts adsense={adsense} monetag={monetag} />
       </body>
     </html>
   );

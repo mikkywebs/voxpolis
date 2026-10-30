@@ -31,7 +31,7 @@ jobs:
           HOUR=$(date -u +%H)
           if [ -n "${{ github.event.inputs.desk }}" ]; then
             DESKS="${{ github.event.inputs.desk }}"
-          elif [ $((10#$HOUR % 3)) -eq 0 ]; then
+          elif [ $((10#$HOUR % 6)) -eq 0 ]; then
             DESKS="$TIER1 $TIER2"
           else
             DESKS="$TIER1"

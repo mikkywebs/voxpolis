@@ -46,6 +46,9 @@ export interface ArticleData {
   image_credit?: string;
   image_license?: string;
   image_page_url?: string;
+  review_status?: 'pending' | 'approved' | 'rejected';
+  reviewed_at?: string;
+  reviewed_by?: string;
   poll?: {
     id: string;
     question: string;

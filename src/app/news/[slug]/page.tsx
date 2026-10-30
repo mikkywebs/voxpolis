@@ -66,7 +66,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: description(a),
     keywords: a.tags,
     alternates: { canonical: `/news/${a.slug}` },
-    robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
+    // Editor review: AI-written drafts are readable but stay out of Google until approved.
+    robots:
+      a.review_status === 'approved'
+        ? { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } }
+        : { index: false, follow: true },
     openGraph: {
       type: 'article',
       title: a.title,
@@ -80,6 +84,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [{ url: absoluteUrl(image), alt: a.title, width: 1200, height: 630 }],
     },
     twitter: { card: 'summary_large_image', title: a.title, description: description(a), images: [absoluteUrl(image)] },
+    // No ads of any kind on stories the editor hasn't approved.
+    other: a.review_status === 'approved' ? undefined : { 'voxpolis-ads': 'off' },
   };
 }
 
@@ -97,6 +103,7 @@ export default async function ArticlePage({ params }: Props) {
   const minutes = Math.max(1, Math.round(words / 220));
   const url = absoluteUrl(`/news/${a.slug}`);
   const image = absoluteUrl(shareImage(a));
+  const approved = a.review_status === 'approved';
 
   const ld = {
     '@context': 'https://schema.org',
@@ -115,7 +122,8 @@ export default async function ArticlePage({ params }: Props) {
         wordCount: words,
         inLanguage: 'en',
         contentLocation: { '@type': 'Country', name: country.name },
-        author: { '@type': 'Organization', name: `${SITE_NAME} Politics Desk`, url: `${SITE_URL}/about` },
+        author: { '@type': 'Organization', name: `${SITE_NAME} Politics Desk`, url: `${SITE_URL}/how-we-report` },
+        editor: approved && a.reviewed_by ? { '@type': 'Person', name: a.reviewed_by, url: `${SITE_URL}/how-we-report#editor` } : undefined,
         publisher: { '@id': `${SITE_URL}/#org`, '@type': 'NewsMediaOrganization', name: SITE_NAME, logo: { '@type': 'ImageObject', url: `${SITE_URL}/voxpolis-icon.png` } },
         isBasedOn: a.source_url?.startsWith('http') ? a.source_url : undefined,
       },
@@ -138,7 +146,7 @@ export default async function ArticlePage({ params }: Props) {
       <div className="relative flex justify-center w-full max-w-[1360px] mx-auto px-4 sm:px-6">
         <aside className="hidden xl:block shrink-0 w-[160px] mr-6">
           <div className="sticky top-20">
-            <AdSlot slotLocation="skyscraper_left" />
+            <AdSlot slotLocation="skyscraper_left" isAllowed={approved} />
           </div>
         </aside>
 
@@ -159,6 +167,15 @@ export default async function ArticlePage({ params }: Props) {
               )}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 border-y border-gray-200 dark:border-gray-800 py-2.5">
                 <span className="font-semibold text-gray-700 dark:text-gray-300">Voxpolis Politics Desk</span>
+                {approved ? (
+                  <Link href="/how-we-report#editor" className="hover:underline">
+                    Reviewed by {a.reviewed_by || 'the editor'}
+                  </Link>
+                ) : (
+                  <Link href="/how-we-report" className="text-amber-700 dark:text-amber-400 hover:underline">
+                    AI-assisted · awaiting editor review
+                  </Link>
+                )}
                 <time dateTime={a.created_at}>{formatDate(a.created_at)}</time>
                 {a.updated_at && a.updated_at.slice(0, 10) !== a.created_at.slice(0, 10) && (
                   <span>Updated <time dateTime={a.updated_at}>{formatDate(a.updated_at)}</time></span>
@@ -199,7 +216,7 @@ export default async function ArticlePage({ params }: Props) {
               </section>
             )}
 
-            <AdSlot slotLocation="below_dek" />
+            <AdSlot slotLocation="below_dek" isAllowed={approved} />
 
             <div className="text-base sm:text-[17px] leading-relaxed sm:leading-8 text-gray-800 dark:text-gray-200 space-y-5">
               {body.slice(0, mid).map((p, i) => (
@@ -207,7 +224,7 @@ export default async function ArticlePage({ params }: Props) {
               ))}
             </div>
 
-            {body.length > mid && <AdSlot slotLocation="mid_article" />}
+            {body.length > mid && <AdSlot slotLocation="mid_article" isAllowed={approved} />}
 
             <div className="text-base sm:text-[17px] leading-relaxed sm:leading-8 text-gray-800 dark:text-gray-200 space-y-5">
               {body.slice(mid).map((p, i) => (
@@ -261,7 +278,7 @@ export default async function ArticlePage({ params }: Props) {
             )}
           </article>
 
-          <AdSlot slotLocation="below_sources" />
+          <AdSlot slotLocation="below_sources" isAllowed={approved} />
 
           <div className="mt-8" id="comments">
             <ArticleInteractions
@@ -302,7 +319,7 @@ export default async function ArticlePage({ params }: Props) {
 
         <aside className="hidden xl:block shrink-0 w-[160px] ml-6">
           <div className="sticky top-20">
-            <AdSlot slotLocation="skyscraper_right" />
+            <AdSlot slotLocation="skyscraper_right" isAllowed={approved} />
           </div>
         </aside>
       </div>

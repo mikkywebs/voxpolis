@@ -65,13 +65,24 @@ export default function HowWeReportPage() {
             <li>The source must be readable in full; paywalled or cut-off reports are skipped.</li>
             <li>No run of eight or more words may match the original report outside a quotation.</li>
             <li>Stories that repeat one we already published are skipped.</li>
+            <li>Only significant stories are written up: we prefer fewer, better articles.</li>
           </ul>
         </section>
 
-        <section className="space-y-3">
-          <h2 className="text-xl font-black">6. We credit and we correct</h2>
+        <section id="editor" className="space-y-3 scroll-mt-24">
+          <h2 className="text-xl font-black">6. A human editor checks every story</h2>
           <p>
-            Every article links to the original report that it is based on. If you spot an error, please{' '}
+            New stories start as drafts marked &quot;awaiting editor review&quot;. Our editor reads each one against the
+            original report, checks names, numbers and dates, fixes anything unclear or unfair, and only then approves it.
+            Approved stories carry a &quot;Reviewed by&quot; line with the editor&apos;s name. Stories that fall short are
+            rejected and removed.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xl font-black">7. We credit and we correct</h2>
+          <p>
+            Every article links to the original report it is based on, and every photo shows its licence and author. If you spot an error, please{' '}
             <Link href="/corrections" className="text-blue-600 dark:text-blue-400 underline">
               tell us
             </Link>

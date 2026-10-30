@@ -29,6 +29,9 @@ function rowToArticle(r: any): ArticleData {
     image_credit: r.image_credit || undefined,
     image_license: r.image_license || undefined,
     image_page_url: r.image_page_url || undefined,
+    review_status: r.review_status || 'pending',
+    reviewed_at: r.reviewed_at || undefined,
+    reviewed_by: r.reviewed_by || undefined,
     source_name: r.source_name,
     source_url: r.source_url,
     is_breaking: !!r.is_breaking,
@@ -51,8 +54,13 @@ function rowToArticle(r: any): ArticleData {
 }
 
 function isPublished(r: any): boolean {
-  // rows created before the migration have no status column / null status
-  return !r?.status || r.status === 'published';
+  // rows created before the migration have no status column / null status; rejected stories are never shown
+  return (!r?.status || r.status === 'published') && r?.review_status !== 'rejected';
+}
+
+/** Only stories the editor approved are offered to Google (sitemaps, RSS, index). */
+export function isApproved(a: { review_status?: string }): boolean {
+  return a.review_status === 'approved';
 }
 
 async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
@@ -111,6 +119,7 @@ export async function getSitemapEntries(limit = 5000): Promise<{ slug: string; c
     const { data, error } = await supabaseAdmin
       .from('articles')
       .select('slug, country_code, created_at, updated_at, title')
+      .eq('review_status', 'approved')
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
@@ -121,6 +130,7 @@ export async function getSitemapEntries(limit = 5000): Promise<{ slug: string; c
 export async function getCountriesWithArticles(): Promise<{ code: string; latest: string }[]> {
   return safe(async () => {
     const { data } = await supabaseAdmin.from('articles').select('country_code, created_at')
+      .eq('review_status', 'approved')
       .order('created_at', { ascending: false })
       .limit(3000);
     const seen = new Map<string, string>();
@@ -129,4 +139,18 @@ export async function getCountriesWithArticles(): Promise<{ code: string; latest
     });
     return Array.from(seen, ([code, latest]) => ({ code, latest }));
   }, []);
+}
+
+/** Latest approved stories (RSS feed). */
+export async function getLatestApproved(limit = 50): Promise<ArticleData[]> {
+  return safe(async () => {
+    const { data, error } = await supabaseAdmin
+      .from('articles')
+      .select(LIST_COLUMNS)
+      .eq('review_status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data || []).filter(isPublished).map(rowToArticle);
+  }, [] as ArticleData[]);
 }
