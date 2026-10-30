@@ -122,7 +122,10 @@ function evaluate(page: any, subject: string, person: boolean, countryName?: str
   } else {
     // Institutions and places must match the full name, so "Electoral Commission of Afghanistan"
     // can never stand in for Nigeria's INEC.
+    if (words.length < 2) return no('place/institution name too vague (needs 2+ words)');
     if (!haystack.includes(full)) return no('full name not in file');
+    // "Oyin in Lekki, Lagos" = a named person at a place, not the place itself.
+    if (/^File:[A-Z][a-z]+( [A-Z][a-z]+)? (in|at|visits?|near) /.test(title)) return no('a person at the place');
     // Many countries share institution names (e.g. "Independent National Electoral Commission").
     if (countryName && !full.includes(normalise(countryName)) && !haystack.includes(normalise(countryName))) return no(`not about ${countryName}`);
     if (PERSON_TITLE.test(title)) return no('a person, not the institution');
