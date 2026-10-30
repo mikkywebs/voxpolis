@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
 import { getCountriesWithArticles, getSitemapEntries } from '@/lib/articles';
 import { SITE_URL } from '@/lib/site';
+import { articlePath } from '@/lib/paths';
 
 export const revalidate = 900;
 
@@ -25,7 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   const articlePages: MetadataRoute.Sitemap = articles.map((a) => ({
-    url: `${SITE_URL}/news/${a.slug}`,
+    url: `${SITE_URL}${articlePath(a)}`,
     lastModified: new Date(a.updated_at || a.created_at),
     changeFrequency: 'weekly',
     priority: 0.7,

@@ -8,6 +8,7 @@ import PollSection from '@/components/article/PollSection';
 import { CommentInputForm, CommentList, CommentItem } from '@/components/article/CommentSection';
 import { createClient } from '@/lib/supabase/client';
 import { getCountryByCode } from '@/config/countries';
+import { articlePath } from '@/lib/paths';
 
 interface Props {
   part: 'top' | 'bottom';
@@ -41,7 +42,8 @@ export default function ArticleInteractions({ part, articleId, slug, title, dek,
   const router = useRouter();
   const member = useMember();
   const [comments, setComments] = useState<CommentItem[]>([]);
-  const requireAuth = () => router.push(`/login?redirect=/news/${slug}`);
+  const path = articlePath({ slug, country_code: countryCode });
+  const requireAuth = () => router.push(`/login?redirect=${encodeURIComponent(path)}`);
 
   useEffect(() => {
     if (part !== 'top') return;
@@ -80,7 +82,7 @@ export default function ArticleInteractions({ part, articleId, slug, title, dek,
     return (
       <div className="space-y-3">
         <EmojiReactions articleId={articleId} slug={slug} />
-        <SocialShareButtons title={title} slug={slug} />
+        <SocialShareButtons title={title} slug={slug} path={path} />
       </div>
     );
   }

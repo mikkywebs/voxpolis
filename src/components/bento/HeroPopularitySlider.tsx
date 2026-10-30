@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { articlePath } from '@/lib/paths';
 import PhotoCredit from '@/components/article/PhotoCredit';
 import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
@@ -65,7 +66,7 @@ export default function HeroPopularitySlider({
   const imageUrl = getArticleImageUrl(active, currentIndex);
   const fallbackUrl = getArticleFallbackUrl(active, currentIndex);
   const displayTitle = decodeAllHtmlEntities((active.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
-  const articleUrl = `/news/${active.slug}`;
+  const articleUrl = articlePath(active);
   const isFeaturedStory = active.is_featured || active.tags?.some((t) => /featured/i.test(t));
 
   const handleCardClick = () => {

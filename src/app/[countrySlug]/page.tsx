@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import LiveFeed from '@/components/feed/LiveFeed';
+import { articlePath } from '@/lib/paths';
 import { ALL_COUNTRIES, CountryConfig, findCountryBySlug, getCountrySlug } from '@/config/countries';
 import { getLatestForCountry, getLatestWorld } from '@/lib/articles';
 import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
@@ -55,7 +56,7 @@ export default async function CountryPage({ params }: Props) {
           itemListElement: articles.slice(0, 20).map((a, i) => ({
             '@type': 'ListItem',
             position: i + 1,
-            url: absoluteUrl(`/news/${a.slug}`),
+            url: absoluteUrl(articlePath(a)),
             name: a.title,
           })),
         },

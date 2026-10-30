@@ -146,7 +146,11 @@ export default function BentoFeedLayout({
             <p className="text-base font-bold text-gray-800 dark:text-gray-200">
               Our {selectedCountry.name} desk has no new stories yet.
             </p>
-            <p className="text-sm text-gray-500">New reports are added through the day. Meanwhile, here is what is happening elsewhere.</p>
+            <p className="text-sm text-gray-500">
+              {secondaryFeeds.length > 0
+                ? 'New reports are added through the day. Meanwhile, here is what is happening elsewhere.'
+                : 'New stories are on the way. Please check back soon.'}
+            </p>
           </div>
         ) : null}
         {!loading && articles.length === 0 ? (

@@ -21,6 +21,10 @@ check /sitemap.xml xml '<loc>[^<]+'
 check /news-sitemap.xml xml 'urlset'
 check /feed.xml xml '<title>[^<]+'
 check /ads.txt text/plain '.+'
+check /nigeria/no-such-story text/html 'not-found|404'
+check /news/old-style-slug-2026-10-30-abcd text/html 'not-found|404'
+check /forgot-password text/html '<h1[^>]*>[^<]+'
+check /login text/html 'Forgot password'
 check /card/test-story image 'PNG'
 size=$(stat -c %s /tmp/body 2>/dev/null || echo 0)
 out="${out}card bytes: $size%0A"

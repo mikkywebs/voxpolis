@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { articlePath } from '@/lib/paths';
 import PhotoCredit from '@/components/article/PhotoCredit';
 import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl, formatCleanSnippet } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
@@ -56,7 +57,7 @@ export default function FeedCard({ article, index, onCardClick }: FeedCardProps)
   const fallbackUrl = getArticleFallbackUrl(article, index);
   const formattedTime = formatExactTimestamp(article.created_at);
   const displayTitle = decodeAllHtmlEntities((article.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
-  const articleUrl = `/news/${article.slug}`;
+  const articleUrl = articlePath(article);
 
   return (
     <article className="group bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/70 rounded-2xl overflow-hidden p-5 sm:p-6 shadow-sm hover:shadow-lg transition duration-200 flex flex-col justify-between h-full">

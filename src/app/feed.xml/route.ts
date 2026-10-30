@@ -1,5 +1,6 @@
 import { getLatestApproved } from '@/lib/articles';
 import { getCountryByCode } from '@/config/countries';
+import { articlePath } from '@/lib/paths';
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 
 // RSS feed of the latest Voxpolis stories (for readers, aggregators and social tools).
@@ -10,7 +11,7 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 export async function GET() {
   const items = (await getLatestApproved(50))
     .map((a) => {
-      const link = `${SITE_URL}/news/${a.slug}`;
+      const link = `${SITE_URL}${articlePath(a)}`;
       return `    <item>
       <title>${esc(a.title)}</title>
       <link>${link}</link>

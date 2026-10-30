@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { articlePath } from '@/lib/paths';
 import { createClient } from '@/lib/supabase/client';
 import { getCountryByCode } from '@/config/countries';
 
@@ -55,6 +56,7 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
     background: story.background || '',
     what_next: story.what_next || '',
     poll_question: story.poll_question || '',
+    slug: story.slug || '',
     original_image_url: story.original_image_url || '',
     image_credit: story.image_credit || '',
   });
@@ -134,7 +136,7 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
           Original: {story.source_name} ↗
         </a>
         {story.review_status === 'approved' && (
-          <Link href={`/news/${story.slug}`} target="_blank" className="text-blue-600 hover:underline">
+          <Link href={articlePath(story)} target="_blank" className="text-blue-600 hover:underline">
             View live ↗
           </Link>
         )}
@@ -163,6 +165,21 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
       {open && (
         <div className="space-y-3 pt-1">
           {field('title', 'Headline', 1)}
+          <label className="block space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Web address</span>
+            <div className="flex items-center rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 overflow-hidden text-sm">
+              <span className="px-3 py-2 text-gray-400 bg-gray-50 dark:bg-gray-900 whitespace-nowrap">voxpolis.app/{articlePath({ slug: '', country_code: story.country_code }).split('/')[1]}/</span>
+              <input
+                className="flex-1 min-w-0 px-2 py-2 bg-transparent focus:outline-none disabled:text-gray-400"
+                value={f.slug}
+                disabled={story.review_status === 'approved'}
+                onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-') })}
+              />
+            </div>
+            <span className="block text-[11px] text-gray-400">
+              {story.review_status === 'approved' ? 'Locked after publishing.' : '3-6 key words, e.g. peter-obi-tinubu-campaign-2027. Locked once published.'}
+            </span>
+          </label>
           {field('dek', 'Summary line', 2)}
           {field('key_points', 'The short version', 5, 'One point per line')}
           {field('content', `Story (${words} words)`, 14)}
