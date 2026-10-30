@@ -76,7 +76,8 @@ export const getArticleBySlug = cache(async (slug: string): Promise<ArticleData 
   safe(async () => {
     const { data, error } = await supabaseAdmin.from('articles').select('*').eq('slug', slug).maybeSingle();
     if (error || !data) return null;
-    if (!isPublished(data)) return null;
+    // Draft mode: only stories the editor has published are visible to the public.
+    if (!isPublished(data) || data.review_status !== 'approved') return null;
     const article = rowToArticle(data);
     const { data: poll } = await supabaseAdmin
       .from('polls')
@@ -90,7 +91,11 @@ export const getArticleBySlug = cache(async (slug: string): Promise<ArticleData 
 
 export const getLatestForCountry = cache(async (code: string, limit = 40): Promise<ArticleData[]> =>
   safe(async () => {
-    const { data, error } = await supabaseAdmin.from('articles').select(LIST_COLUMNS).eq('country_code', code.toUpperCase())
+    const { data, error } = await supabaseAdmin
+      .from('articles')
+      .select(LIST_COLUMNS)
+      .eq('country_code', code.toUpperCase())
+      .eq('review_status', 'approved')
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
@@ -101,7 +106,7 @@ export const getLatestForCountry = cache(async (code: string, limit = 40): Promi
 /** Latest stories from every country except `excludeCode`, one list for the "Around the world" strip. */
 export const getLatestWorld = cache(async (excludeCode?: string, limit = 12): Promise<ArticleData[]> =>
   safe(async () => {
-    let q = supabaseAdmin.from('articles').select(LIST_COLUMNS);
+    let q = supabaseAdmin.from('articles').select(LIST_COLUMNS).eq('review_status', 'approved');
     if (excludeCode) q = q.neq('country_code', excludeCode.toUpperCase());
     const { data, error } = await q.order('created_at', { ascending: false }).limit(limit);
     if (error) throw error;

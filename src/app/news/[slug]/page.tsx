@@ -66,11 +66,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: description(a),
     keywords: a.tags,
     alternates: { canonical: `/news/${a.slug}` },
-    // Editor review: AI-written drafts are readable but stay out of Google until approved.
-    robots:
-      a.review_status === 'approved'
-        ? { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } }
-        : { index: false, follow: true },
+    robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
     openGraph: {
       type: 'article',
       title: a.title,
@@ -84,8 +80,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [{ url: absoluteUrl(image), alt: a.title, width: 1200, height: 630 }],
     },
     twitter: { card: 'summary_large_image', title: a.title, description: description(a), images: [absoluteUrl(image)] },
-    // No ads of any kind on stories the editor hasn't approved.
-    other: a.review_status === 'approved' ? undefined : { 'voxpolis-ads': 'off' },
   };
 }
 
@@ -123,7 +117,6 @@ export default async function ArticlePage({ params }: Props) {
         inLanguage: 'en',
         contentLocation: { '@type': 'Country', name: country.name },
         author: { '@type': 'Organization', name: `${SITE_NAME} Politics Desk`, url: `${SITE_URL}/how-we-report` },
-        editor: approved && a.reviewed_by ? { '@type': 'Person', name: a.reviewed_by, url: `${SITE_URL}/how-we-report#editor` } : undefined,
         publisher: { '@id': `${SITE_URL}/#org`, '@type': 'NewsMediaOrganization', name: SITE_NAME, logo: { '@type': 'ImageObject', url: `${SITE_URL}/voxpolis-icon.png` } },
         isBasedOn: a.source_url?.startsWith('http') ? a.source_url : undefined,
       },
@@ -167,15 +160,6 @@ export default async function ArticlePage({ params }: Props) {
               )}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 border-y border-gray-200 dark:border-gray-800 py-2.5">
                 <span className="font-semibold text-gray-700 dark:text-gray-300">Voxpolis Politics Desk</span>
-                {approved ? (
-                  <Link href="/how-we-report#editor" className="hover:underline">
-                    Reviewed by {a.reviewed_by || 'the editor'}
-                  </Link>
-                ) : (
-                  <Link href="/how-we-report" className="text-amber-700 dark:text-amber-400 hover:underline">
-                    AI-assisted · awaiting editor review
-                  </Link>
-                )}
                 <time dateTime={a.created_at}>{formatDate(a.created_at)}</time>
                 {a.updated_at && a.updated_at.slice(0, 10) !== a.created_at.slice(0, 10) && (
                   <span>Updated <time dateTime={a.updated_at}>{formatDate(a.updated_at)}</time></span>
@@ -259,7 +243,7 @@ export default async function ArticlePage({ params }: Props) {
 
             {a.source_url?.startsWith('http') && (
               <p className="text-xs text-gray-500 border-t border-gray-200 dark:border-gray-800 pt-4">
-                Written by the Voxpolis newsroom from original reporting by{' '}
+                Based on reporting by{' '}
                 <a href={a.source_url} target="_blank" rel="noopener" className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
                   {a.source_name}
                 </a>
