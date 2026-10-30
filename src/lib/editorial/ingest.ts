@@ -205,7 +205,12 @@ async function writeAndSave(desk: CoverageDesk, item: FeedItem, src: Extracted):
   const dup = await isDuplicateOfRecent(piece.country_iso, piece.headline, item.title);
   if (dup) return { ...base, outcome: 'skipped', reason: `same story as /news/${dup}`, country: piece.country_iso };
 
-  const photo = await findLicensedPhoto([...piece.image_subjects, ...piece.actors.slice(0, 2)], PHOTO_BUDGET_MS);
+  const photo = await findLicensedPhoto(
+    [...piece.image_subjects, ...piece.actors.slice(0, 2)],
+    PHOTO_BUDGET_MS,
+    undefined,
+    getCountryByCode(piece.country_iso).name
+  );
 
   try {
     const slug = await saveArticle(piece, item, src, photo);

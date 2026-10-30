@@ -32,6 +32,7 @@ const BAD_FILE = /(logo|\bmap\b|flag|coat of arms|emblem|seal of|signature|chart
 const NOT_MAIN_SUBJECT = /\b(receives?|received|meets?|meeting|met with|with|and|visit(s|ing)?|talks|summit|delegation|bilateral|greets?|welcom(es|ing)|shakes?|vs\.?|versus|family|wife|husband|funeral|reuni[aã]o|r[ée]union|reuni[oó]n|encontro|encuentro|rencontre|treffen|incontro|entre|com|avec|con|und|mit|ampliada|cumbre|cimeira|sommet|gipfel)\b/i;
 // For institutions/places we want the building or chamber, not a portrait of an office-holder.
 const PERSON_TITLE = /\b(chairman|chairperson|chair|professor|prof|dr|mr|mrs|ms|hon|sen|president|minister|governor|senator|speaker|commissioner|portrait|headshot)\b/i;
+const EVENT_HINT = /\b(ceremony|cerim[oô]nia|ceremonia|c[ée]r[ée]monie|arrival|chegada|llegada|arriv[ée]e|departure|inauguration of|state visit|official visit)\b/i;
 const PORTRAIT_HINT = /\b(portrait|official|headshot|cropped|profile)\b/i;
 
 function strip(html?: string): string {
@@ -84,7 +85,7 @@ async function search(query: string, signal: AbortSignal): Promise<any[]> {
 
 type Verdict = { photo: LicensedPhoto | null; score: number; reason: string; title: string };
 
-function evaluate(page: any, subject: string, person: boolean): Verdict {
+function evaluate(page: any, subject: string, person: boolean, countryName?: string): Verdict {
   const title: string = page?.title || '';
   const no = (reason: string): Verdict => ({ photo: null, score: -99, reason, title });
   const info = page?.imageinfo?.[0];
@@ -111,7 +112,9 @@ function evaluate(page: any, subject: string, person: boolean): Verdict {
     if (cleanTitle.includes(full)) score += 5;
     else if (cleanTitle.includes(surname)) score += 3;
     else score += 1; // only in description
-    if (cleanTitle.startsWith(full) || cleanTitle.startsWith(surname)) score += 2;
+    const at = cleanTitle.indexOf(surname);
+    if (at >= 0 && at <= 30) score += 3; // the person is named first → usually the main subject
+    if (EVENT_HINT.test(title)) score -= 3;
     if (PORTRAIT_HINT.test(title)) score += 3;
     if (/\(cropped/i.test(title)) score += 1;
     if (NOT_MAIN_SUBJECT.test(title.replace(/^File:/, ''))) score -= 6;
@@ -120,6 +123,8 @@ function evaluate(page: any, subject: string, person: boolean): Verdict {
     // Institutions and places must match the full name, so "Electoral Commission of Afghanistan"
     // can never stand in for Nigeria's INEC.
     if (!haystack.includes(full)) return no('full name not in file');
+    // Many countries share institution names (e.g. "Independent National Electoral Commission").
+    if (countryName && !full.includes(normalise(countryName)) && !haystack.includes(normalise(countryName))) return no(`not about ${countryName}`);
     if (PERSON_TITLE.test(title)) return no('a person, not the institution');
     score += 3 + (cleanTitle.includes(full) ? 3 : 0);
     if (ratio >= 1.2) score += 1;
@@ -146,11 +151,11 @@ function evaluate(page: any, subject: string, person: boolean): Verdict {
   };
 }
 
-async function bestFor(subject: string, signal: AbortSignal, debug?: string[]): Promise<LicensedPhoto | null> {
+async function bestFor(subject: string, signal: AbortSignal, debug?: string[], countryName?: string): Promise<LicensedPhoto | null> {
   const person = looksLikePerson(subject);
   const queries = person ? [`intitle:"${subject}"`, `"${subject}"`] : [`intitle:"${subject}"`, subject];
   for (const q of queries) {
-    const verdicts = (await search(q, signal)).map((p) => evaluate(p, subject, person));
+    const verdicts = (await search(q, signal)).map((p) => evaluate(p, subject, person, countryName));
     verdicts.forEach((v) => debug?.push(`  [${q}] ${v.title.slice(0, 70)} → ${v.reason}${v.photo ? ` (score ${v.score})` : ''}`));
     const best = verdicts.filter((v) => v.photo).sort((a, b) => b.score - a.score)[0];
     if (best?.photo) return best.photo;
@@ -159,13 +164,18 @@ async function bestFor(subject: string, signal: AbortSignal, debug?: string[]): 
 }
 
 /** Try each subject in order (most specific first). Gives up quietly after `budgetMs`. */
-export async function findLicensedPhoto(subjects: string[], budgetMs = 4500, debug?: string[]): Promise<LicensedPhoto | null> {
+export async function findLicensedPhoto(
+  subjects: string[],
+  budgetMs = 4500,
+  debug?: string[],
+  countryName?: string
+): Promise<LicensedPhoto | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), budgetMs);
   try {
     const unique = Array.from(new Set(subjects.map((s) => s.trim()).filter((s) => s.length > 2))).slice(0, 4);
     for (const subject of unique) {
-      const photo = await bestFor(subject, controller.signal, debug);
+      const photo = await bestFor(subject, controller.signal, debug, countryName);
       if (photo) return photo;
     }
     return null;
