@@ -83,7 +83,7 @@ Source headline: ${input.sourceTitle}
 Source text:
 ${input.sourceText}`;
 
-  const { text, provider } = await callNewsroomLLM(SYSTEM, user);
+  const { text, provider, notes } = await callNewsroomLLM(SYSTEM, user);
   const raw = parseJsonReply<any>(text);
 
   const arr = (v: any) => (Array.isArray(v) ? v : typeof v === 'string' && v ? [v] : []).map((x: any) => String(x).trim()).filter(Boolean);
@@ -109,7 +109,7 @@ ${input.sourceText}`;
     slug_keywords: str(raw.slug_keywords),
     completeness: raw.completeness === 'incomplete' ? 'incomplete' : 'complete',
     incomplete_reason: raw.incomplete_reason || null,
-    provider,
+    provider: notes.length ? `${provider} (after: ${notes.join(' | ')})` : provider,
   };
 }
 

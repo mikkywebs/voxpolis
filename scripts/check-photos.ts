@@ -14,6 +14,8 @@ const CASES: [string, string][] = [
   ['Anthony Albanese', ''],
   ['National Assembly of Nigeria', 'Nigeria'],
   ['Independent National Electoral Commission', 'Nigeria'],
+  ['Lekki', 'Nigeria'], // too vague: must find nothing
+  ['Dangote Petroleum Refinery', 'Nigeria'],
   ['Zzxq Notarealperson', ''], // must find nothing
 ];
 

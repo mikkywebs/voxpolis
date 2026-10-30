@@ -12,6 +12,7 @@
 export interface LLMResult {
   text: string;
   provider: string;
+  notes: string[]; // why earlier providers/models were skipped (stored in ingest_log)
 }
 
 const TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS || 28_000);
@@ -26,18 +27,24 @@ async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<
   }
 }
 
-async function callGemini(system: string, user: string): Promise<LLMResult | null> {
+async function callGemini(system: string, user: string, notes: string[]): Promise<LLMResult | null> {
   // Accept the name used in Vercel (GOOGLE_STUDIO_API_KEY) as well as the standard names.
   const key = (process.env.GEMINI_API_KEY || process.env.GOOGLE_STUDIO_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
-  if (!key) return null;
+  if (!key) {
+    notes.push('gemini: no key');
+    return null;
+  }
   const models = (process.env.GEMINI_MODELS || 'gemini-flash-latest,gemini-flash-lite-latest')
     .split(',')
     .map((m) => m.trim())
     .filter(Boolean);
+  // Newer Gemini models "think" before answering, which can blow the time budget. Cap it.
+  const thinkingBudget = Number(process.env.GEMINI_THINKING_BUDGET ?? 512);
 
   for (const model of models) {
-    try {
-      const res = await withTimeout((signal) =>
+    const t0 = Date.now();
+    const attempt = async (withThinking: boolean) =>
+      withTimeout((signal) =>
         fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: 'POST',
           signal,
@@ -49,22 +56,32 @@ async function callGemini(system: string, user: string): Promise<LLMResult | nul
               temperature: 0.4,
               maxOutputTokens: 8192,
               responseMimeType: 'application/json',
+              ...(withThinking ? { thinkingConfig: { thinkingBudget } } : {}),
             },
           }),
         })
       );
+    try {
+      let res = await attempt(thinkingBudget >= 0);
+      if (res.status === 400 && thinkingBudget >= 0) {
+        // Model doesn't accept a thinking budget: retry without it.
+        notes.push(`gemini:${model} rejected thinkingBudget`);
+        res = await attempt(false);
+      }
       if (!res.ok) {
-        console.warn(`[llm] gemini ${model} HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+        notes.push(`gemini:${model} HTTP ${res.status} ${(await res.text()).slice(0, 120).replace(/\s+/g, ' ')}`);
         continue;
       }
       const data = await res.json();
       const text = (data?.candidates?.[0]?.content?.parts || [])
+        .filter((p: any) => !p?.thought)
         .map((p: any) => p?.text || '')
         .join('')
         .trim();
-      if (text) return { text, provider: `gemini:${model}` };
+      if (text) return { text, provider: `gemini:${model} ${Math.round((Date.now() - t0) / 1000)}s`, notes };
+      notes.push(`gemini:${model} empty reply (${data?.candidates?.[0]?.finishReason || 'no candidate'})`);
     } catch (e: any) {
-      console.warn(`[llm] gemini ${model} failed: ${e?.message || e}`);
+      notes.push(`gemini:${model} ${e?.name === 'AbortError' ? `timeout after ${Math.round((Date.now() - t0) / 1000)}s` : e?.message || e}`);
     }
   }
   return null;
@@ -76,7 +93,8 @@ async function callOpenAICompatible(
   key: string | undefined,
   model: string,
   system: string,
-  user: string
+  user: string,
+  notes: string[]
 ): Promise<LLMResult | null> {
   if (!key?.trim()) return null;
   try {
@@ -98,28 +116,31 @@ async function callOpenAICompatible(
       })
     );
     if (!res.ok) {
-      console.warn(`[llm] ${name} HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      notes.push(`${name} HTTP ${res.status} ${(await res.text()).slice(0, 120).replace(/\s+/g, ' ')}`);
       return null;
     }
     const data = await res.json();
     const text = data?.choices?.[0]?.message?.content?.trim();
-    return text ? { text, provider: `${name}:${model}` } : null;
+    if (!text) notes.push(`${name} empty reply`);
+    return text ? { text, provider: `${name}:${model}`, notes } : null;
   } catch (e: any) {
-    console.warn(`[llm] ${name} failed: ${e?.message || e}`);
+    notes.push(`${name} ${e?.name === 'AbortError' ? 'timeout' : e?.message || e}`);
     return null;
   }
 }
 
 export async function callNewsroomLLM(system: string, user: string): Promise<LLMResult> {
+  const notes: string[] = [];
   const result =
-    (await callGemini(system, user)) ||
+    (await callGemini(system, user, notes)) ||
     (await callOpenAICompatible(
       'deepseek',
       'https://api.deepseek.com/chat/completions',
       process.env.DEEPSEEK_API_KEY,
       process.env.DEEPSEEK_MODEL || 'deepseek-chat',
       system,
-      user
+      user,
+      notes
     )) ||
     (await callOpenAICompatible(
       'kimi',
@@ -127,11 +148,12 @@ export async function callNewsroomLLM(system: string, user: string): Promise<LLM
       process.env.KIMI_API_KEY,
       process.env.KIMI_MODEL || 'moonshot-v1-32k',
       system,
-      user
+      user,
+      notes
     ));
 
   if (!result) {
-    throw new Error('No AI provider answered. Check GOOGLE_STUDIO_API_KEY (or GEMINI_API_KEY) / DEEPSEEK_API_KEY / KIMI_API_KEY in Vercel.');
+    throw new Error(`No AI provider answered: ${notes.join(' | ') || 'no keys set (GOOGLE_STUDIO_API_KEY / DEEPSEEK_API_KEY / KIMI_API_KEY)'}`);
   }
   return result;
 }
