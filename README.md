@@ -15,7 +15,7 @@
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | yes | Supabase |
 | `NEXT_PUBLIC_SITE_URL` | yes | Your primary domain, e.g. `https://www.voxpolis.app` |
 | `CRON_SECRET` | yes | Any long random string; protects `/api/ingest` |
-| `GEMINI_API_KEY` | yes (or one of the next two) | AI writer |
+| `GOOGLE_STUDIO_API_KEY` (or `GEMINI_API_KEY`) | yes (or one of the next two) | AI writer (Google AI Studio key) |
 | `DEEPSEEK_API_KEY`, `KIMI_API_KEY` | optional | AI fallbacks |
 | `GEMINI_MODELS` | optional | Comma list, default `gemini-flash-latest,gemini-flash-lite-latest` |
 | `INGEST_MIN_IMPORTANCE` | optional | 1-10, default 4 |

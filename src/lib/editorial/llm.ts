@@ -4,7 +4,7 @@
  * Models are configurable with env vars so you never need a code change
  * when a provider renames a model.
  *
- *   GEMINI_API_KEY,   GEMINI_MODELS   (comma list, default: gemini-flash-latest,gemini-flash-lite-latest)
+ *   GEMINI_API_KEY (or GOOGLE_STUDIO_API_KEY), GEMINI_MODELS   (comma list, default: gemini-flash-latest,gemini-flash-lite-latest)
  *   DEEPSEEK_API_KEY, DEEPSEEK_MODEL  (default: deepseek-chat)
  *   KIMI_API_KEY,     KIMI_MODEL      (default: moonshot-v1-32k)
  */
@@ -27,7 +27,8 @@ async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<
 }
 
 async function callGemini(system: string, user: string): Promise<LLMResult | null> {
-  const key = process.env.GEMINI_API_KEY?.trim();
+  // Accept the name used in Vercel (GOOGLE_STUDIO_API_KEY) as well as the standard names.
+  const key = (process.env.GEMINI_API_KEY || process.env.GOOGLE_STUDIO_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
   if (!key) return null;
   const models = (process.env.GEMINI_MODELS || 'gemini-flash-latest,gemini-flash-lite-latest')
     .split(',')
@@ -130,7 +131,7 @@ export async function callNewsroomLLM(system: string, user: string): Promise<LLM
     ));
 
   if (!result) {
-    throw new Error('No AI provider answered. Check GEMINI_API_KEY / DEEPSEEK_API_KEY / KIMI_API_KEY in Vercel.');
+    throw new Error('No AI provider answered. Check GOOGLE_STUDIO_API_KEY (or GEMINI_API_KEY) / DEEPSEEK_API_KEY / KIMI_API_KEY in Vercel.');
   }
   return result;
 }
