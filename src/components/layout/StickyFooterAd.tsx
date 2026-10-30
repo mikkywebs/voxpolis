@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { adsAllowedHere } from '@/components/ads/AdScripts';
 import { X, ChevronUp, Sparkles } from 'lucide-react';
 
 const NON_NEWS_PATHS = [
@@ -27,8 +28,10 @@ export default function StickyFooterAd() {
 
   useEffect(() => {
     const pubId = process.env.NEXT_PUBLIC_ADSENSE_PUB_ID || '';
-    if (pubId && pubId !== 'ca-pub-0000000000000000' && pubId.startsWith('ca-pub-')) {
+    if (pubId && pubId !== 'ca-pub-0000000000000000' && pubId.startsWith('ca-pub-') && adsAllowedHere(pathname)) {
       setAdClient(pubId);
+    } else {
+      setAdClient(null);
     }
 
     const handleScroll = () => {
@@ -44,7 +47,7 @@ export default function StickyFooterAd() {
     }
 
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [pathname]);
 
   // 1. Strictly block placeholder ads if live AdSense is not configured
   if (!adClient) {

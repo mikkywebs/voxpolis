@@ -148,9 +148,20 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString(),
     };
 
+    // Written by the editor in the admin page → counts as reviewed (indexable).
+    let editorName = 'Voxpolis Editor';
+    try {
+      const editorId = (auth as any)?.user?.id;
+      if (editorId) {
+        const { data: prof } = await supabaseAdmin.from('profiles').select('full_name').eq('id', editorId).maybeSingle();
+        if (prof?.full_name) editorName = prof.full_name;
+      }
+    } catch {}
+    const reviewFields = { review_status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: editorName };
+
     const { data, error } = await supabaseAdmin
       .from('articles')
-      .upsert(articleData, { onConflict: 'slug' })
+      .upsert({ ...articleData, ...reviewFields }, { onConflict: 'slug' })
       .select()
       .single();
 

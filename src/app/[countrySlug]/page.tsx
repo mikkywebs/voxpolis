@@ -32,8 +32,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: `Clear, original reporting on ${country.name} politics — government, elections, parties and policy, with what each story means.${lead}`.slice(0, 300),
     alternates: { canonical: path },
     openGraph: { title: `${title} | ${SITE_NAME}`, url: absoluteUrl(path), type: 'website' },
-    // An empty desk is thin content: keep it out of Google until it has stories.
-    robots: articles.length === 0 ? { index: false, follow: true } : undefined,
+    // Keep a country page out of Google until it lists at least one editor-approved story.
+    robots: articles.some((a) => a.review_status === 'approved') ? undefined : { index: false, follow: true },
   };
 }
 

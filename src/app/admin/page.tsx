@@ -736,6 +736,9 @@ export default function AdminDashboardPage() {
           <span className="text-xs text-gray-400 hidden sm:inline">
             Logged in as: <span className="text-white font-semibold">{currentUser?.email}</span>
           </span>
+          <Link href="/admin/review" className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg">
+            Review new stories
+          </Link>
           <Link href="/news" className="text-xs font-semibold text-blue-400 hover:text-blue-300">
             View Live News →
           </Link>

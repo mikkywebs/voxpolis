@@ -14,7 +14,8 @@ import { findLicensedPhoto, LicensedPhoto } from './photos';
  */
 
 const MAX_AGE_HOURS = Number(process.env.INGEST_MAX_AGE_HOURS || 36);
-const MIN_IMPORTANCE = Number(process.env.INGEST_MIN_IMPORTANCE || 4);
+// Only significant stories (6+ = significant national story). Change with INGEST_MIN_IMPORTANCE.
+const MIN_IMPORTANCE = Number(process.env.INGEST_MIN_IMPORTANCE || 6);
 const RETRY_AFTER_HOURS = 72;
 // Time budget inside one 60s serverless call: feeds ≤8s, reading articles ≤12s, AI writing ≤34s.
 const EXTRACT_BUDGET_MS = 12_000;
