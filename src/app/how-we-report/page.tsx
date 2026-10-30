@@ -70,12 +70,11 @@ export default function HowWeReportPage() {
         </section>
 
         <section id="editor" className="space-y-3 scroll-mt-24">
-          <h2 className="text-xl font-black">6. A human editor checks every story</h2>
+          <h2 className="text-xl font-black">6. Every story is edited before it is published</h2>
           <p>
-            New stories start as drafts marked &quot;awaiting editor review&quot;. Our editor reads each one against the
-            original report, checks names, numbers and dates, fixes anything unclear or unfair, and only then approves it.
-            Approved stories carry a &quot;Reviewed by&quot; line with the editor&apos;s name. Stories that fall short are
-            rejected and removed.
+            Nothing goes on Voxpolis automatically. Each story starts as a private draft. Our editors read it against the
+            original report, check names, numbers and dates, fix anything unclear or unfair, choose the photo, and only then
+            publish it. Drafts that fall short are discarded.
           </p>
         </section>
 

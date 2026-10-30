@@ -98,6 +98,26 @@ export async function POST(req: NextRequest) {
       update.key_points = f.key_points.map((k: unknown) => clean(k, 300)).filter(Boolean).slice(0, 6);
     }
 
+    // Featured image chosen by the editor: an upload to our own storage, a Wikimedia photo, or none.
+    if (typeof f.original_image_url === 'string') {
+      const url = f.original_image_url.trim();
+      const ours = /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/article-images\//.test(url);
+      const commons = /^https:\/\/(upload|thumb)\.wikimedia\.org\//.test(url);
+      if (!url) {
+        Object.assign(update, { original_image_url: null, image_credit: null, image_license: null, image_page_url: null, image_mode: 'breaking_logo' });
+      } else if (ours || commons) {
+        update.original_image_url = url;
+        update.image_mode = 'original';
+        if (ours) {
+          update.image_license = null;
+          update.image_page_url = null;
+        }
+      } else {
+        return NextResponse.json({ error: 'Images must be uploaded here (or come from Wikimedia Commons).' }, { status: 400 });
+      }
+    }
+    if (typeof f.image_credit === 'string') update.image_credit = f.image_credit.trim().slice(0, 160) || null;
+
     if (typeof f.poll_question === 'string') {
       const q = f.poll_question.trim().slice(0, 240);
       const { data: poll } = await supabaseAdmin.from('polls').select('id').eq('article_id', id).maybeSingle();
