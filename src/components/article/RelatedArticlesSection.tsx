@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import PhotoCredit from '@/components/article/PhotoCredit';
 import { ArticleData, getArticleImageUrl, getArticleFallbackUrl } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
 
@@ -27,7 +28,7 @@ export default function RelatedArticlesSection({ articles }: RelatedArticlesSect
           return (
             <Link
               key={art.id}
-              href={`/news/${art.slug}${art.country_code ? `?country=${art.country_code}` : ''}`}
+              href={`/news/${art.slug}`}
               className={`group p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-500/50 transition flex flex-col justify-between ${
                 idx === 3 ? 'hidden sm:flex' : 'flex'
               }`}
@@ -48,6 +49,7 @@ export default function RelatedArticlesSection({ articles }: RelatedArticlesSect
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"
                   />
+                  <PhotoCredit article={art} />
                 </div>
 
               <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-1">

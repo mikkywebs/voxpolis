@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import PhotoCredit from '@/components/article/PhotoCredit';
 import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
 import UniversalEngagementBar from './UniversalEngagementBar';
@@ -64,7 +65,7 @@ export default function HeroPopularitySlider({
   const imageUrl = getArticleImageUrl(active, currentIndex);
   const fallbackUrl = getArticleFallbackUrl(active, currentIndex);
   const displayTitle = decodeAllHtmlEntities((active.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
-  const articleUrl = `/news/${active.slug}${countryCode ? `?country=${countryCode}` : ''}`;
+  const articleUrl = `/news/${active.slug}`;
   const isFeaturedStory = active.is_featured || active.tags?.some((t) => /featured/i.test(t));
 
   const handleCardClick = () => {
@@ -138,6 +139,7 @@ export default function HeroPopularitySlider({
       </div>
 
       {/* Slide Content Overlay */}
+      <PhotoCredit article={active} className="z-20" />
       <div className="relative z-10 p-5 sm:p-6 md:p-8 space-y-3">
         {/* Publisher & Freshness Row */}
         <div className="flex items-center gap-2 text-xs text-white/80 font-semibold flex-wrap">

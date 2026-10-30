@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import PhotoCredit from '@/components/article/PhotoCredit';
 import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl, formatCleanSnippet } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
 import { ExternalLink, AlertCircle, Eye, Sparkles } from 'lucide-react';
@@ -55,7 +56,7 @@ export default function FeedCard({ article, index, onCardClick }: FeedCardProps)
   const fallbackUrl = getArticleFallbackUrl(article, index);
   const formattedTime = formatExactTimestamp(article.created_at);
   const displayTitle = decodeAllHtmlEntities((article.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
-  const articleUrl = `/news/${article.slug}${article.country_code ? `?country=${article.country_code}` : ''}`;
+  const articleUrl = `/news/${article.slug}`;
 
   return (
     <article className="group bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/70 rounded-2xl overflow-hidden p-5 sm:p-6 shadow-sm hover:shadow-lg transition duration-200 flex flex-col justify-between h-full">
@@ -64,7 +65,7 @@ export default function FeedCard({ article, index, onCardClick }: FeedCardProps)
         <Link
           href={articleUrl}
           onClick={handleRecordClick}
-          className="block mb-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900"
+          className="block mb-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900 relative"
         >
           {/* eslint-disable-next-html-element-suppression */}
           <img
@@ -78,6 +79,7 @@ export default function FeedCard({ article, index, onCardClick }: FeedCardProps)
             }}
             className="w-full h-48 object-cover group-hover:scale-105 transition duration-300"
           />
+          <PhotoCredit article={article} />
         </Link>
 
         <div className="flex items-center justify-between text-xs mb-2">

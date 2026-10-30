@@ -35,7 +35,7 @@ JSON SCHEMA:
 }`;
 
 async function callGemini(prompt: string, payloadStr: string): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_STUDIO_API_KEY);
   if (!apiKey || apiKey.trim() === '') return null;
 
   const models = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-flash-latest'];

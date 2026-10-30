@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import SiteLogo from '@/components/branding/SiteLogo';
+import { COVERED_COUNTRY_CODES } from '@/config/coverage';
+import { getCountryByCode, getCountrySlug } from '@/config/countries';
 
 export default function Footer() {
   return (
@@ -12,6 +14,18 @@ export default function Footer() {
           <SiteLogo variant="dark" className="h-12 sm:h-14 w-auto mx-auto" />
         </Link>
 
+        {/* Country desks: crawlable links to every covered country */}
+        <nav aria-label="Country desks" className="flex items-center justify-center flex-wrap gap-x-4 gap-y-2 text-xs text-gray-400 max-w-4xl">
+          {COVERED_COUNTRY_CODES.map((code) => {
+            const c = getCountryByCode(code);
+            return (
+              <Link key={code} href={`/${getCountrySlug(c)}`} className="hover:text-blue-400 transition">
+                {c.name} politics
+              </Link>
+            );
+          })}
+        </nav>
+
         {/* Footer Navigation Links for All Trust Pages (Historical Archive link removed per request) */}
         <nav className="flex items-center justify-center flex-wrap gap-5 text-xs font-semibold text-gray-300">
           <Link href="/" className="hover:text-blue-400 transition">
@@ -19,6 +33,12 @@ export default function Footer() {
           </Link>
           <Link href="/about" className="hover:text-blue-400 transition">
             About Us
+          </Link>
+          <Link href="/how-we-report" className="hover:text-blue-400 transition">
+            How We Report
+          </Link>
+          <Link href="/corrections" className="hover:text-blue-400 transition">
+            Corrections
           </Link>
           <Link href="/contact" className="hover:text-blue-400 transition">
             Contact Us

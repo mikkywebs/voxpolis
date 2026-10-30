@@ -1,6 +1,7 @@
 import { getCountryByCode } from '@/config/countries';
 import { fetchRssArticlesForCountry, isCurrentMonthArticle } from './rss';
 import { decodeAllHtmlEntities } from './news-rewriter';
+import { isUsablePhoto } from './site';
 
 export interface ArticleData {
   id: string;
@@ -31,6 +32,20 @@ export interface ArticleData {
   total_reading_time_seconds: number;
   created_at: string;
   is_archived?: boolean;
+  // Editorial v2 fields (present on articles written by the new newsroom)
+  dek?: string;
+  key_points?: string[];
+  analysis?: string;
+  background?: string;
+  what_next?: string;
+  seo_title?: string;
+  meta_description?: string;
+  importance?: number;
+  updated_at?: string;
+  source_published_at?: string;
+  image_credit?: string;
+  image_license?: string;
+  image_page_url?: string;
   poll?: {
     id: string;
     question: string;
@@ -1073,48 +1088,19 @@ export async function fetchArticlesForCountry(
         }
       }
     } catch (e) {
-      console.warn('API news route fetch failed, falling back to localized civic briefs.', e);
+      console.warn('API news route fetch failed.', e);
     }
+    return [];
   }
 
-  // Server-side: Query Supabase Postgres database for durable published articles
+  // Server-side: read real published articles only (never placeholder text).
   try {
-    const { supabaseAdmin } = await import('@/lib/supabase/admin');
-    const { data: dbRows, error: dbErr } = await supabaseAdmin
-      .from('articles')
-      .select('*')
-      .eq('country_code', code)
-      .order('created_at', { ascending: false });
-
-    if (!dbErr && dbRows && dbRows.length > 0) {
-      return dbRows.map((dbArticle: any) => ({
-        id: dbArticle.id || `db-${dbArticle.slug}`,
-        slug: dbArticle.slug,
-        title: dbArticle.title,
-        snippet: dbArticle.snippet || '',
-        content: dbArticle.content || '',
-        ai_analysis: dbArticle.ai_analysis,
-        country_code: dbArticle.country_code || code,
-        language: dbArticle.language || langCode,
-        category: dbArticle.category || 'politics',
-        image_mode: dbArticle.original_image_url ? ('original' as const) : ('breaking_logo' as const),
-        original_image_url: dbArticle.original_image_url || undefined,
-        source_name: dbArticle.source_name || 'Voxpolis',
-        source_url: dbArticle.source_url || `https://voxpolis.app/news/${dbArticle.slug}`,
-        author: dbArticle.author,
-        is_breaking: dbArticle.is_breaking === true,
-        is_featured: dbArticle.is_featured !== undefined ? dbArticle.is_featured : true,
-        tags: dbArticle.tags || ['Featured News', country.name, 'Voxpolis'],
-        views_count: dbArticle.views_count || 0,
-        total_reading_time_seconds: dbArticle.total_reading_time_seconds || 180,
-        created_at: dbArticle.created_at || new Date().toISOString(),
-      }));
-    }
+    const { getLatestForCountry } = await import('@/lib/articles');
+    return await getLatestForCountry(code);
   } catch (err) {
-    console.warn('Server-side database query error, using localized briefs.', err);
+    console.warn('Server-side article query failed.', err);
+    return [];
   }
-
-  return getFallbackArticlesForCountry(code, langCode);
 }
 
 export function getFallbackArticlesForCountry(countryCode: string, language: string = 'en'): ArticleData[] {
@@ -1448,13 +1434,14 @@ export function getArticleFallbackUrl(article: Partial<ArticleData>, seed?: numb
   return getStandardFallbackImage(seed !== undefined ? seed : (article.slug || article.id || article.title || ''));
 }
 
+/**
+ * Image for a story: its licensed photo if it has one (always with a credit),
+ * otherwise the generated Voxpolis story card. Publisher photos are never shown.
+ */
 export function getArticleImageUrl(article: Partial<ArticleData>, seed?: number | string): string {
-  if (
-    article.original_image_url &&
-    article.original_image_url.trim() !== '' &&
-    !article.original_image_url.includes('google.com/news')
-  ) {
-    return article.original_image_url.trim();
+  if (isUsablePhoto(article.original_image_url, article.image_credit)) {
+    return article.original_image_url!.trim();
   }
+  if (article.slug) return `/card/${encodeURIComponent(article.slug)}`;
   return getArticleFallbackUrl(article, seed);
 }

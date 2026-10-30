@@ -169,7 +169,7 @@ function setCachedExtraction(urlKey: string, payload: Record<string, any>) {
  * Active punchy title + exactly 4 crisp, objective, factual paragraphs.
  */
 async function callGemini(systemPrompt: string, userText: string): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_STUDIO_API_KEY);
   if (!apiKey || apiKey.trim() === '') return null;
 
   const models = [

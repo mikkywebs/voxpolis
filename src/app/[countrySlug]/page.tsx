@@ -1,123 +1,86 @@
-'use client';
+import type { Metadata } from 'next';
+import { notFound, permanentRedirect } from 'next/navigation';
+import LiveFeed from '@/components/feed/LiveFeed';
+import { ALL_COUNTRIES, CountryConfig, findCountryBySlug, getCountrySlug } from '@/config/countries';
+import { getLatestForCountry, getLatestWorld } from '@/lib/articles';
+import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 300;
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import BentoFeedLayout from '@/components/bento/BentoFeedLayout';
-import { CountryConfig, getCountrySlug, getCountryBySlug } from '@/config/countries';
-import { fetchArticlesForCountry, ArticleData } from '@/lib/news';
-import { createClient } from '@/lib/supabase/client';
+interface Props {
+  params: { countrySlug: string };
+}
 
-export default function CountryFeedPage() {
-  const params = useParams();
-  const router = useRouter();
-  const supabase = createClient();
-  const countrySlug = ((params?.countrySlug as string) || 'nigeria').toLowerCase();
+function resolve(slug: string): CountryConfig {
+  const country = findCountryBySlug(slug);
+  if (country) return country;
+  // Old links like /ng → /nigeria
+  const byCode = ALL_COUNTRIES.find((c) => c.code.toLowerCase() === slug.toLowerCase());
+  if (byCode) permanentRedirect(`/${getCountrySlug(byCode)}`);
+  return notFound();
+}
 
-  const initialCountry = getCountryBySlug(countrySlug);
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const country = findCountryBySlug(params.countrySlug);
+  if (!country) return { title: 'Not found', robots: { index: false } };
+  const articles = await getLatestForCountry(country.code, 12);
+  const path = `/${getCountrySlug(country)}`;
+  const title = `${country.name} Political News Today: Latest Updates & Analysis`;
+  const lead = articles[0]?.title ? ` Latest: ${articles[0].title}.` : '';
+  return {
+    title,
+    description: `Clear, original reporting on ${country.name} politics — government, elections, parties and policy, with what each story means.${lead}`.slice(0, 300),
+    alternates: { canonical: path },
+    openGraph: { title: `${title} | ${SITE_NAME}`, url: absoluteUrl(path), type: 'website' },
+    // An empty desk is thin content: keep it out of Google until it has stories.
+    robots: articles.length === 0 ? { index: false, follow: true } : undefined,
+  };
+}
 
-  const [selectedCountry, setSelectedCountry] = useState<CountryConfig>(initialCountry);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>(initialCountry.languages[0]?.code || 'en');
-  const [articles, setArticles] = useState<ArticleData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+export default async function CountryPage({ params }: Props) {
+  const country = resolve(params.countrySlug);
+  const [articles, world] = await Promise.all([getLatestForCountry(country.code, 40), getLatestWorld(country.code, 24)]);
+  const path = `/${getCountrySlug(country)}`;
 
-  // Sync state if countrySlug URL param changes dynamically
-  useEffect(() => {
-    const matched = getCountryBySlug(countrySlug);
-    setSelectedCountry(matched);
-    const defaultLang = matched.languages[0]?.code || 'en';
-    setSelectedLanguage(defaultLang);
-  }, [countrySlug]);
-
-  // Check auth status for guest vs member
-  useEffect(() => {
-    let authSub: any = null;
-
-    async function checkAuth() {
-      try {
-        const { data } = await supabase.auth.getSession();
-        const sessionUser = data?.session?.user;
-        const localActive = typeof window !== 'undefined' && localStorage.getItem('voxpolis_session_active') === 'true';
-        const localName = typeof window !== 'undefined' && localStorage.getItem('voxpolis_user_name');
-        const localEmail = typeof window !== 'undefined' && localStorage.getItem('voxpolis_user_email');
-
-        if (sessionUser) {
-          setUser({
-            id: sessionUser.id,
-            email: sessionUser.email,
-            fullName: sessionUser.user_metadata?.full_name || localName || sessionUser.email?.split('@')[0] || 'Citizen',
-          });
-        } else if (localActive || localName) {
-          setUser({
-            id: 'local-member',
-            email: localEmail || undefined,
-            fullName: localName || 'Citizen',
-          });
-        }
-
-        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-          if (session?.user) {
-            setUser({
-              id: session.user.id,
-              email: session.user.email,
-              fullName: session.user.user_metadata?.full_name || 'Citizen',
-            });
-          } else if (typeof window !== 'undefined' && localStorage.getItem('voxpolis_session_active') === 'true') {
-            setUser({
-              id: 'local-member',
-              fullName: localStorage.getItem('voxpolis_user_name') || 'Citizen',
-            });
-          } else {
-            setUser(null);
-          }
-        });
-        authSub = sub?.subscription;
-      } catch (e) {
-        if (typeof window !== 'undefined') {
-          const localName = localStorage.getItem('voxpolis_user_name');
-          if (localName || localStorage.getItem('voxpolis_session_active') === 'true') {
-            setUser({
-              id: 'local-member',
-              fullName: localName || 'Citizen',
-            });
-          }
-        }
-      }
-    }
-
-    checkAuth();
-    return () => {
-      if (authSub) authSub.unsubscribe();
-    };
-  }, [supabase]);
-
-  // Fetch articles when country or language changes
-  useEffect(() => {
-    async function loadNews() {
-      setLoading(true);
-      const data = await fetchArticlesForCountry(selectedCountry.code, selectedLanguage);
-      setArticles(data);
-      setLoading(false);
-    }
-    if (selectedCountry) {
-      loadNews();
-    }
-  }, [selectedCountry, selectedLanguage]);
-
-  const handleCountryChange = (c: CountryConfig) => {
-    const slug = getCountrySlug(c);
-    router.push(`/${slug}`);
+  const ld = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        name: `${country.name} political news`,
+        url: absoluteUrl(path),
+        isPartOf: { '@id': `${SITE_URL}/#website` },
+        mainEntity: {
+          '@type': 'ItemList',
+          itemListElement: articles.slice(0, 20).map((a, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            url: absoluteUrl(`/news/${a.slug}`),
+            name: a.title,
+          })),
+        },
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: country.name, item: absoluteUrl(path) },
+        ],
+      },
+    ],
   };
 
   return (
-    <BentoFeedLayout
-      selectedCountry={selectedCountry}
-      articles={articles}
-      loading={loading}
-      user={user}
-      onSelectCountry={handleCountryChange}
-    />
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      <LiveFeed
+        mode="country"
+        initialCountryCode={country.code}
+        initialArticles={articles}
+        worldArticles={world}
+        heading={`${country.name} political news`}
+        intro={`The latest on ${country.name}'s government, elections, parties and policy, written in plain English with analysis of what each development means.`}
+      />
+    </>
   );
 }

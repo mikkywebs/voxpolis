@@ -1,4 +1,38 @@
-# Voxpolis Automatic Multi-Country Political News Engine
+# Voxpolis — political news, explained
+
+## How the newsroom works (v2)
+
+1. **Desks** (`src/config/coverage.ts`): 15 country desks + a World desk, each with tested publisher feeds.
+2. **Schedule** (`.github/workflows/ingest.yml`): every hour GitHub Actions calls `/api/ingest?desk=XX` for each Tier 1 desk; Tier 2 every 3 hours. Vercel Cron runs the NG desk daily as a backup.
+3. **Pipeline** (`src/lib/editorial/`): read feeds → drop old / non-political / already-covered → rank stories carried by several outlets first → read the article → AI writes an original Voxpolis article (headline, summary, key points, story, *What it means*, background, *What happens next*, poll question only when there is a real public choice) → quality gates (politics only, no 8-word copying, minimum length, duplicate check) → save → log to `ingest_log`.
+4. **Pages** render on the server (`src/app/page.tsx`, `src/app/[countrySlug]/page.tsx`, `src/app/news/[slug]/page.tsx`) with full SEO metadata and structured data.
+5. **SEO files**: `/sitemap.xml`, `/news-sitemap.xml` (last 48h), `/feed.xml`, `/robots.txt`, `/ads.txt` (all generated).
+
+### Environment variables (Vercel → Settings → Environment Variables)
+
+| Name | Needed | What it is |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | yes | Supabase |
+| `NEXT_PUBLIC_SITE_URL` | yes | Your primary domain, e.g. `https://www.voxpolis.app` |
+| `CRON_SECRET` | yes | Any long random string; protects `/api/ingest` |
+| `GOOGLE_STUDIO_API_KEY` (or `GEMINI_API_KEY`) | yes (or one of the next two) | AI writer (Google AI Studio key) |
+| `DEEPSEEK_API_KEY`, `KIMI_API_KEY` | optional | AI fallbacks |
+| `GEMINI_MODELS` | optional | Comma list, default `gemini-flash-latest,gemini-flash-lite-latest` |
+| `INGEST_MIN_IMPORTANCE` | optional | 1-10, default 4 |
+| `GOOGLE_SITE_VERIFICATION` | optional | Search Console meta-tag code |
+| `NEXT_PUBLIC_ADSENSE_PUB_ID` | later | `ca-pub-…` — turns AdSense on |
+| `NEXT_PUBLIC_MONETAG_SRC`, `NEXT_PUBLIC_MONETAG_ZONE`, `ADS_TXT_EXTRA`, `MONETAG_VERIFICATION` | later | Monetag |
+
+GitHub repository secrets (Settings → Secrets and variables → Actions): `SITE_URL`, `CRON_SECRET`.
+
+### Useful checks
+- Why was a story skipped? `select * from ingest_log order by created_at desc limit 50;`
+- Are feeds still healthy? The "Build check" workflow runs `scripts/check-sources.ts` on every branch push.
+
+---
+
+## Legacy notes (v1)
+
 
 **Voxpolis** is a fully automated, unattended multi-country political intelligence web app. It ingests primary source RSS feeds, scrapes full source article HTML, rewrites articles using Anthropic Claude into original briefs, enforces strict quality gates, and serves country-localized political coverage.
 

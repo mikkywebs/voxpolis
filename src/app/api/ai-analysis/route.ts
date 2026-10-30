@@ -114,7 +114,7 @@ Summary Snippet: ${cleanSnippet}
 Full Context: ${cleanContent}`;
 
     // 1. Try Gemini
-    const geminiKey = process.env.GEMINI_API_KEY;
+    const geminiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_STUDIO_API_KEY);
     if (geminiKey && geminiKey.trim() !== '') {
       const models = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3.5-flash-lite'];
       for (const model of models) {

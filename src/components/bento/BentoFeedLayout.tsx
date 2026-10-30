@@ -26,6 +26,10 @@ interface BentoFeedLayoutProps {
   onSelectCountry?: (country: CountryConfig) => void;
   // Followed feeds for logged in users or guest exploration
   secondaryFeeds?: Array<{ country: CountryConfig; articles: ArticleData[] }>;
+  // SEO: visible page heading + intro (rendered on the server)
+  heading?: string;
+  intro?: string;
+  secondaryTitle?: string;
 }
 
 export default function BentoFeedLayout({
@@ -35,6 +39,9 @@ export default function BentoFeedLayout({
   user,
   onSelectCountry,
   secondaryFeeds = [],
+  heading,
+  intro,
+  secondaryTitle,
 }: BentoFeedLayoutProps) {
   const router = useRouter();
   const [isCountryModalOpen, setIsCountryModalOpen] = useState(false);
@@ -75,6 +82,44 @@ export default function BentoFeedLayout({
     }
   };
 
+  const secondaryBlock = secondaryFeeds.length > 0 && (
+                <div className="pt-8 mt-8 border-t border-gray-200 dark:border-neutral-800 space-y-8">
+                  {secondaryTitle && (
+                    <h2 className="text-lg font-black text-gray-900 dark:text-white">{secondaryTitle}</h2>
+                  )}
+                  {secondaryFeeds.map((feed) => (
+                    <div key={feed.country.code} className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{feed.country.flag}</span>
+                          <h4 className="text-sm font-extrabold text-gray-900 dark:text-white">
+                            {feed.country.name}
+                          </h4>
+                        </div>
+                        <Link
+                          href={`/${getCountrySlug(feed.country)}`}
+                          className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          View all in {feed.country.name} →
+                        </Link>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {feed.articles.slice(0, 3).map((art, idx) => (
+                          <StoryCard
+                            key={art.id || art.slug || idx}
+                            article={art}
+                            index={idx}
+                            countryCode={feed.country.code}
+                            variant="standard"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
       {/* 1. Header Bar with Greeting, Country Selector Trigger, Centered Logo & Theme Toggle */}
@@ -89,7 +134,24 @@ export default function BentoFeedLayout({
 
       {/* 3. Main Bento Feed Area */}
       <main className="flex-1 max-w-[1440px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-        {loading ? (
+        {heading && (
+          <div className="mb-5">
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{heading}</h1>
+            {intro && <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 max-w-3xl">{intro}</p>}
+          </div>
+        )}
+        {!loading && articles.length === 0 ? (
+          <div className="w-full rounded-3xl bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 p-10 text-center space-y-3">
+            <Newspaper className="w-10 h-10 text-gray-400 mx-auto" />
+            <p className="text-base font-bold text-gray-800 dark:text-gray-200">
+              Our {selectedCountry.name} desk has no new stories yet.
+            </p>
+            <p className="text-sm text-gray-500">New reports are added through the day. Meanwhile, here is what is happening elsewhere.</p>
+          </div>
+        ) : null}
+        {!loading && articles.length === 0 ? (
+          secondaryBlock
+        ) : loading ? (
           <div className="w-full h-96 rounded-3xl bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 flex flex-col items-center justify-center gap-4">
             <img
               src="/voxpolis-loader-logo.png"
@@ -208,41 +270,8 @@ export default function BentoFeedLayout({
                 </div>
               )}
 
-              {/* Secondary Feeds (e.g. Followed Countries or Global Dispatches) */}
-              {secondaryFeeds.length > 0 && (
-                <div className="pt-8 mt-8 border-t border-gray-200 dark:border-neutral-800 space-y-8">
-                  {secondaryFeeds.map((feed) => (
-                    <div key={feed.country.code} className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{feed.country.flag}</span>
-                          <h4 className="text-sm font-extrabold text-gray-900 dark:text-white">
-                            {feed.country.name}
-                          </h4>
-                        </div>
-                        <Link
-                          href={`/${getCountrySlug(feed.country)}`}
-                          className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
-                        >
-                          View all in {feed.country.name} →
-                        </Link>
-                      </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {feed.articles.slice(0, 3).map((art, idx) => (
-                          <StoryCard
-                            key={art.id || art.slug || idx}
-                            article={art}
-                            index={idx}
-                            countryCode={feed.country.code}
-                            variant="standard"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {secondaryBlock}
             </div>
           </div>
         )}
