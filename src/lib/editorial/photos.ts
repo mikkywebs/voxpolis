@@ -117,7 +117,7 @@ function evaluate(page: any, subject: string, person: boolean, countryName?: str
     if (EVENT_HINT.test(title)) score -= 3;
     if (PORTRAIT_HINT.test(title)) score += 3;
     if (/\(cropped/i.test(title)) score += 1;
-    if (NOT_MAIN_SUBJECT.test(title.replace(/^File:/, ''))) score -= 6;
+    if (NOT_MAIN_SUBJECT.test(title.replace(/^File:/, '')) || /\s&\s|%26/.test(title)) score -= 6;
     if (cleanTitle.length > 90) score -= 2; // long captions are usually event photos with several people
   } else {
     // Institutions and places must match the full name, so "Electoral Commission of Afghanistan"
