@@ -45,7 +45,9 @@ export async function GET(request: Request) {
       const hasCompletedProfile = !!(user.user_metadata?.username && user.user_metadata?.primary_country);
 
       let targetPath = '/onboarding';
-      if (!hasCompletedProfile) {
+      if (next === '/reset-password') {
+        targetPath = next; // password reset link: go straight to the new-password form
+      } else if (!hasCompletedProfile) {
         targetPath = next ? `/onboarding?next=${encodeURIComponent(next)}` : '/onboarding';
       } else if (next) {
         targetPath = next;

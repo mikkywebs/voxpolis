@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { articlePath } from '@/lib/paths';
 import PhotoCredit from '@/components/article/PhotoCredit';
 import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
@@ -65,7 +66,7 @@ export default function StoryCard({
   const fallbackUrl = getArticleFallbackUrl(article, index);
   const formattedTime = formatExactTimestamp(article.created_at);
   const displayTitle = decodeAllHtmlEntities((article.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
-  const articleUrl = `/news/${article.slug}`;
+  const articleUrl = articlePath(article);
 
   // 1. ADJACENT CARD (Placed next to Hero Slider in Row 1)
   if (variant === 'adjacent') {

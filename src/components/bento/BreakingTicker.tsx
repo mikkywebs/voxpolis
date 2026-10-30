@@ -1,5 +1,7 @@
 'use client';
 
+import { articlePath } from '@/lib/paths';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArticleData, formatExactTimestamp } from '@/lib/news';
@@ -35,7 +37,7 @@ export default function BreakingTicker({ articles, countryCode }: BreakingTicker
 
   const activeItem = tickerItems[currentIndex] || tickerItems[0];
   const cleanTitle = decodeAllHtmlEntities((activeItem.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
-  const articleUrl = `/news/${activeItem.slug}`;
+  const articleUrl = articlePath(activeItem);
   const timeFormatted = formatExactTimestamp(activeItem.created_at);
 
   return (

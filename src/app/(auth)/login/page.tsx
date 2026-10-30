@@ -1,5 +1,6 @@
 'use client';
 
+import { rememberAfterLogin } from '@/components/auth/AuthReturn';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -22,7 +23,7 @@ export default function LoginPage() {
     try {
       const params = new URLSearchParams(window.location.search);
       const n = params.get('next') || params.get('redirect') || '';
-      if (n) setNextParam(n);
+      if (n && n.startsWith('/') && !n.startsWith('//')) setNextParam(n);
     } catch {}
   }, []);
 
@@ -61,6 +62,7 @@ export default function LoginPage() {
     setErrorMsg('');
     setLoading(true);
     try {
+      if (nextParam) rememberAfterLogin(nextParam);
       const callbackUrl = nextParam
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextParam)}`
         : `${window.location.origin}/auth/callback`;
@@ -95,6 +97,7 @@ export default function LoginPage() {
     setErrorMsg('');
     setLoading(true);
     try {
+      if (nextParam) rememberAfterLogin(nextParam);
       const callbackUrl = nextParam
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextParam)}`
         : `${window.location.origin}/auth/callback`;
@@ -207,6 +210,11 @@ export default function LoginPage() {
                 className="w-full text-xs p-3 pl-10 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
               <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
+            </div>
+            <div className="text-right mt-1.5">
+              <Link href="/forgot-password" className="text-[11px] font-semibold text-blue-600 hover:underline">
+                Forgot password?
+              </Link>
             </div>
           </div>
 

@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyAdmin } from '@/lib/admin/auth';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
+import { articlePath, isValidSlug } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 
-  const { data: current } = await supabaseAdmin.from('articles').select('id, slug, country_code').eq('id', id).maybeSingle();
+  const { data: current } = await supabaseAdmin.from('articles').select('id, slug, country_code, review_status').eq('id', id).maybeSingle();
   if (!current) return NextResponse.json({ error: 'Story not found' }, { status: 404 });
 
   const update: Record<string, any> = { updated_at: new Date().toISOString() };
@@ -89,6 +90,15 @@ export async function POST(req: NextRequest) {
     if (analysis !== undefined) {
       update.analysis = analysis;
       update.ai_analysis = analysis;
+    }
+    // Web address: editable while it's a draft; locked once published (changing live addresses hurts ranking).
+    if (typeof f.slug === 'string' && f.slug.trim() && f.slug.trim() !== current.slug) {
+      const slug = f.slug.trim().toLowerCase();
+      if (current.review_status === 'approved') return NextResponse.json({ error: 'The web address of a published story cannot be changed.' }, { status: 400 });
+      if (!isValidSlug(slug)) return NextResponse.json({ error: 'Web address: use 8-80 lowercase letters, numbers and hyphens only.' }, { status: 400 });
+      const { data: taken } = await supabaseAdmin.from('articles').select('id').or(`slug.eq.${slug},previous_slug.eq.${slug}`).neq('id', id).limit(1);
+      if (taken && taken.length) return NextResponse.json({ error: 'That web address is already used by another story.' }, { status: 400 });
+      update.slug = slug;
     }
     const bg = clean(f.background, 2000);
     if (bg !== undefined) update.background = bg;
@@ -147,7 +157,7 @@ export async function POST(req: NextRequest) {
 
   // Refresh the public pages that show this story.
   try {
-    revalidatePath(`/news/${current.slug}`);
+    revalidatePath(articlePath({ slug: update.slug || current.slug, country_code: current.country_code }));
     revalidatePath(`/${getCountrySlug(getCountryByCode(current.country_code))}`);
     revalidatePath('/');
     revalidatePath('/sitemap.xml');

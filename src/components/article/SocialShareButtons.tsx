@@ -6,14 +6,14 @@ import { Share2, Copy, Check, Send } from 'lucide-react';
 interface SocialShareButtonsProps {
   title: string;
   slug: string;
+  path?: string; // public address, e.g. /nigeria/peter-obi-tinubu-campaign-2027
 }
 
-export default function SocialShareButtons({ title, slug }: SocialShareButtonsProps) {
+export default function SocialShareButtons({ title, slug, path }: SocialShareButtonsProps) {
   const [copied, setCopied] = useState(false);
 
-  const fullUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/news/${slug}`
-    : `https://voxpolis.app/news/${slug}`;
+  const href = path || `/news/${slug}`;
+  const fullUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.voxpolis.app'}${href}`;
 
   const encodedUrl = encodeURIComponent(fullUrl);
   const encodedTitle = encodeURIComponent(title);

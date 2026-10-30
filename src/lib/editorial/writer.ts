@@ -35,7 +35,7 @@ You receive ONE source news report. You write ONE original Voxpolis article abou
 Readers come to Voxpolis because we explain politics clearly: what happened, why it matters, and what to watch.
 
 HARD RULES
-1. ORIGINAL WORDS. Never copy 6 or more consecutive words from the source, except short direct quotes inside quotation marks with attribution (max 2 quotes, each under 20 words). Rebuild every sentence from scratch.
+1. ORIGINAL WORDS. Never copy 7 or more consecutive words from the source, except short direct quotes inside quotation marks with attribution (max 2 quotes, each under 20 words). Rebuild every sentence from scratch.
 2. FACTS ONLY FROM THE SOURCE for the news part. Keep names, titles, numbers, dates and places exact. Never invent quotes, reactions, figures, critics, protests or outcomes.
 3. ATTRIBUTE. Separate confirmed facts from claims ("the minister said", "the party alleges").
 4. BALANCE. Politics divides people. Present the main competing positions fairly. Never take a side, never use loaded words, never tell readers what to think or whom to vote for.
@@ -56,11 +56,42 @@ LENGTHS
 - background: one paragraph, 50-110 words, the context a newcomer needs.
 - what_next: one paragraph, 30-80 words, concrete next steps or dates only if reported or certain.
 - tags: 3-6 short topical tags (people, institutions, issues). actors: key people/institutions named.
+- slug_keywords: 3-6 plain words for the web address, most-searched names first, no dates, no filler words. Example: "peter obi tinubu campaign 2027".
 - image_subjects: 2-3 search terms to find a real photo on Wikimedia Commons. Most important person's FULL name first (e.g. "Bola Tinubu"), then the main institution or building with its country (e.g. "National Assembly of Nigeria"). Only real, photographable people, buildings or places. Never abstract ideas.
 - importance: 1-10. 9-10 national turning point or global headline; 6-8 significant national story; 4-5 notable; 1-3 minor/local/routine.
 
 Return ONLY this JSON:
-{"is_political":true,"country_iso":"NG","importance":7,"headline":"","seo_title":"","meta_description":"","dek":"","key_points":[""],"body":[""],"analysis":[""],"background":"","what_next":"","question":null,"tags":[""],"actors":[""],"image_subjects":[""],"slug_keywords":"three to six words","completeness":"complete","incomplete_reason":null}`;
+{"is_political":true,"country_iso":"NG","importance":7,"headline":"","seo_title":"","meta_description":"","dek":"","key_points":[""],"body":[""],"analysis":[""],"background":"","what_next":"","question":null,"tags":[""],"actors":[""],"image_subjects":[""],"slug_keywords":"3-6 words","completeness":"complete","incomplete_reason":null}`;
+
+const STR = { type: 'STRING' };
+const STR_LIST = { type: 'ARRAY', items: STR };
+/** Gemini structured-output schema: guarantees valid, complete JSON in exactly this shape. */
+const RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    is_political: { type: 'BOOLEAN' },
+    country_iso: STR,
+    importance: { type: 'INTEGER' },
+    headline: STR,
+    seo_title: STR,
+    meta_description: STR,
+    dek: STR,
+    key_points: STR_LIST,
+    body: STR_LIST,
+    analysis: STR_LIST,
+    background: STR,
+    what_next: STR,
+    question: { type: 'STRING', nullable: true },
+    tags: STR_LIST,
+    actors: STR_LIST,
+    image_subjects: STR_LIST,
+    slug_keywords: STR,
+    completeness: { type: 'STRING', enum: ['complete', 'incomplete'] },
+    incomplete_reason: { type: 'STRING', nullable: true },
+  },
+  required: ['is_political', 'country_iso', 'importance', 'headline', 'seo_title', 'meta_description', 'dek', 'key_points', 'body', 'analysis', 'background', 'what_next', 'tags', 'actors', 'image_subjects', 'slug_keywords', 'completeness'],
+  propertyOrdering: ['is_political', 'country_iso', 'importance', 'headline', 'seo_title', 'meta_description', 'dek', 'key_points', 'body', 'analysis', 'background', 'what_next', 'question', 'tags', 'actors', 'image_subjects', 'slug_keywords', 'completeness', 'incomplete_reason'],
+};
 
 export async function writeVoxpolisArticle(input: {
   sourceTitle: string;
@@ -83,8 +114,17 @@ Source headline: ${input.sourceTitle}
 Source text:
 ${input.sourceText}`;
 
-  const { text, provider, notes } = await callNewsroomLLM(SYSTEM, user);
-  const raw = parseJsonReply<any>(text);
+  // One automatic retry if the reply can't be read.
+  let reply = await callNewsroomLLM(SYSTEM, user, RESPONSE_SCHEMA);
+  let raw: any;
+  try {
+    raw = parseJsonReply<any>(reply.text);
+  } catch (first) {
+    reply = await callNewsroomLLM(SYSTEM, user, RESPONSE_SCHEMA);
+    raw = parseJsonReply<any>(reply.text);
+    reply.notes.unshift(`retried after unreadable reply (${(first as Error).message.slice(0, 60)})`);
+  }
+  const { provider, notes } = reply;
 
   const arr = (v: any) => (Array.isArray(v) ? v : typeof v === 'string' && v ? [v] : []).map((x: any) => String(x).trim()).filter(Boolean);
   const str = (v: any) => (typeof v === 'string' ? v.trim() : '');
@@ -132,7 +172,8 @@ export function checkPiece(piece: EditorialPiece, sourceTitle: string, sourceTex
 
   // Originality: no 8+ word run copied from the source, outside quotation marks.
   const unquoted = everything.replace(/["“][^"”]{0,200}["”]/g, ' ');
-  const overlaps = findConsecutiveWordOverlaps(`${sourceTitle}\n${sourceText}`, unquoted, 8);
+  // 10+ identical words in a row = copying. (8 flagged long official names/titles, which isn't copying.)
+  const overlaps = findConsecutiveWordOverlaps(`${sourceTitle}\n${sourceText}`, unquoted, 10);
   if (overlaps.length > 0) problems.push(`copied wording: "${overlaps[0].span}"`);
 
   return problems;

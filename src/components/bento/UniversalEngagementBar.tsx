@@ -1,5 +1,7 @@
 'use client';
 
+import { articlePath } from '@/lib/paths';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ThumbsUp, ThumbsDown, MessageSquare } from 'lucide-react';
@@ -115,7 +117,7 @@ export default function UniversalEngagementBar({
     }).catch(() => {});
   };
 
-  const articleCommentsUrl = `/news/${articleSlug}#comments`;
+  const articleCommentsUrl = `${articlePath({ slug: articleSlug, country_code: countryCode })}#comments`;
 
   const isHero = variant === 'hero';
 

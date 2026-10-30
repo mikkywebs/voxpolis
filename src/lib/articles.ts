@@ -159,3 +159,16 @@ export async function getLatestApproved(limit = 50): Promise<ArticleData[]> {
     return (data || []).filter(isPublished).map(rowToArticle);
   }, [] as ArticleData[]);
 }
+
+/** A published story that used to live at another address (for 301 redirects). */
+export async function getArticleByPreviousSlug(slug: string): Promise<ArticleData | null> {
+  return safe(async () => {
+    const { data } = await supabaseAdmin
+      .from('articles')
+      .select('*')
+      .eq('previous_slug', slug)
+      .eq('review_status', 'approved')
+      .maybeSingle();
+    return data && isPublished(data) ? rowToArticle(data) : null;
+  }, null);
+}

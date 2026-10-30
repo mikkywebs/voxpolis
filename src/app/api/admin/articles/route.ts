@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { articlePath } from '@/lib/paths';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
@@ -100,7 +101,7 @@ export async function GET(request: NextRequest) {
         is_featured: (art.tags && Array.isArray(art.tags) && art.tags.some((t: string) => /featured/i.test(t))) || false,
         tags: art.tags || [],
         created_at: art.created_at,
-        live_url: `/news/${art.slug}`,
+        live_url: articlePath(art),
       };
     });
 

@@ -5,6 +5,7 @@ import StickyFooterAd from '@/components/layout/StickyFooterAd';
 import ScrollToTopButton from '@/components/layout/ScrollToTopButton';
 import NetworkErrorOverlay from '@/components/common/NetworkErrorOverlay';
 import AdScripts from '@/components/ads/AdScripts';
+import AuthReturn from '@/components/auth/AuthReturn';
 import { getAdsenseClient, getMonetag } from '@/config/ads';
 import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <StickyFooterAd />
         <NetworkErrorOverlay />
         <AdScripts adsense={adsense} monetag={monetag} />
+        <AuthReturn />
       </body>
     </html>
   );

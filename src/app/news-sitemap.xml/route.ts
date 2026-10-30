@@ -1,4 +1,5 @@
 import { getSitemapEntries } from '@/lib/articles';
+import { articlePath } from '@/lib/paths';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
 
 // Google News sitemap: stories from the last 48 hours only.
@@ -14,7 +15,7 @@ export async function GET() {
   const items = recent
     .map(
       (a) => `  <url>
-    <loc>${SITE_URL}/news/${esc(a.slug)}</loc>
+    <loc>${SITE_URL}${esc(articlePath(a))}</loc>
     <news:news>
       <news:publication><news:name>${SITE_NAME}</news:name><news:language>en</news:language></news:publication>
       <news:publication_date>${new Date(a.created_at).toISOString()}</news:publication_date>

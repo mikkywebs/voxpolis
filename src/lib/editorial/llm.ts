@@ -27,14 +27,15 @@ async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<
   }
 }
 
-async function callGemini(system: string, user: string, notes: string[]): Promise<LLMResult | null> {
+async function callGemini(system: string, user: string, notes: string[], schema?: object): Promise<LLMResult | null> {
   // Accept the name used in Vercel (GOOGLE_STUDIO_API_KEY) as well as the standard names.
   const key = (process.env.GEMINI_API_KEY || process.env.GOOGLE_STUDIO_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
   if (!key) {
     notes.push('gemini: no key');
     return null;
   }
-  const models = (process.env.GEMINI_MODELS || 'gemini-flash-latest,gemini-flash-lite-latest')
+  // Lite first: fast and reliable within our time budget; Flash as backup. Override with GEMINI_MODELS.
+  const models = (process.env.GEMINI_MODELS || 'gemini-flash-lite-latest,gemini-flash-latest')
     .split(',')
     .map((m) => m.trim())
     .filter(Boolean);
@@ -43,7 +44,7 @@ async function callGemini(system: string, user: string, notes: string[]): Promis
 
   for (const model of models) {
     const t0 = Date.now();
-    const attempt = async (withThinking: boolean) =>
+    const attempt = async (withThinking: boolean, withSchema: boolean) =>
       withTimeout((signal) =>
         fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: 'POST',
@@ -56,17 +57,24 @@ async function callGemini(system: string, user: string, notes: string[]): Promis
               temperature: 0.4,
               maxOutputTokens: 8192,
               responseMimeType: 'application/json',
+              // Structured output: the model must return exactly this shape (no broken JSON).
+              ...(schema && withSchema ? { responseSchema: schema } : {}),
               ...(withThinking ? { thinkingConfig: { thinkingBudget } } : {}),
             },
           }),
         })
       );
     try {
-      let res = await attempt(thinkingBudget >= 0);
+      let res = await attempt(thinkingBudget >= 0, true);
       if (res.status === 400 && thinkingBudget >= 0) {
         // Model doesn't accept a thinking budget: retry without it.
-        notes.push(`gemini:${model} rejected thinkingBudget`);
-        res = await attempt(false);
+        notes.push(`gemini:${model} 400 with thinkingBudget (${(await res.clone().text()).slice(0, 60).replace(/\s+/g, ' ')})`);
+        res = await attempt(false, true);
+      }
+      if (res.status === 400 && schema) {
+        // Model doesn't accept the output template: plain JSON mode still works (parser repairs small slips).
+        notes.push(`gemini:${model} 400 with schema (${(await res.clone().text()).slice(0, 60).replace(/\s+/g, ' ')})`);
+        res = await attempt(false, false);
       }
       if (!res.ok) {
         notes.push(`gemini:${model} HTTP ${res.status} ${(await res.text()).slice(0, 120).replace(/\s+/g, ' ')}`);
@@ -129,10 +137,10 @@ async function callOpenAICompatible(
   }
 }
 
-export async function callNewsroomLLM(system: string, user: string): Promise<LLMResult> {
+export async function callNewsroomLLM(system: string, user: string, schema?: object): Promise<LLMResult> {
   const notes: string[] = [];
   const result =
-    (await callGemini(system, user, notes)) ||
+    (await callGemini(system, user, notes, schema)) ||
     (await callOpenAICompatible(
       'deepseek',
       'https://api.deepseek.com/chat/completions',
@@ -166,5 +174,16 @@ export function parseJsonReply<T = any>(raw: string): T {
   const start = s.indexOf('{');
   const end = s.lastIndexOf('}');
   if (start === -1 || end === -1) throw new Error('AI reply had no JSON object');
-  return JSON.parse(s.slice(start, end + 1));
+  const body = s.slice(start, end + 1);
+  try {
+    return JSON.parse(body);
+  } catch {
+    // Light repair for common model slips: trailing commas, smart quotes around keys, stray placeholders.
+    const repaired = body
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/<text omitted>|\.\.\.\s*\]/g, ']')
+      .replace(/\n\s*\/\/[^\n]*/g, '\n');
+    return JSON.parse(repaired);
+  }
 }

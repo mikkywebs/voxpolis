@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { articlePath } from '@/lib/paths';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
@@ -210,7 +211,7 @@ export async function POST(request: NextRequest) {
       message: 'Article successfully published live on Voxpolis!',
       article: data || articleData,
       slug,
-      liveUrl: `/news/${slug}`,
+      liveUrl: articlePath({ slug, country_code: country_code.toUpperCase() }),
       countrySlug: getCountrySlug(countryObj),
     });
   } catch (error: any) {

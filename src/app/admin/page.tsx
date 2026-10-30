@@ -44,6 +44,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import Link from 'next/link';
+import { articlePath } from '@/lib/paths';
 
 interface ColumnistItem {
   id: string;
@@ -1026,7 +1027,7 @@ export default function AdminDashboardPage() {
                               </span>
                               <span className="text-[10px] font-bold text-blue-400">{art.totalReads} reads</span>
                             </div>
-                            <Link href={`/news/${art.slug}`} target="_blank" className="text-white hover:text-blue-400 transition font-semibold line-clamp-1 mt-0.5">
+                            <Link href={articlePath(art)} target="_blank" className="text-white hover:text-blue-400 transition font-semibold line-clamp-1 mt-0.5">
                               {art.title}
                             </Link>
                           </div>

@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { CoverageDesk } from '@/config/coverage';
 import { getCountryByCode } from '@/config/countries';
-import { generateUniqueSlug } from '@/lib/pipeline/slug';
+import { toSlug, RESERVED_SLUGS } from '@/lib/paths';
 import { readFeeds, looksPolitical, titleTokens, similarity, FeedItem } from './feeds';
 import { extractSourceArticle } from './extract';
 import { writeVoxpolisArticle, checkPiece, EditorialPiece } from './writer';
@@ -116,9 +116,25 @@ async function isDuplicateOfRecent(country: string, headline: string, sourceTitl
   return null;
 }
 
+/** Short, readable, unique web address part, e.g. "peter-obi-tinubu-campaign-2027". */
+async function uniqueSlug(base: string): Promise<string> {
+  let root = toSlug(base, 60) || 'political-update';
+  if (RESERVED_SLUGS.has(root) || root.length < 8) root = `${root}-update`;
+  for (let n = 1; n <= 20; n++) {
+    const candidate = n === 1 ? root : `${root}-${n}`;
+    const { data } = await supabaseAdmin
+      .from('articles')
+      .select('id')
+      .or(`slug.eq.${candidate},previous_slug.eq.${candidate}`)
+      .limit(1);
+    if (!data || data.length === 0) return candidate;
+  }
+  return `${root}-${Date.now().toString(36)}`;
+}
+
 async function saveArticle(piece: EditorialPiece, item: FeedItem, src: { finalUrl: string; publishedAt?: string }, photo: LicensedPhoto | null) {
   const country = getCountryByCode(piece.country_iso);
-  const slug =generateUniqueSlug(piece.slug_keywords || piece.headline, item.url, src.publishedAt || item.publishedAt);
+  const slug = await uniqueSlug(piece.slug_keywords || piece.headline);
   const content = piece.body.join('\n\n');
   const wordCount = [content, ...piece.analysis, piece.background, piece.what_next].join(' ').split(/\s+/).filter(Boolean).length;
   const tags = Array.from(new Set([...piece.tags, country.name, 'Politics']));
@@ -204,7 +220,7 @@ async function writeAndSave(desk: CoverageDesk, item: FeedItem, src: Extracted):
   if (problems.length) return { ...base, outcome: 'rejected', reason: problems.join('; '), country: piece.country_iso };
 
   const dup = await isDuplicateOfRecent(piece.country_iso, piece.headline, item.title);
-  if (dup) return { ...base, outcome: 'skipped', reason: `same story as /news/${dup}`, country: piece.country_iso };
+  if (dup) return { ...base, outcome: 'skipped', reason: `same story as ${dup}`, country: piece.country_iso };
 
   const photo = await findLicensedPhoto(
     [...piece.image_subjects, ...piece.actors.slice(0, 2)],
