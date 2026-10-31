@@ -42,6 +42,7 @@ interface Story {
   source_facts: SourceFacts | null;
   meta_description: string | null;
   checked_items: string[] | null;
+  new_reports_at: string | null;
   updated_at: string | null;
 }
 
