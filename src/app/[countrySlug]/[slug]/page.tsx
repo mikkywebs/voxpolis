@@ -208,7 +208,7 @@ export default async function ArticlePage({ params }: Props) {
             {keyPoints.length > 0 && (
               <section aria-labelledby="short-version" className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/30 p-5">
                 <h2 id="short-version" className="text-sm font-black uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-3">
-                  The short version
+                  At a glance
                 </h2>
                 <ul className="space-y-2 list-disc pl-5 text-[15px] leading-relaxed text-gray-800 dark:text-gray-200">
                   {keyPoints.map((k, i) => (
