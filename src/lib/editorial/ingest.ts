@@ -5,7 +5,7 @@ import { toSlug, RESERVED_SLUGS } from '@/lib/paths';
 import { readFeeds, looksPolitical, titleTokens, similarity, companionsFor, FeedItem } from './feeds';
 import { extractSourceArticle } from './extract';
 import { writeVoxpolisArticle, checkPiece, repairCopiedWording, EditorialPiece, SourceInput } from './writer';
-import { extractFacts } from './facts';
+import { extractFacts, numbersIn, namesIn } from './facts';
 import { findLicensedPhoto, LicensedPhoto } from './photos';
 
 /**
@@ -122,22 +122,97 @@ async function alreadyHandled(urls: string[]): Promise<Set<string>> {
   return handled;
 }
 
-async function isDuplicateOfRecent(country: string, headline: string, sourceTitle: string): Promise<string | null> {
-  const since = new Date(Date.now() - 4 * 86400_000).toISOString();
+// ---- Same event, different outlet: one draft, not two ----
+
+/** Words reduced to a rough stem so "protest", "protests" and "protesters" match. */
+function stems(text: string): Set<string> {
+  const out = new Set<string>();
+  titleTokens(text).forEach((w) => {
+    let x = w;
+    for (const end of ['ations', 'ation', 'ings', 'ing', 'ers', 'er', 'ies', 'es', 'ed', 's']) {
+      if (x.length > end.length + 3 && x.endsWith(end)) {
+        x = x.slice(0, -end.length);
+        break;
+      }
+    }
+    out.add(x);
+  });
+  return out;
+}
+
+function overlap(a: Set<string>, b: Set<string>) {
+  let n = 0;
+  a.forEach((w) => b.has(w) && n++);
+  return n;
+}
+
+/** Specific figures (not years or small counts): the strongest sign two reports describe the same event. */
+function keyNumbers(text: string) {
+  return new Set(numbersIn(text).filter((n) => Number(n) > 10 && !(/^\d{4}$/.test(n) && Number(n) >= 1900 && Number(n) <= 2100)));
+}
+
+/**
+ * Same event if: they share a specific figure and enough words, or two named people/bodies and enough words,
+ * or most of their words. Tested on real drafts: joins two outlets' reports of the same protest,
+ * keeps apart different stories about the same institution (e.g. two separate INEC stories).
+ */
+function sameEvent(a: string, b: string): number {
+  const sa = stems(a);
+  const sb = stems(b);
+  const shared = overlap(sa, sb);
+  const words = shared < 4 ? 0 : shared / Math.min(sa.size, sb.size);
+  const nums = overlap(keyNumbers(a), keyNumbers(b));
+  const names = overlap(new Set(namesIn(a).map((n) => n.toLowerCase())), new Set(namesIn(b).map((n) => n.toLowerCase())));
+  if ((nums >= 1 && words >= 0.25) || (names >= 2 && words >= 0.3) || words >= 0.55) return words + nums + names;
+  return 0;
+}
+
+interface SameEvent {
+  id: string;
+  slug: string;
+  review_status: string;
+  touched: boolean;
+  sources: { name: string; url: string }[];
+}
+
+/** A draft or story from the last 36 hours, same country, about the same event. */
+async function findSameEvent(country: string, text: string): Promise<SameEvent | null> {
+  const since = new Date(Date.now() - 36 * 3600_000).toISOString();
   const { data } = await supabaseAdmin
     .from('articles')
-    .select('slug, title')
+    .select('id, slug, title, dek, key_points, lead, review_status, created_at, updated_at, checked_items, sources, source_url, source_name')
     .eq('country_code', country)
+    .in('review_status', ['pending', 'approved'])
     .gte('created_at', since)
     .order('created_at', { ascending: false })
-    .limit(80);
-  const a = titleTokens(headline);
-  const b = titleTokens(sourceTitle);
+    .limit(60);
+  let best: any = null;
+  let bestScore = 0;
   for (const row of data || []) {
-    const t = titleTokens(row.title || '');
-    if (similarity(a, t) >= 0.6 || similarity(b, t) >= 0.6) return row.slug;
+    const score = sameEvent(text, [row.title, row.dek, ...(row.key_points || []), row.lead].filter(Boolean).join('. '));
+    if (score > bestScore) {
+      best = row;
+      bestScore = score;
+    }
   }
-  return null;
+  if (!best || bestScore <= 0) return null;
+  const edited = best.updated_at && new Date(best.updated_at).getTime() - new Date(best.created_at).getTime() > 60_000;
+  return {
+    id: best.id,
+    slug: best.slug,
+    review_status: best.review_status,
+    touched: best.review_status !== 'pending' || !!edited || (best.checked_items || []).length > 0,
+    sources: best.sources?.length ? best.sources : [{ name: best.source_name, url: best.source_url }],
+  };
+}
+
+// Stories written in parallel are saved one at a time, so two outlets' reports of the same event
+// can't both become drafts in the same run.
+let saveChain: Promise<unknown> = Promise.resolve();
+function oneAtATime<T>(fn: () => Promise<T>): Promise<T> {
+  const run = saveChain.then(fn, fn);
+  saveChain = run.catch(() => undefined);
+  return run;
 }
 
 /** Short, readable, unique web address part, e.g. "peter-obi-tinubu-campaign-2027". */
@@ -159,6 +234,19 @@ async function uniqueSlug(base: string): Promise<string> {
 interface UsedSource {
   item: FeedItem;
   src: Extracted;
+}
+
+/** Private copy of the reports (server only), so a later report of the same event can be merged in. */
+async function storeSourceTexts(articleId: string, used: UsedSource[] | SourceInput[]) {
+  const sources = (used as any[]).map((u) =>
+    'item' in u
+      ? { name: u.item.sourceName, url: u.item.url, title: u.src.title || u.item.title, text: u.src.text, publishedAt: u.src.publishedAt || u.item.publishedAt }
+      : u
+  );
+  await supabaseAdmin
+    .from('article_source_texts')
+    .upsert({ article_id: articleId, sources, updated_at: new Date().toISOString() })
+    .then(() => undefined, () => undefined);
 }
 
 async function saveArticle(piece: EditorialPiece, used: UsedSource[], photo: LicensedPhoto | null) {
@@ -216,6 +304,7 @@ async function saveArticle(piece: EditorialPiece, used: UsedSource[], photo: Lic
 
   const { data, error } = await supabaseAdmin.from('articles').insert(row).select('id, slug').single();
   if (error || !data) throw new Error(error?.message || 'insert failed');
+  await storeSourceTexts(data.id, used);
 
   if (piece.question) {
     await supabaseAdmin
@@ -228,7 +317,7 @@ async function saveArticle(piece: EditorialPiece, used: UsedSource[], photo: Lic
 
 type Extracted = Awaited<ReturnType<typeof extractSourceArticle>>;
 
-async function writeAndSave(desk: CoverageDesk, used: UsedSource[]): Promise<IngestOutcome> {
+async function writeAndSave(desk: CoverageDesk, used: UsedSource[], deadline: number): Promise<IngestOutcome> {
   const primary = used[0];
   const base = { url: primary.item.url, source: used.map((u) => u.item.sourceName).join(' + ') };
   const sources: SourceInput[] = used.map((u) => ({
@@ -259,22 +348,94 @@ async function writeAndSave(desk: CoverageDesk, used: UsedSource[]): Promise<Ing
   }
   if (problems.length) return { ...base, outcome: 'rejected', reason: problems.join('; '), country: piece.country_iso };
 
-  const dup = await isDuplicateOfRecent(piece.country_iso, piece.headline, primary.item.title);
-  if (dup) return { ...base, outcome: 'skipped', reason: `same story as ${dup}`, country: piece.country_iso };
+  const eventText = [piece.headline, piece.dek, ...piece.key_points, piece.lead.join(' ')].join('. ');
+  // Quick look before the photo search; the decisive check happens inside the save queue.
+  const early = await findSameEvent(piece.country_iso, eventText);
+  const photo = early
+    ? null
+    : await findLicensedPhoto([...piece.image_subjects, ...piece.actors.slice(0, 2)], PHOTO_BUDGET_MS, undefined, getCountryByCode(piece.country_iso).name);
 
-  const photo = await findLicensedPhoto(
-    [...piece.image_subjects, ...piece.actors.slice(0, 2)],
-    PHOTO_BUDGET_MS,
-    undefined,
-    getCountryByCode(piece.country_iso).name
-  );
+  const decision = await oneAtATime(async () => {
+    const same = early || (await findSameEvent(piece.country_iso, eventText));
+    if (same) return { same } as const;
+    try {
+      const slug = await saveArticle(piece, used, photo);
+      return { slug } as const;
+    } catch (e: any) {
+      return { error: String(e?.message || e) } as const;
+    }
+  });
 
-  try {
-    const slug = await saveArticle(piece, used, photo);
-    return { ...base, outcome: 'published', slug, country: piece.country_iso, reason: `${used.length} source(s) · ${piece.story_type} · ${piece.provider}` };
-  } catch (e: any) {
-    return { ...base, outcome: 'error', reason: `save: ${e?.message || e}`, country: piece.country_iso };
+  if ('error' in decision) return { ...base, outcome: 'error', reason: `save: ${decision.error}`, country: piece.country_iso };
+  if ('slug' in decision) return { ...base, outcome: 'published', slug: decision.slug, country: piece.country_iso, reason: `${used.length} source(s) · ${piece.story_type} · ${piece.provider}` };
+  return mergeIntoExisting(decision.same, used, sources, piece.country_iso, base, deadline);
+}
+
+/**
+ * Another outlet reported an event we already have a draft for.
+ * - Draft not yet touched by the editor: rewrite it once with all the reports together (same address, same photo).
+ * - Draft edited or already published: keep the editor's work, add the new outlet under Sources and flag it.
+ */
+async function mergeIntoExisting(
+  same: SameEvent,
+  used: UsedSource[],
+  newSources: SourceInput[],
+  country: string,
+  base: { url: string; source: string },
+  deadline: number
+): Promise<IngestOutcome> {
+  const known = new Set(same.sources.map((x) => x.url));
+  const extra = newSources.filter((x) => !known.has(x.url));
+  if (!extra.length) return { ...base, outcome: 'skipped', reason: `already in ${same.slug}`, country };
+  const allLinks = [...same.sources, ...extra.map((x) => ({ name: x.name, url: x.url }))].slice(0, 8);
+
+  if (!same.touched && Date.now() < deadline - 30_000) {
+    const { data: stored } = await supabaseAdmin.from('article_source_texts').select('sources').eq('article_id', same.id).maybeSingle();
+    const before: SourceInput[] = (stored?.sources as SourceInput[]) || [];
+    if (before.length) {
+      const combined = [...before, ...extra].slice(0, 4);
+      try {
+        const piece = await writeVoxpolisArticle({ sources: combined, deskCountry: country });
+        const problems = checkPiece(piece, combined, MIN_IMPORTANCE);
+        if (!problems.length) {
+          const content = piece.body.join('\n\n');
+          const { error } = await supabaseAdmin
+            .from('articles')
+            .update({
+              title: piece.headline,
+              snippet: piece.dek,
+              dek: piece.dek,
+              content,
+              analysis: piece.analysis.join('\n\n'),
+              ai_analysis: piece.analysis.join('\n\n'),
+              key_points: piece.key_points,
+              lead: piece.lead.join('\n\n'),
+              sections: piece.sections,
+              what_to_watch: piece.what_to_watch,
+              what_next: piece.what_to_watch,
+              story_type: piece.story_type,
+              seo_title: piece.seo_title,
+              meta_description: piece.meta_description,
+              importance: Math.max(piece.importance, 0),
+              sources: allLinks,
+              source_facts: extractFacts(combined.map((x) => `${x.title}\n${x.text}`).join('\n')),
+              word_count: [content, ...piece.analysis].join(' ').split(/\s+/).filter(Boolean).length,
+            })
+            .eq('id', same.id)
+            .eq('review_status', 'pending');
+          if (!error) {
+            await storeSourceTexts(same.id, combined);
+            return { ...base, outcome: 'merged', slug: same.slug, country, reason: `rewritten with ${combined.length} reports: ${same.slug}` };
+          }
+        }
+      } catch {
+        // fall through to adding the link only
+      }
+    }
   }
+
+  await supabaseAdmin.from('articles').update({ sources: allLinks, new_reports_at: new Date().toISOString() }).eq('id', same.id);
+  return { ...base, outcome: 'merged', slug: same.slug, country, reason: `added as extra source to ${same.slug}` };
 }
 
 export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadlineMs?: number } = {}): Promise<IngestReport> {
@@ -340,11 +501,11 @@ export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadline
     const batch = ready.slice(next, next + (max - published));
     next += batch.length;
     const t1 = Date.now();
-    const done = await Promise.all(batch.map((used) => writeAndSave(desk, used)));
+    const done = await Promise.all(batch.map((used) => writeAndSave(desk, used, deadline)));
     for (let i = 0; i < done.length; i++) {
       await record(done[i], t1);
       // Supporting reports are marked as used so they don't become separate stories.
-      if (done[i].outcome === 'published') {
+      if (done[i].outcome === 'published' || done[i].outcome === 'merged') {
         for (const u of batch[i].slice(1)) {
           await record({ url: u.item.url, source: u.item.sourceName, outcome: 'merged', reason: `used in ${done[i].slug}`, country: done[i].country }, t1);
         }

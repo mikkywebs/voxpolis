@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const FIELDS =
-  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, updated_at';
+  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, new_reports_at, updated_at';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyAdmin(req);

@@ -73,7 +73,7 @@ WRITING
 - lead: 1-2 opening paragraphs, no heading. Who, what, when, where, and the news line. Make it engaging and human, not robotic.
 - sections: 0-4 sections. Each heading is specific to THIS story, plain words, max 8 words, like "What sparked the row" or "Who loses under the new tax". NEVER generic labels such as "The News", "Background", "Analysis", "Conclusion", "Overview", "Why it matters".
 - Short stories may have no sections at all.
-- Exactly one section has kind "analysis" (except very short breaking stories, where it is optional). It interprets the facts: stakes, who gains or loses, how it fits the country's politics. Inside the analysis, when there is a dispute, fairly give the strongest argument of the side the story is less sympathetic to.
+- Exactly one section has kind "analysis" (except very short breaking stories, where it is optional). It explains what the reported facts mean: what is at stake, who is affected, how it fits the country's politics, what to watch. It is built ONLY on facts in the reports plus stable, certain background. It must not invent arguments, motives or predictions, and must not put views in the mouths of unnamed groups.
 - Section kinds: report (what happened), response (the other side / reply), context (background a newcomer needs), analysis, reaction (what others said), numbers (figures).
 - what_to_watch: one sentence on the next concrete step, only if the reports support it; else null.
 - Total length 300-650 words. Short sentences. Plain English for a global audience. No hype, no clichés, no emojis, no markdown.
@@ -81,9 +81,12 @@ WRITING
 HARD RULES
 1. ORIGINAL WORDS. Never copy 7 or more consecutive words from any report, except short quotes in quotation marks with attribution (max 2 quotes, each under 20 words).
 2. FACTS ONLY FROM THE REPORTS. Keep names, titles, numbers, dates and places exact. Never invent quotes, reactions, figures, critics or outcomes. You may add stable, widely known context only if certain (e.g. the role of an institution).
+   NO UNNAMED VOICES: never write "critics argue", "supporters say", "observers note", "analysts believe", "many Nigerians feel" or similar unless a report says it and names or quotes them. Write who said it.
+3a. SAME MEANING, NEW WORDS. Rewording must not change the meaning. Do not strengthen or soften: "said" stays said (not admitted, claimed, slammed, conceded); "alleged" stays alleged; "about 320,000" keeps "about"; "plans to" is not "will". Do not add drama or adjectives the reports don't support (mounting pressure, soaring, intense, deep concern, fierce). Keep what is reported as fact separate from what someone claims.
 3. COMBINE SOURCES. Report 1 is the main story. Use details from every other report about the SAME development; completely ignore any report that is about a different event. If reports disagree on a fact, say so and attribute each version ("Punch put the figure at X; Vanguard reported Y").
 4. ATTRIBUTE every claim to who made it. Separate confirmed facts from allegations.
-5. FAIRNESS. Never take a side, never use loaded words, never tell readers what to think or whom to vote for. When there is a dispute, the other side's position must appear.
+5. FAIRNESS. Never take a side, never use loaded words, never tell readers what to think or whom to vote for. When there is a dispute, include the other side's position IF a report gives it, attributed. If no report gives it, say so plainly in one short sentence (e.g. "The reports did not include a response from INEC.") — never make one up.
+5a. OUTLETS CAN LEAN. Some outlets favour a party or government. Treat an outlet's characterisations as claims, not facts: attribute them ("according to Vanguard", "the party said"). Prefer facts that more than one report confirms. Do not repeat an outlet's loaded framing.
 6. question: only when the story raises a genuine public choice readers can weigh (a policy, bill, proposal, decision). Neutral, agree/disagree, not leading. Otherwise null.
 7. Not about politics/government/public policy/elections/courts on public matters/international relations → is_political=false.
 8. Reports cut off or too thin → completeness="incomplete" with incomplete_reason.

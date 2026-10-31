@@ -48,6 +48,7 @@ export interface CheckInput {
   image_credit?: string | null;
   meta_description?: string | null;
   checked_items?: string[] | null;
+  new_reports_at?: string | null;
   created_at: string;
   updated_at?: string | null;
 }
@@ -73,7 +74,13 @@ const LOADED: [RegExp, string][] = [
 // Opinion or certainty words that don't belong in the news part (fine inside the labelled analysis).
 const OPINION = /\b(overwhelming(?:ly)?|clearly|obviously|undoubtedly|undeniably|of course|everyone knows|beloved|brilliant|disastrous|best|worst|finally|sadly|unfortunately|thankfully|hugely popular|very popular)\b/gi;
 
+// Opinions or arguments given to unnamed groups: the most common way a rewrite drifts from the reports.
+const UNNAMED =
+  /\b(?:critics|supporters|observers|analysts|experts|commentators|opponents|detractors|proponents|skeptics|sceptics|many(?: \w+)?|some(?: \w+)?)(?:\s+of\s+(?:the\s+)?\w+(?:\s+\w+)?)?\s+(?:often\s+|have\s+|would\s+|also\s+)?(?:argue|argued|say|said|note|noted|believe|believed|contend|maintain|warn|warned|point out|suggest|fear|feel|insist|claim)\b|\bit is (?:widely )?(?:believed|argued|felt|said)\b/gi;
+
 const HOW = {
+  unnamed:
+    'Open the original reports and search for this point. If a report says it, write who said it (a name, a party, an organisation). If no report says it, delete the sentence: it was added by the writer, not the source.',
   number: (n: string) =>
     `Open the original report (links under "Sources"), press Ctrl+F (on a phone: "Find in page") and type ${n}. It may be written differently, e.g. "2.5 million" instead of 2500000, or as a date. If it is there and means the same thing, press "It's correct". If not, fix or remove it.`,
   name: (n: string) =>
@@ -140,6 +147,10 @@ export function checkStory(a: CheckInput): CheckResult {
       const m = plain.match(re);
       if (m) items.push({ level: 'check', field: p.field, text: `Loaded word "${m[0]}". Use instead: ${alt}.`, how: HOW.loaded, key: `loaded:${p.field}:${m[0].toLowerCase()}` });
     });
+    const vague = Array.from(new Set((plain.match(UNNAMED) || []).map((w) => w.toLowerCase())));
+    vague.slice(0, 2).forEach((v) =>
+      items.push({ level: 'check', field: p.field, text: `"${v}": who exactly? Opinions must be credited to a named person or group from the reports.`, how: HOW.unnamed, key: `unnamed:${p.field}:${v}` })
+    );
     if (p.news) {
       const op = Array.from(new Set((plain.match(OPINION) || []).map((w) => w.toLowerCase())));
       if (op.length)
@@ -164,6 +175,15 @@ export function checkStory(a: CheckInput): CheckResult {
         });
     }
   });
+
+  if (a.new_reports_at)
+    items.push({
+      level: 'check',
+      field: 'sources',
+      text: 'More outlets reported this story after the draft was made. They were added under Sources.',
+      how: 'Open the newer reports and see if anything changed: new figures, a response from the other side, a correction. Update the story if needed, then press "It\'s correct".',
+      key: `newreports:${a.new_reports_at}`,
+    });
 
   if (!a.source_facts)
     items.push({
