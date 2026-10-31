@@ -3,7 +3,6 @@ import { articlePath } from '@/lib/paths';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
-import { generateAiAnalysisSummary, generateCivicPollQuestion } from '@/lib/news';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,12 +113,6 @@ export async function POST(request: NextRequest) {
     const countryName = countryObj?.name || country_code.toUpperCase();
     const cleanSnippet = (snippet || content.slice(0, 220)).trim();
 
-    const aiAnalysis = generateAiAnalysisSummary(
-      cleanTitle,
-      cleanSnippet,
-      'Voxpolis',
-      countryName
-    );
 
     const tagList: string[] = Array.isArray(tags) && tags.length > 0 ? [...tags] : ['Politics', countryName, 'Voxpolis'];
     if (is_featured && !tagList.some((t) => /featured/i.test(t))) {
@@ -134,14 +127,22 @@ export async function POST(request: NextRequest) {
       title: displayTitle,
       snippet: cleanSnippet,
       content: content.trim(),
-      ai_analysis: aiAnalysis || `• Strategic Perspective: Published report by Voxpolis Editorial Desk for ${countryName}.\n• Key Takeaway: Verified political news dispatch.`,
+      ai_analysis: '',
+      dek: cleanSnippet,
+      lead: content.trim(),
+      sections: [],
+      sources: [],
+      editorial_version: 3,
+      origin: 'editor',
       country_code: country_code.toUpperCase(),
       language: 'en',
       category: category || 'politics',
-      image_mode: 'original',
-      original_image_url: image_url && image_url.trim() ? image_url.trim() : (is_breaking ? '/breaking-news-banner.png' : '/voxpolis-fallback-1.png'),
+      // Only our own uploads or Wikimedia Commons; anything else is dropped (no copyright risk).
+      ...(typeof image_url === 'string' && /^https:\/\/([a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/article-images\/|(upload|thumb)\.wikimedia\.org\/)/.test(image_url.trim())
+        ? { image_mode: 'original', original_image_url: image_url.trim() }
+        : { image_mode: 'breaking_logo', original_image_url: null }),
       source_name: 'Voxpolis',
-      source_url: `https://voxpolis.app/news/${slug}`,
+      source_url: '',
       is_breaking: !!is_breaking,
       tags: Array.from(new Set(tagList)),
       views_count: 0,
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString(),
     };
 
-    // Written by the editor in the admin page → counts as reviewed (indexable).
+    // Everything goes to Newsroom drafts first, so it gets the same checks before publishing.
     let editorName = 'Voxpolis Editor';
     try {
       const editorId = (auth as any)?.user?.id;
@@ -158,11 +159,12 @@ export async function POST(request: NextRequest) {
         if (prof?.full_name) editorName = prof.full_name;
       }
     } catch {}
-    const reviewFields = { review_status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: editorName };
+    void editorName;
+    const reviewFields = { review_status: 'pending' };
 
     const { data, error } = await supabaseAdmin
       .from('articles')
-      .upsert({ ...articleData, ...reviewFields }, { onConflict: 'slug' })
+      .insert({ ...articleData, ...reviewFields })
       .select()
       .single();
 
@@ -208,7 +210,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Article successfully published live on Voxpolis!',
+      message: 'Saved to Newsroom drafts. Check it there, then publish.',
       article: data || articleData,
       slug,
       liveUrl: articlePath({ slug, country_code: country_code.toUpperCase() }),

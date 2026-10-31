@@ -3,10 +3,12 @@ import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyAdmin } from '@/lib/admin/auth';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
-import { articlePath, isValidSlug } from '@/lib/paths';
+import { articlePath, isValidSlug, toSlug } from '@/lib/paths';
+import { verifyArticle } from '@/lib/editorial/verify';
 import { checkStory } from '@/lib/editorial/prepublish';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 /**
  * Editor review queue.
@@ -16,7 +18,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const FIELDS =
-  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, new_reports_at, updated_at';
+  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, new_reports_at, fidelity, origin, category, editorial_version, updated_at';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyAdmin(req);
@@ -62,12 +64,66 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const id = String(body?.id || '');
   const action = String(body?.action || '');
-  if (!id || !['save', 'approve', 'reject', 'reopen', 'remove_photo', 'confirm', 'unconfirm'].includes(action)) {
+  // The editor's own story: create an empty draft, then write it in the normal editor (with all the checks).
+  if (action === 'create') {
+    const country = getCountryByCode(String(body?.country_code || 'NG').toUpperCase());
+    const title = clean(body?.title, 160) || '';
+    if (title.length < 20) return NextResponse.json({ error: 'Write a working headline first (at least 20 characters).' }, { status: 400 });
+    let slug = toSlug(title, 60) || 'voxpolis-story';
+    for (let i = 2; i < 50; i++) {
+      const { data: taken } = await supabaseAdmin.from('articles').select('id').or(`slug.eq.${slug},previous_slug.eq.${slug}`).limit(1);
+      if (!taken?.length) break;
+      slug = `${toSlug(title, 56)}-${i}`;
+    }
+    const now = new Date().toISOString();
+    const { data, error } = await supabaseAdmin
+      .from('articles')
+      .insert({
+        slug,
+        title,
+        snippet: '',
+        dek: '',
+        content: '',
+        ai_analysis: '',
+        lead: '',
+        sections: [],
+        key_points: [],
+        sources: [],
+        country_code: country.code,
+        language: 'en',
+        category: body?.category === 'opinion' ? 'opinion' : 'politics',
+        source_name: 'Voxpolis',
+        source_url: '',
+        image_mode: 'breaking_logo',
+        review_status: 'pending',
+        origin: 'editor',
+        editorial_version: 3,
+        status: 'published',
+        created_at: now,
+        updated_at: now,
+      })
+      .select('id, slug')
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, id: data.id, slug: data.slug });
+  }
+
+  if (!id || !['save', 'approve', 'reject', 'reopen', 'remove_photo', 'confirm', 'unconfirm', 'verify'].includes(action)) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 
   const { data: current } = await supabaseAdmin.from('articles').select('id, slug, country_code, review_status, checked_items').eq('id', id).maybeSingle();
   if (!current) return NextResponse.json({ error: 'Story not found' }, { status: 404 });
+
+  // Run the AI accuracy check now (takes 10-30 seconds).
+  if (action === 'verify') {
+    try {
+      const fidelity = await verifyArticle(id);
+      return NextResponse.json({ ok: true, fidelity });
+    } catch (e: any) {
+      return NextResponse.json({ error: `Accuracy check failed: ${e?.message || e}` }, { status: 500 });
+    }
+  }
 
   // "It's correct" on an amber check (and undo). Saved straight away, without touching other edits.
   if (action === 'confirm' || action === 'unconfirm') {
@@ -167,6 +223,19 @@ export async function POST(req: NextRequest) {
         }
       } else {
         return NextResponse.json({ error: 'Images must be uploaded here (or come from Wikimedia Commons).' }, { status: 400 });
+      }
+    }
+    // Sources: the reports, statements or documents the story is based on.
+    if (Array.isArray(f.sources)) {
+      const list = f.sources
+        .map((x: any) => ({ name: clean(x?.name, 80) || '', url: String(x?.url || '').trim().slice(0, 500) }))
+        .filter((x: any) => /^https?:\/\/[^\s]+\.[^\s]+/.test(x.url))
+        .map((x: any) => ({ name: x.name || new URL(x.url).hostname.replace(/^www\./, ''), url: x.url }))
+        .slice(0, 8);
+      update.sources = list;
+      if (list[0]) {
+        update.source_url = list[0].url;
+        update.source_name = list[0].name;
       }
     }
     if (typeof f.meta_description === 'string') update.meta_description = clean(f.meta_description, 200) || null;

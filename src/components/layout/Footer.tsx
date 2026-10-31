@@ -14,16 +14,23 @@ export default function Footer() {
           <SiteLogo variant="dark" className="h-12 sm:h-14 w-auto mx-auto" />
         </Link>
 
-        {/* Country desks: crawlable links to every covered country */}
-        <nav aria-label="Country desks" className="flex items-center justify-center flex-wrap gap-x-4 gap-y-2 text-xs text-gray-400 max-w-4xl">
-          {COVERED_COUNTRY_CODES.map((code) => {
-            const c = getCountryByCode(code);
-            return (
-              <Link key={code} href={`/${getCountrySlug(c)}`} className="hover:text-blue-400 transition">
-                {c.name} politics
-              </Link>
-            );
-          })}
+        {/* Country pages: one crawlable link to each covered country (helps Google find every country page). */}
+        <nav aria-labelledby="footer-countries" className="space-y-2 max-w-4xl">
+          <h2 id="footer-countries" className="text-[11px] font-bold uppercase tracking-[0.15em] text-gray-500">
+            Political news by country
+          </h2>
+          <ul className="flex items-center justify-center flex-wrap gap-x-4 gap-y-2 text-xs text-gray-400">
+            {COVERED_COUNTRY_CODES.map((code) => {
+              const c = getCountryByCode(code);
+              return (
+                <li key={code}>
+                  <Link href={`/${getCountrySlug(c)}`} title={`${c.name} political news`} className="hover:text-blue-400 transition">
+                    {c.name}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </nav>
 
         {/* Footer Navigation Links for All Trust Pages (Historical Archive link removed per request) */}

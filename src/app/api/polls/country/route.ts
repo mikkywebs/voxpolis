@@ -1,110 +1,60 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCountryByCode, getCountryBySlug } from '@/config/countries';
-import { generateCivicPollQuestion } from '@/lib/news';
+import { articlePath } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * The reader poll for a country: the question attached to the most recent PUBLISHED story
+ * in that country (written for the story and approved by the editor), with its real vote counts.
+ * No question → { poll: null } and the box is not shown. Nothing is generated or made up here.
+ */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const countryParam = searchParams.get('country') || 'NG';
-    const headline = searchParams.get('headline');
-    const snippet = searchParams.get('snippet');
-    const country = getCountryByCode(countryParam) || getCountryBySlug(countryParam) || getCountryByCode('NG');
+    const param = searchParams.get('country') || 'NG';
+    const country = getCountryByCode(param) || getCountryBySlug(param);
+    const since = new Date(Date.now() - 14 * 86400_000).toISOString();
 
-    // Synthesize question if headline is provided
-    let dynamicQuestion: string | undefined = undefined;
-    if (headline && headline.trim()) {
-      const cleanH = headline.replace(/\s*[-–—|]\s*Voxpolis.*$/i, '').trim();
-      const text = `${cleanH} ${snippet || ''}`.toLowerCase();
+    const { data: stories } = await supabaseAdmin
+      .from('articles')
+      .select('id, slug, title, country_code, reviewed_at')
+      .eq('country_code', country.code)
+      .eq('review_status', 'approved')
+      .gte('reviewed_at', since)
+      .order('reviewed_at', { ascending: false })
+      .limit(30);
+    const ids = (stories || []).map((s: any) => s.id);
+    if (!ids.length) return NextResponse.json({ success: true, poll: null });
 
-      if (text.includes('debt') || text.includes('deficit') || text.includes('spending') || text.includes('borrowing')) {
-        if (text.includes('promise') || text.includes('election')) {
-          dynamicQuestion = `Should the government prioritise national debt reduction over funding new election promises in ${country.name}?`;
-        } else {
-          dynamicQuestion = `Do you believe reducing public debt should take priority over increased government spending in ${country.name}?`;
-        }
-      } else if (text.includes('cut') || text.includes('closed') || text.includes('closure') || text.includes('disaster') || text.includes('tsunami') || text.includes('quake') || text.includes('emergency') || text.includes('staff')) {
-        dynamicQuestion = `Do public sector budget and staffing cuts compromise national emergency preparedness and public safety in ${country.name}?`;
-      } else if (text.includes('water storage') || text.includes('farmer') || text.includes('farming') || text.includes('agriculture') || text.includes('scheme')) {
-        dynamicQuestion = `Do you support government-backed financing schemes for regional water storage and agricultural development in ${country.name}?`;
-      } else if (text.includes('tax') || text.includes('tariff') || text.includes('vat')) {
-        dynamicQuestion = `Do you support the proposed tax and tariff reforms currently being debated in ${country.name}?`;
-      } else if (text.includes('hospital') || text.includes('health') || text.includes('doctor') || text.includes('nurse')) {
-        dynamicQuestion = `Should the government increase emergency funding allocations to the public healthcare system in ${country.name}?`;
-      } else if (text.includes('housing') || text.includes('rent') || text.includes('mortgage')) {
-        dynamicQuestion = `Should stricter regulatory caps or rent controls be enacted to address the housing crisis in ${country.name}?`;
-      } else if (cleanH.includes(':')) {
-        const spk = cleanH.split(':')[0]?.trim();
-        if (spk && spk.length > 2 && spk.length < 28 && !/^\d+/.test(spk)) {
-          dynamicQuestion = `Do you agree with the stance taken by ${spk} on this national issue in ${country.name}?`;
-        }
-      }
+    const { data: polls } = await supabaseAdmin
+      .from('polls')
+      .select('id, article_id, question, agree_count, disagree_count')
+      .in('article_id', ids);
+    const withQuestion = (polls || []).filter((p: any) => (p.question || '').trim().endsWith('?'));
+    // Newest published story that has a question.
+    const story = (stories || []).find((s: any) => withQuestion.some((p: any) => p.article_id === s.id));
+    if (!story) return NextResponse.json({ success: true, poll: null });
+    const p: any = withQuestion.find((x: any) => x.article_id === story.id);
 
-      if (!dynamicQuestion && cleanH.length > 10) {
-        dynamicQuestion = `Do you support the proposed governance approach regarding "${cleanH.slice(0, 50)}..." in ${country.name}?`;
-      }
-    }
-
-    // 1. Check for existing polls in DB
-    try {
-      const { data: countryArticles } = await supabaseAdmin
-        .from('articles')
-        .select('id, slug, title, snippet')
-        .eq('country_code', country.code)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (countryArticles && countryArticles.length > 0) {
-        const articleIds = countryArticles.map((a: any) => a.id).filter(Boolean);
-
-        if (articleIds.length > 0) {
-          const { data: existingPolls } = await supabaseAdmin
-            .from('polls')
-            .select('id, article_id, question, agree_count, disagree_count, created_at')
-            .in('article_id', articleIds)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (existingPolls && existingPolls.length > 0) {
-            const matchedArticle = countryArticles.find((a: any) => a.id === existingPolls[0].article_id);
-            return NextResponse.json({
-              success: true,
-              poll: {
-                id: existingPolls[0].id,
-                articleId: existingPolls[0].article_id,
-                articleSlug: matchedArticle?.slug,
-                articleTitle: matchedArticle?.title,
-                question: dynamicQuestion || existingPolls[0].question,
-                agree_count: existingPolls[0].agree_count || 148,
-                disagree_count: existingPolls[0].disagree_count || 92,
-                country_code: country.code,
-                country_name: country.name,
-              },
-            });
-          }
-        }
-      }
-    } catch (err) {
-      // Non-fatal database error
-    }
-
-    // Default civic poll tailored to country with trending question
-    const finalQuestion = dynamicQuestion || `Do you approve of the current economic and governance direction in ${country.name}?`;
-
-    return NextResponse.json({
-      success: true,
-      poll: {
-        id: `civic-poll-${country.code.toLowerCase()}`,
-        question: finalQuestion,
-        agree_count: 148,
-        disagree_count: 92,
-        country_code: country.code,
-        country_name: country.name,
+    return NextResponse.json(
+      {
+        success: true,
+        poll: {
+          id: p.id,
+          question: p.question.trim(),
+          agree_count: p.agree_count || 0,
+          disagree_count: p.disagree_count || 0,
+          article_title: story.title,
+          article_path: articlePath(story),
+          country_code: country.code,
+          country_name: country.name,
+        },
       },
-    });
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch {
-    return NextResponse.json({ success: false, error: 'Failed to load country poll' }, { status: 500 });
+    return NextResponse.json({ success: false, poll: null }, { status: 500 });
   }
 }

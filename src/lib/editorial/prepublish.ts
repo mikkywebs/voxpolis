@@ -49,6 +49,14 @@ export interface CheckInput {
   meta_description?: string | null;
   checked_items?: string[] | null;
   new_reports_at?: string | null;
+  category?: string | null;
+  origin?: string | null;
+  fidelity?: {
+    checked_at: string;
+    status: 'done' | 'no_sources' | 'failed';
+    note?: string;
+    issues: { sentence: string; problem: string; explanation: string; source_says?: string | null }[];
+  } | null;
   created_at: string;
   updated_at?: string | null;
 }
@@ -151,7 +159,7 @@ export function checkStory(a: CheckInput): CheckResult {
     vague.slice(0, 2).forEach((v) =>
       items.push({ level: 'check', field: p.field, text: `"${v}": who exactly? Opinions must be credited to a named person or group from the reports.`, how: HOW.unnamed, key: `unnamed:${p.field}:${v}` })
     );
-    if (p.news) {
+    if (p.news && a.category !== 'opinion') {
       const op = Array.from(new Set((plain.match(OPINION) || []).map((w) => w.toLowerCase())));
       if (op.length)
         items.push({ level: 'check', field: p.field, text: `Opinion word${op.length > 1 ? 's' : ''} in the news part: "${op.join('", "')}".`, how: HOW.opinion, key: `op:${p.field}:${op.join(',')}` });
@@ -194,7 +202,37 @@ export function checkStory(a: CheckInput): CheckResult {
       key: 'facts:manual',
     });
 
-  if (!hasAnalysis)
+  // --- AI accuracy check: sentences the original reports don't support ---
+  const PROBLEM_LABEL: Record<string, string> = {
+    not_in_sources: 'Not in the original reports',
+    meaning_changed: 'Meaning changed from the reports',
+    wrong_detail: 'A detail differs from the reports',
+    unattributed_opinion: 'Opinion given to unnamed people',
+    invented_reaction: 'A reaction no report contains',
+    loaded_framing: 'One-sided wording',
+  };
+  const norm = (t: string) => t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+  if (a.fidelity?.status === 'done') {
+    a.fidelity.issues.forEach((f) => {
+      const want = norm(f.sentence);
+      // Only issues whose sentence is still in the story: once the editor rewrites it, the item disappears.
+      const where = parts.find((p) => norm(p.text).includes(want)) || (want.length > 40 ? parts.find((p) => norm(p.text).includes(want.slice(0, 40))) : undefined);
+      if (!where) return;
+      items.push({
+        level: 'check',
+        field: where.field,
+        text: `${PROBLEM_LABEL[f.problem] || 'Check this sentence'}: "${f.sentence.length > 160 ? f.sentence.slice(0, 157) + '…' : f.sentence}"`,
+        how: `${f.explanation}${f.source_says ? ` The report says: "${f.source_says}"` : ''} Fix or delete the sentence. If you have checked it and it is right, press "It's correct".`,
+        key: `fid:${want.slice(0, 120)}`,
+      });
+    });
+  } else if (a.fidelity?.status === 'failed') {
+    items.push({ level: 'tip', field: 'story', text: 'The automatic accuracy check could not run. Press "Check accuracy" to try again.' });
+  } else if (!a.fidelity && a.origin !== 'editor' && (a.sources?.length || 0) > 0) {
+    items.push({ level: 'tip', field: 'story', text: 'The automatic accuracy check has not run yet (it runs every 10 minutes). You can press "Check accuracy" now.' });
+  }
+
+  if (!hasAnalysis && a.category !== 'opinion')
     items.push({
       level: 'check',
       field: flexible ? 'lead' : 'analysis',
