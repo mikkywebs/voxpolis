@@ -183,6 +183,8 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
     original_image_url: story.original_image_url || '',
     image_credit: story.image_credit || '',
     meta_description: story.meta_description || '',
+    image_license: '',
+    image_page_url: '',
   });
   const [checked, setChecked] = useState<string[]>(story.checked_items || []);
   const [preview, setPreview] = useState(false);
@@ -326,6 +328,37 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
     setAfter('save');
   };
   const fixableItems = live.items.filter(canAutoFix);
+
+  // ---- "Find a free photo" (Wikimedia Commons, licensed for reuse). Nothing changes until "Use this photo". ----
+  const [ph, setPh] = useState<{ open: boolean; busy: boolean; query: string; results: any[]; searched: string[]; note: string }>({
+    open: false,
+    busy: false,
+    query: '',
+    results: [],
+    searched: [],
+    note: '',
+  });
+  const findPhotos = async (query = '') => {
+    setPh((x) => ({ ...x, open: true, busy: true, note: '' }));
+    try {
+      const res = await fetch('/api/admin/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: story.id, action: 'photos', query }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Search failed');
+      setPh((x) => ({
+        ...x,
+        busy: false,
+        results: d.photos || [],
+        searched: d.subjects || [],
+        note: (d.photos || []).length ? '' : (d.subjects || []).length ? 'No free photo found. Try another name (e.g. the full name of the main person) or leave the Voxpolis card.' : 'Type the name of the main person or place and press Search.',
+      }));
+    } catch (e: any) {
+      setPh((x) => ({ ...x, busy: false, note: e.message }));
+    }
+  };
   const runVerify = async () => {
     setVerifying(true);
     setErr('');
@@ -395,6 +428,8 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
                 original_image_url: f.original_image_url,
                 image_credit: f.image_credit,
                 meta_description: f.meta_description,
+                image_license: f.image_license,
+                image_page_url: f.image_page_url,
                 sources: srcList(),
                 key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean),
                 lead,
@@ -708,6 +743,57 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
               value={f.image_credit}
               onChange={(e) => setF({ ...f, image_credit: e.target.value })}
             />
+            <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-2.5 space-y-2">
+              {!ph.open ? (
+                <button type="button" onClick={() => findPhotos()} className="text-xs font-bold text-blue-700 dark:text-blue-300">
+                  🔍 Find a free photo
+                </button>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      className={inputCls}
+                      placeholder={ph.searched[0] ? `Searched: ${ph.searched.join(', ')}. Type another name…` : 'Name of the person or place, e.g. Mary Peltola'}
+                      value={ph.query}
+                      onChange={(e) => setPh((x) => ({ ...x, query: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), findPhotos(ph.query))}
+                    />
+                    <button type="button" disabled={ph.busy} onClick={() => findPhotos(ph.query)} className="px-3 rounded-xl bg-gray-900 text-white dark:bg-white dark:text-gray-900 text-xs font-bold disabled:opacity-50">
+                      {ph.busy ? 'Searching…' : 'Search'}
+                    </button>
+                  </div>
+                  {ph.note && <p className="text-xs text-gray-500">{ph.note}</p>}
+                  {ph.results.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {ph.results.map((p) => (
+                        <figure key={p.url} className={`rounded-lg border overflow-hidden ${f.original_image_url === p.url ? 'border-emerald-500 ring-2 ring-emerald-400' : 'border-gray-200 dark:border-gray-800'}`}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={p.url} alt={p.subject} className="w-full h-28 object-cover object-top" loading="lazy" />
+                          <figcaption className="p-1.5 space-y-1">
+                            <p className="text-[10px] text-gray-500 line-clamp-2">{p.credit}</p>
+                            <div className="flex items-center justify-between gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setF((x) => ({ ...x, original_image_url: p.url, image_credit: p.credit, image_license: p.license, image_page_url: p.pageUrl }))}
+                                className="px-2 py-1 rounded bg-emerald-600 text-white text-[11px] font-bold"
+                              >
+                                {f.original_image_url === p.url ? '✓ Chosen' : 'Use this photo'}
+                              </button>
+                              <a href={p.pageUrl} target="_blank" rel="noopener" className="text-[10px] text-blue-600 hover:underline">
+                                Details ↗
+                              </a>
+                            </div>
+                          </figcaption>
+                        </figure>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-gray-500">
+                    These are free to use with the credit shown (added automatically). After choosing, press <strong>Save edits</strong>.
+                  </p>
+                </>
+              )}
+            </div>
             <p className="text-[11px] text-gray-500">
               Only use photos you own or have permission to use: your own photos, official government handouts that allow reuse,
               licensed stock, or Wikimedia Commons. Never photos copied from other news sites.

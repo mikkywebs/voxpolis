@@ -260,7 +260,7 @@ export function checkStory(a: CheckInput): CheckResult {
     items.push({
       level: 'check',
       field: 'photo',
-      text: 'This photo was chosen automatically. Make sure it shows the right person or place.',
+      text: 'Make sure this photo shows the right person or place.',
       how: 'Look at the photo and its credit. A wrong face next to a political story is a serious error. If it is right, press "It\'s correct". If not, replace or remove it.',
       key: `photo:${img}`,
     });

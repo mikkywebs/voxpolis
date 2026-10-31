@@ -188,3 +188,38 @@ export async function findLicensedPhoto(
     clearTimeout(timer);
   }
 }
+
+/**
+ * Several licensed options for the editor to choose from ("Find a free photo").
+ * Same licence and quality rules as the automatic pick; nothing is applied until the editor clicks.
+ */
+export async function findPhotoOptions(subjects: string[], max = 6, budgetMs = 9000, countryName?: string): Promise<(LicensedPhoto & { score: number })[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), budgetMs);
+  const found: (LicensedPhoto & { score: number })[] = [];
+  try {
+    const unique = Array.from(new Set(subjects.map((s) => s.trim()).filter((s) => s.length > 2))).slice(0, 3);
+    await Promise.all(
+      unique.map(async (subject, rank) => {
+        const person = looksLikePerson(subject);
+        const queries = person ? [`intitle:"${subject}"`, `"${subject}"`] : [`intitle:"${subject}"`, subject];
+        for (const q of queries) {
+          try {
+            (await search(q, controller.signal)).forEach((p) => {
+              const v = evaluate(p, subject, person, countryName);
+              // Earlier subjects (the main person) rank higher.
+              if (v.photo) found.push({ ...v.photo, score: v.score - rank * 2 });
+            });
+          } catch {}
+        }
+      })
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+  const seen = new Set<string>();
+  return found
+    .sort((a, b) => b.score - a.score)
+    .filter((p) => (seen.has(p.url) ? false : (seen.add(p.url), true)))
+    .slice(0, max);
+}
