@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { articlePath } from '@/lib/paths';
 import { createClient } from '@/lib/supabase/client';
-import { getCountryByCode } from '@/config/countries';
+import { getCountryByCode, ALL_COUNTRIES } from '@/config/countries';
 import { checkStory, fieldLevel, CheckItem, CheckResult } from '@/lib/editorial/prepublish';
 import type { SourceFacts } from '@/lib/editorial/facts';
 
@@ -44,6 +44,10 @@ interface Story {
   checked_items: string[] | null;
   new_reports_at: string | null;
   updated_at: string | null;
+  fidelity: any;
+  origin: string | null;
+  category: string | null;
+  editorial_version: number | null;
 }
 
 const DOT: Record<'red' | 'amber' | 'green', string> = { red: 'bg-red-600', amber: 'bg-amber-500', green: 'bg-emerald-500' };
@@ -125,8 +129,21 @@ function ago(iso: string) {
   return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
 }
 
-function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: string) => void; token: string }) {
-  const [open, setOpen] = useState(false);
+function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story; onDone: (msg: string) => void; token: string; autoOpen?: boolean }) {
+  const [open, setOpen] = useState(autoOpen);
+  const [fidelity, setFidelity] = useState<any>(story.fidelity || null);
+  const [verifying, setVerifying] = useState(false);
+  const [srcText, setSrcText] = useState((story.sources?.length ? story.sources : story.source_url ? [{ name: story.source_name, url: story.source_url }] : []).map((x) => `${x.name} | ${x.url}`).join('\n'));
+  const srcList = () =>
+    srcText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => {
+        const m = l.match(/^(.*?)\s*\|\s*(https?:\/\/\S+)$/) || l.match(/^()(https?:\/\/\S+)$/);
+        return m ? { name: (m[1] || '').trim(), url: m[2] } : null;
+      })
+      .filter(Boolean) as { name: string; url: string }[];
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [f, setF] = useState({
@@ -147,7 +164,7 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
   const [preview, setPreview] = useState(false);
   const [uploading, setUploading] = useState(false);
   // Flexible structure (v3 stories)
-  const flexible = Array.isArray(story.sections) && story.sections.length + (story.lead ? 1 : 0) > 0;
+  const flexible = (story.editorial_version || 0) >= 3 || (Array.isArray(story.sections) && story.sections.length + (story.lead ? 1 : 0) > 0);
   const [lead, setLead] = useState(story.lead || '');
   const [secs, setSecs] = useState<EditSection[]>(
     (story.sections || []).map((x) => ({ heading: x.heading, kind: x.kind, text: (x.paragraphs || []).join('\n\n') }))
@@ -183,8 +200,11 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
         image_credit: f.image_credit,
         meta_description: f.meta_description,
         checked_items: checked,
+        sources: srcList(),
+        fidelity,
       }),
-    [story, f, lead, secs, watch, checked, flexible]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [story, f, lead, secs, watch, checked, flexible, srcText, fidelity]
   );
   const confirm = async (key: string, undo = false) => {
     setErr('');
@@ -205,6 +225,26 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
     }
   };
   const lv = (field: string) => fieldLevel(live, field);
+  const runVerify = async () => {
+    setVerifying(true);
+    setErr('');
+    try {
+      // Save first so the check reads the latest text.
+      await act('save', true);
+      const res = await fetch('/api/admin/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: story.id, action: 'verify' }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Accuracy check failed');
+      setFidelity(d.fidelity);
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -226,7 +266,7 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
   const country = getCountryByCode(story.country_code);
   const words = (flexible ? [lead, ...secs.map((x) => x.text)].join(' ') : f.content).split(/\s+/).filter(Boolean).length;
 
-  const act = async (action: string) => {
+  const act = async (action: string, quiet = false) => {
     setBusy(true);
     setErr('');
     try {
@@ -245,16 +285,18 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
                 original_image_url: f.original_image_url,
                 image_credit: f.image_credit,
                 meta_description: f.meta_description,
+                sources: srcList(),
                 key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean),
                 lead,
                 sections: secs,
                 what_to_watch: watch,
               }
-            : { ...f, key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean) },
+            : { ...f, sources: srcList(), key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean) },
         }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Failed');
+      if (quiet) return;
       onDone(
         action === 'approve' ? 'Published. The story is now live on Voxpolis.' : action === 'reject' ? 'Discarded.' : action === 'remove_photo' ? 'Photo removed.' : action === 'reopen' ? 'Unpublished and moved back to drafts.' : 'Saved.'
       );
@@ -311,6 +353,7 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
               : '● Don’t publish yet'}
           </span>
         )}
+        {story.origin === 'editor' && <span className="px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800">Your story</span>}
         <span>{ago(story.created_at)}</span>
         <a href={story.source_url} target="_blank" rel="noopener" className="text-blue-600 hover:underline">
           Original: {story.source_name} ↗
@@ -362,6 +405,13 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
         {!open && live.level !== 'ready' && (
           <p className="text-xs text-gray-500">Press Edit to see what to fix or check under each part.</p>
         )}
+        {fidelity?.status === 'done' && (
+          <p className="text-xs text-gray-500">
+            Accuracy check: {new Date(fidelity.checked_at).toLocaleString()} ·{' '}
+            {live.items.some((i) => i.key?.startsWith('fid:')) ? 'sentences to look at are shown under each part' : 'every sentence matches the reports'}
+          </p>
+        )}
+        {fidelity?.status === 'no_sources' && <p className="text-xs text-amber-700">Accuracy check: the original reports could not be read. Check the facts by hand.</p>}
         <FieldChecks result={live} field="story" onConfirm={confirm} />
       </div>
 
@@ -451,7 +501,6 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
                   ))}
                 </p>
               )}
-              <FieldChecks result={live} field="sources" onConfirm={confirm} />
             </div>
           ) : (
             <>
@@ -461,6 +510,23 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
               {field('what_next', 'What happens next', 3, undefined, 'watch')}
             </>
           )}
+          <div className="space-y-1.5 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+            <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+              Sources <Light level={lv('sources')} />
+            </span>
+            <span className="block text-[11px] text-gray-400">
+              One per line: <code>Name | link</code>, e.g. <code>INEC statement | https://inecnigeria.org/…</code>. Every story needs at least one: a report, an official statement or a document.
+            </span>
+            <textarea className={inputCls} rows={3} value={srcText} onChange={(e) => setSrcText(e.target.value)} />
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              {srcList().map((x) => (
+                <a key={x.url} href={x.url} target="_blank" rel="noopener" className="text-blue-600 hover:underline">
+                  Open {x.name || 'link'} ↗
+                </a>
+              ))}
+            </div>
+            <FieldChecks result={live} field="sources" onConfirm={confirm} />
+          </div>
           {field('poll_question', 'Reader question (leave empty for none)', 1, 'Only for a real public choice. Neutral, agree/disagree.')}
           <div className="space-y-2 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
             <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
@@ -627,6 +693,15 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
         <button type="button" onClick={() => setPreview(!preview)} className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm font-bold">
           {preview ? 'Hide preview' : '👁 Preview'}
         </button>
+        <button
+          type="button"
+          disabled={verifying || busy}
+          onClick={runVerify}
+          title="An AI fact-checker compares every sentence with the original reports (10-30 seconds)"
+          className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm font-bold disabled:opacity-50"
+        >
+          {verifying ? 'Checking accuracy…' : fidelity?.status === 'done' ? '↻ Check accuracy again' : '🔎 Check accuracy'}
+        </button>
         {open && (
           <button type="button" disabled={busy} onClick={() => act('save')} className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold disabled:opacity-50">
             Save edits
@@ -657,6 +732,27 @@ export default function ReviewPage() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(false);
+  const [newId, setNewId] = useState('');
+  const [nw, setNw] = useState({ open: false, title: '', country: 'NG', category: 'politics', busy: false, err: '' });
+
+  const createStory = async () => {
+    setNw((x) => ({ ...x, busy: true, err: '' }));
+    try {
+      const res = await fetch('/api/admin/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'create', title: nw.title, country_code: nw.country, category: nw.category }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not create the draft');
+      setNewId(d.id);
+      setNw({ open: false, title: '', country: nw.country, category: 'politics', busy: false, err: '' });
+      if (status !== 'pending') setStatus('pending');
+      else load();
+    } catch (e: any) {
+      setNw((x) => ({ ...x, busy: false, err: e.message }));
+    }
+  };
 
   useEffect(() => {
     createClient()
@@ -729,6 +825,48 @@ export default function ReviewPage() {
           <p className="mt-3 text-xs text-gray-500">The checker catches common problems automatically, but it can&apos;t know everything. If you are unsure about a story, don&apos;t publish it.</p>
         </details>
 
+        <section className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/20 p-4 text-sm space-y-3">
+          {!nw.open ? (
+            <button type="button" onClick={() => setNw((x) => ({ ...x, open: true }))} className="font-bold text-blue-700 dark:text-blue-300">
+              + Write your own story
+            </button>
+          ) : (
+            <>
+              <p className="font-bold">Write your own story</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                It opens in the same editor with the same checks. Add your sources (a report, an official statement or a document) and press
+                &quot;Check accuracy&quot; before publishing. Your own drafts never expire.
+              </p>
+              <input
+                className={inputCls}
+                placeholder="Working headline: who did what"
+                value={nw.title}
+                onChange={(e) => setNw((x) => ({ ...x, title: e.target.value }))}
+              />
+              <div className="flex flex-wrap gap-2">
+                <select className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" value={nw.country} onChange={(e) => setNw((x) => ({ ...x, country: e.target.value }))}>
+                  {ALL_COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <select className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" value={nw.category} onChange={(e) => setNw((x) => ({ ...x, category: e.target.value }))}>
+                  <option value="politics">News story</option>
+                  <option value="opinion">Opinion / column</option>
+                </select>
+                <button type="button" disabled={nw.busy} onClick={createStory} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold disabled:opacity-50">
+                  {nw.busy ? 'Creating…' : 'Create draft'}
+                </button>
+                <button type="button" onClick={() => setNw((x) => ({ ...x, open: false, err: '' }))} className="px-3 py-2 text-gray-600 font-bold">
+                  Cancel
+                </button>
+              </div>
+              {nw.err && <p className="text-red-600 text-xs">{nw.err}</p>}
+            </>
+          )}
+        </section>
+
         <nav className="flex gap-2">
           {(['pending', 'approved', 'rejected'] as Status[]).map((s) => (
             <button
@@ -754,9 +892,12 @@ export default function ReviewPage() {
         )}
 
         <div className="space-y-4">
-          {stories.map((s) => (
+          {[...stories]
+            .sort((a, b) => Number(b.id === newId) - Number(a.id === newId) || Number(b.origin === 'editor') - Number(a.origin === 'editor'))
+            .map((s) => (
             <StoryEditor
               key={`${s.id}-${s.review_status}`}
+              autoOpen={s.id === newId}
               story={s}
               token={token || ''}
               onDone={(msg) => {
