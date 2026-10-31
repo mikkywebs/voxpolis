@@ -3,23 +3,42 @@ import { findConsecutiveWordOverlaps } from '@/lib/pipeline/overlap';
 import { ALL_COUNTRIES } from '@/config/countries';
 
 /**
- * The Voxpolis writer: turns one source report into an original Voxpolis article
- * with our own reporting, a plain-English breakdown and balanced analysis.
+ * The Voxpolis writer (v3).
+ * Combines 1-4 reports of the same development into ONE original story whose
+ * shape follows the news: the AI picks the story type and writes natural,
+ * story-specific subheadings. Only the essentials are fixed (summary, attribution,
+ * clearly signposted analysis, fairness, sources).
  */
+
+export type SectionKind = 'report' | 'response' | 'context' | 'analysis' | 'reaction' | 'numbers';
+
+export interface StorySection {
+  heading: string;
+  kind: SectionKind;
+  paragraphs: string[];
+}
+
+export interface SourceInput {
+  name: string;
+  url: string;
+  title: string;
+  text: string;
+  publishedAt?: string;
+}
 
 export interface EditorialPiece {
   is_political: boolean;
   country_iso: string;
   importance: number;
+  story_type: string;
   headline: string;
   seo_title: string;
   meta_description: string;
   dek: string;
   key_points: string[];
-  body: string[];
-  analysis: string[];
-  background: string;
-  what_next: string;
+  lead: string[];
+  sections: StorySection[];
+  what_to_watch: string | null;
   question: string | null;
   tags: string[];
   actors: string[];
@@ -28,59 +47,79 @@ export interface EditorialPiece {
   completeness: 'complete' | 'incomplete';
   incomplete_reason?: string | null;
   provider?: string;
+  // Derived (for older pages, search and checks)
+  body: string[];
+  analysis: string[];
 }
 
-const SYSTEM = `You are the senior political editor at Voxpolis, a global political news site.
-You receive ONE source news report. You write ONE original Voxpolis article about the same development.
-Readers come to Voxpolis because we explain politics clearly: what happened, why it matters, and what to watch.
+const STORY_TYPES = ['clash', 'policy', 'court', 'appointment', 'allegation', 'results', 'breaking', 'diplomacy', 'development'];
+const KINDS: SectionKind[] = ['report', 'response', 'context', 'analysis', 'reaction', 'numbers'];
+
+const SYSTEM = `You are the senior political editor at Voxpolis, a political news site known for explaining politics clearly and fairly.
+You receive one or more reports (from different outlets) about the SAME development. Write ONE original Voxpolis story.
+
+THE SHAPE FOLLOWS THE NEWS. First decide story_type, then use the natural flow for it. Do not force sections the story doesn't need.
+- clash (a row between politicians or parties): what was said → what triggered it / the other side's position → context → analysis
+- policy (bill, budget, regulation, government plan): what it does → who it affects and how → supporters' and critics' arguments → next steps
+- court (ruling or case on a public matter): the decision → the reasoning → reactions → what changes now
+- appointment (appointment, resignation, sacking, defection): who and why → their record → what it signals
+- allegation (corruption claim, scandal, probe): the claim and who made it → the response or denial → what is established and what isn't
+- results (election results, polls, turnout): the numbers → who gained and lost → what's driving it
+- breaking (fast-moving event): what we know → what we don't know yet. Keep it short; analysis optional.
+- diplomacy (international relations, summits, sanctions): what was agreed or said → each side's interest → wider stakes
+- development (anything else): what happened → why → what it means
+
+WRITING
+- lead: 1-2 opening paragraphs, no heading. Who, what, when, where, and the news line. Make it engaging and human, not robotic.
+- sections: 0-4 sections. Each heading is specific to THIS story, plain words, max 8 words, like "What sparked the row" or "Who loses under the new tax". NEVER generic labels such as "The News", "Background", "Analysis", "Conclusion", "Overview", "Why it matters".
+- Short stories may have no sections at all.
+- Exactly one section has kind "analysis" (except very short breaking stories, where it is optional). It interprets the facts: stakes, who gains or loses, how it fits the country's politics. Inside the analysis, when there is a dispute, fairly give the strongest argument of the side the story is less sympathetic to.
+- Section kinds: report (what happened), response (the other side / reply), context (background a newcomer needs), analysis, reaction (what others said), numbers (figures).
+- what_to_watch: one sentence on the next concrete step, only if the reports support it; else null.
+- Total length 300-650 words. Short sentences. Plain English for a global audience. No hype, no clichés, no emojis, no markdown.
 
 HARD RULES
-1. ORIGINAL WORDS. Never copy 7 or more consecutive words from the source, except short direct quotes inside quotation marks with attribution (max 2 quotes, each under 20 words). Rebuild every sentence from scratch.
-2. FACTS ONLY FROM THE SOURCE for the news part. Keep names, titles, numbers, dates and places exact. Never invent quotes, reactions, figures, critics, protests or outcomes.
-3. ATTRIBUTE. Separate confirmed facts from claims ("the minister said", "the party alleges").
-4. BALANCE. Politics divides people. Present the main competing positions fairly. Never take a side, never use loaded words, never tell readers what to think or whom to vote for.
-5. ANALYSIS is interpretation grounded in the reported facts: stakes, who gains or loses, how it fits the country's political process. You may add widely known, stable context (e.g. the role of an institution, when the next scheduled election is) ONLY if you are certain it is correct. If unsure, leave it out. No speculation dressed up as fact.
-6. QUESTION. Set "question" ONLY when the story raises a genuine public choice or debate that ordinary readers can reasonably weigh in on (a policy, a bill, a proposal, a decision). It must be neutral, answerable with agree/disagree, and not leading. For routine updates, appointments, court procedure, crimes, deaths or disasters, set it to null.
-7. NOT POLITICS? If the report is not about government, elections, parties, policy, legislation, courts on public matters, public officials or international relations, set is_political=false and leave other fields minimal.
-8. INCOMPLETE? If the source text is cut off or too thin to write a full article, set completeness="incomplete" and explain in incomplete_reason.
-9. Plain, clear English for a global audience. Short sentences. No hype, no clickbait, no emojis, no markdown, no HTML.
+1. ORIGINAL WORDS. Never copy 7 or more consecutive words from any report, except short quotes in quotation marks with attribution (max 2 quotes, each under 20 words).
+2. FACTS ONLY FROM THE REPORTS. Keep names, titles, numbers, dates and places exact. Never invent quotes, reactions, figures, critics or outcomes. You may add stable, widely known context only if certain (e.g. the role of an institution).
+3. COMBINE SOURCES. Report 1 is the main story. Use details from every other report about the SAME development; completely ignore any report that is about a different event. If reports disagree on a fact, say so and attribute each version ("Punch put the figure at X; Vanguard reported Y").
+4. ATTRIBUTE every claim to who made it. Separate confirmed facts from allegations.
+5. FAIRNESS. Never take a side, never use loaded words, never tell readers what to think or whom to vote for. When there is a dispute, the other side's position must appear.
+6. question: only when the story raises a genuine public choice readers can weigh (a policy, bill, proposal, decision). Neutral, agree/disagree, not leading. Otherwise null.
+7. Not about politics/government/public policy/elections/courts on public matters/international relations → is_political=false.
+8. Reports cut off or too thin → completeness="incomplete" with incomplete_reason.
 
-LENGTHS
-- headline: 55-90 characters, specific, includes the key actor and action. Not a copy of the source headline.
-- seo_title: 45-60 characters, leads with the most-searched name or term.
-- meta_description: 140-158 characters, a complete sentence that makes someone want to click.
-- dek: one sentence, 18-32 words, adds information beyond the headline.
-- key_points: 3-5 items, each one full sentence under 25 words.
-- body: 4-7 paragraphs, 300-600 words total. Paragraph 1 answers who, what, when, where. If the source is short, write a shorter body (minimum 200 words) — never pad with invented detail.
-- analysis: 2-3 paragraphs, 150-280 words total, titled in the UI "What it means".
-- background: one paragraph, 50-110 words, the context a newcomer needs.
-- what_next: one paragraph, 30-80 words, concrete next steps or dates only if reported or certain.
-- tags: 3-6 short topical tags (people, institutions, issues). actors: key people/institutions named.
-- slug_keywords: 3-6 plain words for the web address, most-searched names first, no dates, no filler words. Example: "peter obi tinubu campaign 2027".
-- image_subjects: 2-3 search terms to find a real photo on Wikimedia Commons. Most important person's FULL name first (e.g. "Bola Tinubu"), then the main institution or building with its country (e.g. "National Assembly of Nigeria"). Only real, photographable people, buildings or places. Never abstract ideas.
-- importance: 1-10. 9-10 national turning point or global headline; 6-8 significant national story; 4-5 notable; 1-3 minor/local/routine.
-
-Return ONLY this JSON:
-{"is_political":true,"country_iso":"NG","importance":7,"headline":"","seo_title":"","meta_description":"","dek":"","key_points":[""],"body":[""],"analysis":[""],"background":"","what_next":"","question":null,"tags":[""],"actors":[""],"image_subjects":[""],"slug_keywords":"3-6 words","completeness":"complete","incomplete_reason":null}`;
+ALSO RETURN
+- headline 55-90 chars, specific, active; seo_title 45-60 chars leading with the most-searched name; meta_description 140-158 chars.
+- dek: one sentence 18-32 words adding information beyond the headline.
+- key_points: 2-4 one-sentence bullets for skimmers.
+- importance 1-10 (9-10 national turning point; 6-8 significant national story; 4-5 notable; 1-3 minor).
+- tags 3-6, actors (key people/institutions), image_subjects (2-3 Wikimedia Commons search terms: most important person's full name first, then the main institution/building with its country), slug_keywords (3-6 plain words, most-searched names first, no dates).`;
 
 const STR = { type: 'STRING' };
 const STR_LIST = { type: 'ARRAY', items: STR };
-/** Gemini structured-output schema: guarantees valid, complete JSON in exactly this shape. */
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
     is_political: { type: 'BOOLEAN' },
     country_iso: STR,
     importance: { type: 'INTEGER' },
+    story_type: { type: 'STRING', enum: STORY_TYPES },
     headline: STR,
     seo_title: STR,
     meta_description: STR,
     dek: STR,
     key_points: STR_LIST,
-    body: STR_LIST,
-    analysis: STR_LIST,
-    background: STR,
-    what_next: STR,
+    lead: STR_LIST,
+    sections: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: { heading: STR, kind: { type: 'STRING', enum: KINDS }, paragraphs: STR_LIST },
+        required: ['heading', 'kind', 'paragraphs'],
+        propertyOrdering: ['heading', 'kind', 'paragraphs'],
+      },
+    },
+    what_to_watch: { type: 'STRING', nullable: true },
     question: { type: 'STRING', nullable: true },
     tags: STR_LIST,
     actors: STR_LIST,
@@ -89,32 +128,39 @@ const RESPONSE_SCHEMA = {
     completeness: { type: 'STRING', enum: ['complete', 'incomplete'] },
     incomplete_reason: { type: 'STRING', nullable: true },
   },
-  required: ['is_political', 'country_iso', 'importance', 'headline', 'seo_title', 'meta_description', 'dek', 'key_points', 'body', 'analysis', 'background', 'what_next', 'tags', 'actors', 'image_subjects', 'slug_keywords', 'completeness'],
-  propertyOrdering: ['is_political', 'country_iso', 'importance', 'headline', 'seo_title', 'meta_description', 'dek', 'key_points', 'body', 'analysis', 'background', 'what_next', 'question', 'tags', 'actors', 'image_subjects', 'slug_keywords', 'completeness', 'incomplete_reason'],
+  required: ['is_political', 'country_iso', 'importance', 'story_type', 'headline', 'seo_title', 'meta_description', 'dek', 'key_points', 'lead', 'sections', 'tags', 'actors', 'image_subjects', 'slug_keywords', 'completeness'],
+  propertyOrdering: ['is_political', 'country_iso', 'importance', 'story_type', 'headline', 'seo_title', 'meta_description', 'dek', 'key_points', 'lead', 'sections', 'what_to_watch', 'question', 'tags', 'actors', 'image_subjects', 'slug_keywords', 'completeness', 'incomplete_reason'],
 };
 
-export async function writeVoxpolisArticle(input: {
-  sourceTitle: string;
-  sourceText: string;
-  sourceName: string;
-  publishedAt?: string;
-  deskCountry: string; // ISO code or WORLD
-}): Promise<EditorialPiece> {
+const GENERIC_HEADINGS = /^(the news|news|background|analysis|conclusion|overview|summary|why it matters|context|details|reaction|reactions|what next|what's next|next steps)$/i;
+
+function words(s: string) {
+  return s.split(/\s+/).filter(Boolean).length;
+}
+
+export async function writeVoxpolisArticle(input: { sources: SourceInput[]; deskCountry: string }): Promise<EditorialPiece> {
   const countryHint =
     input.deskCountry === 'WORLD'
-      ? 'This came from an international desk. Set country_iso to the ISO-3166 alpha-2 code of the ONE country whose politics the story is mainly about.'
-      : `This came from the ${input.deskCountry} desk. Use country_iso="${input.deskCountry}" unless the story is clearly about another country's politics.`;
+      ? 'These came from an international desk. Set country_iso to the ISO-3166 alpha-2 code of the ONE country whose politics the story is mainly about.'
+      : `These came from the ${input.deskCountry} desk. Use country_iso="${input.deskCountry}" unless the story is clearly about another country's politics.`;
+
+  // Keep the prompt within budget: the lead source gets the most room.
+  const budget = [7000, 4000, 3000, 2500];
+  const reports = input.sources
+    .slice(0, 4)
+    .map(
+      (s, i) => `--- REPORT ${i + 1}: ${s.name}${s.publishedAt ? ` (${s.publishedAt.slice(0, 10)})` : ''}
+Headline: ${s.title}
+${s.text.slice(0, budget[i])}`
+    )
+    .join('\n\n');
 
   const user = `${countryHint}
-Source outlet: ${input.sourceName}
-Published: ${input.publishedAt || 'unknown'}
 Today: ${new Date().toISOString().slice(0, 10)}
-Source headline: ${input.sourceTitle}
+Number of reports: ${Math.min(input.sources.length, 4)}
 
-Source text:
-${input.sourceText}`;
+${reports}`;
 
-  // One automatic retry if the reply can't be read.
   let reply = await callNewsroomLLM(SYSTEM, user, RESPONSE_SCHEMA);
   let raw: any;
   try {
@@ -129,19 +175,32 @@ ${input.sourceText}`;
   const arr = (v: any) => (Array.isArray(v) ? v : typeof v === 'string' && v ? [v] : []).map((x: any) => String(x).trim()).filter(Boolean);
   const str = (v: any) => (typeof v === 'string' ? v.trim() : '');
 
+  const sections: StorySection[] = (Array.isArray(raw.sections) ? raw.sections : [])
+    .map((s: any) => ({
+      heading: str(s?.heading).replace(/[.:]$/, ''),
+      kind: (KINDS.includes(s?.kind) ? s.kind : 'report') as SectionKind,
+      paragraphs: arr(s?.paragraphs),
+    }))
+    .filter((s: StorySection) => s.paragraphs.length > 0)
+    .slice(0, 5);
+
+  const lead = arr(raw.lead);
+  const body = [...lead, ...sections.filter((s) => s.kind !== 'analysis').flatMap((s) => s.paragraphs)];
+  const analysis = sections.filter((s) => s.kind === 'analysis').flatMap((s) => s.paragraphs);
+
   return {
     is_political: raw.is_political !== false,
     country_iso: str(raw.country_iso).toUpperCase().slice(0, 2),
     importance: Math.max(1, Math.min(10, Number(raw.importance) || 5)),
+    story_type: STORY_TYPES.includes(raw.story_type) ? raw.story_type : 'development',
     headline: str(raw.headline),
     seo_title: str(raw.seo_title),
     meta_description: str(raw.meta_description),
     dek: str(raw.dek),
-    key_points: arr(raw.key_points).slice(0, 5),
-    body: arr(raw.body),
-    analysis: arr(raw.analysis),
-    background: str(raw.background),
-    what_next: str(raw.what_next),
+    key_points: arr(raw.key_points).slice(0, 4),
+    lead,
+    sections,
+    what_to_watch: str(raw.what_to_watch) || null,
     question: str(raw.question) || null,
     tags: arr(raw.tags).slice(0, 6),
     actors: arr(raw.actors).slice(0, 10),
@@ -150,30 +209,36 @@ ${input.sourceText}`;
     completeness: raw.completeness === 'incomplete' ? 'incomplete' : 'complete',
     incomplete_reason: raw.incomplete_reason || null,
     provider: notes.length ? `${provider} (after: ${notes.join(' | ')})` : provider,
+    body,
+    analysis,
   };
 }
 
-/** Quality gates. Returns a list of problems; empty list = publishable. */
-export function checkPiece(piece: EditorialPiece, sourceTitle: string, sourceText: string, minImportance: number): string[] {
+/** Quality gates. Returns a list of problems; empty list = good enough to become a draft. */
+export function checkPiece(piece: EditorialPiece, sources: SourceInput[], minImportance: number): string[] {
   const problems: string[] = [];
   if (!piece.is_political) problems.push('not political');
   if (piece.completeness === 'incomplete') problems.push(`incomplete: ${piece.incomplete_reason || 'source too thin'}`);
   if (!ALL_COUNTRIES.some((c) => c.code === piece.country_iso)) problems.push(`unknown country "${piece.country_iso}"`);
   if (piece.importance < minImportance) problems.push(`importance ${piece.importance} below ${minImportance}`);
   if (piece.headline.length < 30) problems.push('headline too short');
-  if (piece.body.length < 3) problems.push('body has fewer than 3 paragraphs');
+  if (piece.lead.length === 0) problems.push('no opening paragraph');
 
-  const bodyWords = piece.body.join(' ').split(/\s+/).filter(Boolean).length;
-  if (bodyWords < 200) problems.push(`body only ${bodyWords} words`);
-  if (piece.analysis.join(' ').split(/\s+/).filter(Boolean).length < 80) problems.push('analysis too thin');
+  const total = words([...piece.body, ...piece.analysis].join(' '));
+  const minWords = piece.story_type === 'breaking' ? 160 : 240;
+  if (total < minWords) problems.push(`story only ${total} words`);
+  if (piece.story_type !== 'breaking' && words(piece.analysis.join(' ')) < 60) problems.push('analysis missing or too thin');
 
-  const everything = [piece.headline, piece.dek, ...piece.key_points, ...piece.body, ...piece.analysis, piece.background, piece.what_next].join('\n');
+  const generic = piece.sections.filter((s) => GENERIC_HEADINGS.test(s.heading.trim()));
+  if (generic.length) problems.push(`generic subheading "${generic[0].heading}"`);
+
+  const everything = [piece.headline, piece.dek, ...piece.key_points, ...piece.body, ...piece.analysis, piece.what_to_watch || ''].join('\n');
   if (/\[\.\.\.\]|read more|click here|continue reading/i.test(everything)) problems.push('teaser text present');
 
-  // Originality: no 8+ word run copied from the source, outside quotation marks.
+  // Originality: no 10+ identical words in a row from any source, outside quotation marks.
   const unquoted = everything.replace(/["“][^"”]{0,200}["”]/g, ' ');
-  // 10+ identical words in a row = copying. (8 flagged long official names/titles, which isn't copying.)
-  const overlaps = findConsecutiveWordOverlaps(`${sourceTitle}\n${sourceText}`, unquoted, 10);
+  const allSources = sources.map((s) => `${s.title}\n${s.text}`).join('\n');
+  const overlaps = findConsecutiveWordOverlaps(allSources, unquoted, 10);
   if (overlaps.length > 0) problems.push(`copied wording: "${overlaps[0].span}"`);
 
   return problems;

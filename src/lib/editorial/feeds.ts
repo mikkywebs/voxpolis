@@ -128,3 +128,33 @@ export function similarity(a: Set<string>, b: Set<string>): number {
   });
   return inter / Math.min(a.size, b.size);
 }
+
+/**
+ * Other outlets' reports of the same story (same desk feeds, different outlet).
+ * Match on near-identical headlines, OR on 2+ shared headline words plus similar summaries
+ * (outlets word headlines very differently). The writer is also told to ignore any
+ * report that turns out to be about a different development.
+ */
+export function companionsFor(primary: FeedItem, all: FeedItem[], max = 2): FeedItem[] {
+  const tTok = titleTokens(primary.title);
+  const dTok = titleTokens(`${primary.title} ${primary.description}`);
+  const seenOutlets = new Set([primary.sourceName]);
+  return all
+    .filter((i) => i.url !== primary.url && i.sourceName !== primary.sourceName)
+    .map((i) => {
+      const it = titleTokens(i.title);
+      let shared = 0;
+      it.forEach((w) => {
+        if (tTok.has(w)) shared++;
+      });
+      const titleSim = similarity(tTok, it);
+      const descSim = similarity(dTok, titleTokens(`${i.title} ${i.description}`));
+      const score = titleSim >= 0.45 ? titleSim : shared >= 2 && descSim >= 0.3 ? descSim : 0;
+      return { i, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .filter((x) => (seenOutlets.has(x.i.sourceName) ? false : (seenOutlets.add(x.i.sourceName), true)))
+    .slice(0, max)
+    .map((x) => x.i);
+}

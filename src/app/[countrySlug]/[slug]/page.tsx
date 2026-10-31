@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import ArticleChrome from '@/components/article/ArticleChrome';
 import ArticleInteractions from '@/components/article/ArticleInteractions';
 import AdSlot from '@/components/article/AdSlot';
+import StoryBody from '@/components/article/StoryBody';
 import Footer from '@/components/layout/Footer';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
 import { getArticleBySlug, getArticleByPreviousSlug, getRelated } from '@/lib/articles';
@@ -100,7 +101,13 @@ export default async function ArticlePage({ params }: Props) {
   const analysis = realAnalysis(a);
   const keyPoints = (a.key_points || []).filter(Boolean);
   const mid = Math.min(3, Math.ceil(body.length / 2));
-  const words = [a.content, a.analysis, a.background, a.what_next].join(' ').split(/\s+/).filter(Boolean).length;
+  const words = (a.sections?.length
+    ? [a.lead, ...a.sections.flatMap((x) => x.paragraphs), a.what_to_watch]
+    : [a.content, a.analysis, a.background, a.what_next]
+  )
+    .filter(Boolean)
+    .join(' ')
+    .split(/\s+/).length;
   const minutes = Math.max(1, Math.round(words / 220));
   const url = absoluteUrl(articlePath(a));
   const image = absoluteUrl(shareImage(a));
@@ -161,9 +168,9 @@ export default async function ArticlePage({ params }: Props) {
             </nav>
 
             <header className="space-y-3">
-              <h1 className="text-2xl sm:text-4xl font-black leading-tight text-gray-900 dark:text-white">{a.title}</h1>
+              <h1 className="font-serif text-3xl sm:text-[44px] font-semibold leading-[1.1] text-gray-900 dark:text-white">{a.title}</h1>
               {(a.dek || a.snippet) && (
-                <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 leading-relaxed">{a.dek || a.snippet}</p>
+                <p className="font-serif text-lg sm:text-xl text-gray-600 dark:text-gray-300 leading-relaxed">{a.dek || a.snippet}</p>
               )}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 border-y border-gray-200 dark:border-gray-800 py-2.5">
                 <span className="font-semibold text-gray-700 dark:text-gray-300">Voxpolis Politics Desk</span>
@@ -194,6 +201,10 @@ export default async function ArticlePage({ params }: Props) {
               </figure>
             )}
 
+            {a.sections && a.sections.length + (a.lead ? 1 : 0) > 0 ? (
+              <StoryBody a={a} adsAllowed={approved} />
+            ) : (
+              <>
             {keyPoints.length > 0 && (
               <section aria-labelledby="short-version" className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/30 p-5">
                 <h2 id="short-version" className="text-sm font-black uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-3">
@@ -248,12 +259,20 @@ export default async function ArticlePage({ params }: Props) {
               </section>
             )}
 
-            {a.source_url?.startsWith('http') && (
-              <p className="text-xs text-gray-500 border-t border-gray-200 dark:border-gray-800 pt-4">
-                Based on reporting by{' '}
-                <a href={a.source_url} target="_blank" rel="noopener" className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
-                  {a.source_name}
-                </a>
+              </>
+            )}
+
+            {(a.sources?.length || a.source_url?.startsWith('http')) && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-800 pt-4">
+                <span className="font-semibold text-gray-900 dark:text-white">Reporting from: </span>
+                {(a.sources?.length ? a.sources : [{ name: a.source_name, url: a.source_url }]).map((src, i, all) => (
+                  <span key={src.url}>
+                    <a href={src.url} target="_blank" rel="noopener" className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                      {src.name}
+                    </a>
+                    {i < all.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
                 . Spotted an error? <Link href="/corrections" className="underline">Tell us</Link>.
               </p>
             )}

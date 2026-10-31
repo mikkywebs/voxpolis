@@ -31,7 +31,27 @@ interface Story {
   review_status: Status;
   reviewed_by: string | null;
   poll_question: string;
+  story_type: string | null;
+  lead: string | null;
+  sections: { heading: string; kind: string; paragraphs: string[] }[] | null;
+  what_to_watch: string | null;
+  sources: { name: string; url: string }[] | null;
 }
+
+interface EditSection {
+  heading: string;
+  kind: string;
+  text: string;
+}
+
+const KIND_LABELS: Record<string, string> = {
+  report: 'What happened',
+  response: 'The other side',
+  context: 'Context',
+  analysis: 'Analysis (labelled on the page)',
+  reaction: 'Reactions',
+  numbers: 'Numbers',
+};
 
 const inputCls =
   'w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -62,6 +82,22 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
   });
   const [preview, setPreview] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Flexible structure (v3 stories)
+  const flexible = Array.isArray(story.sections) && story.sections.length + (story.lead ? 1 : 0) > 0;
+  const [lead, setLead] = useState(story.lead || '');
+  const [secs, setSecs] = useState<EditSection[]>(
+    (story.sections || []).map((x) => ({ heading: x.heading, kind: x.kind, text: (x.paragraphs || []).join('\n\n') }))
+  );
+  const [watch, setWatch] = useState(story.what_to_watch || '');
+  const setSec = (i: number, patch: Partial<EditSection>) => setSecs((all) => all.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const moveSec = (i: number, d: number) =>
+    setSecs((all) => {
+      const j = i + d;
+      if (j < 0 || j >= all.length) return all;
+      const copy = [...all];
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+      return copy;
+    });
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -81,7 +117,7 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
     }
   };
   const country = getCountryByCode(story.country_code);
-  const words = f.content.split(/\s+/).filter(Boolean).length;
+  const words = (flexible ? [lead, ...secs.map((x) => x.text)].join(' ') : f.content).split(/\s+/).filter(Boolean).length;
 
   const act = async (action: string) => {
     setBusy(true);
@@ -93,7 +129,20 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
         body: JSON.stringify({
           id: story.id,
           action,
-          fields: { ...f, key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean) },
+          fields: flexible
+            ? {
+                title: f.title,
+                dek: f.dek,
+                slug: f.slug,
+                poll_question: f.poll_question,
+                original_image_url: f.original_image_url,
+                image_credit: f.image_credit,
+                key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean),
+                lead,
+                sections: secs,
+                what_to_watch: watch,
+              }
+            : { ...f, key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean) },
         }),
       });
       const d = await res.json();
@@ -181,11 +230,72 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
             </span>
           </label>
           {field('dek', 'Summary line', 2)}
-          {field('key_points', 'The short version', 5, 'One point per line')}
-          {field('content', `Story (${words} words)`, 14)}
-          {field('analysis', 'What it means', 7)}
-          {field('background', 'Background', 4)}
-          {field('what_next', 'What happens next', 3)}
+          {field('key_points', 'Summary bullets', 4, 'One point per line')}
+          {flexible ? (
+            <div className="space-y-4">
+              <label className="block space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Opening ({words} words in the story)</span>
+                <span className="block text-[11px] text-gray-400">No subheading. Leave a blank line between paragraphs.</span>
+                <textarea className={inputCls} rows={5} value={lead} onChange={(e) => setLead(e.target.value)} />
+              </label>
+              {secs.map((x, i) => (
+                <div key={i} className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 space-y-2">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <input
+                      className={`${inputCls} flex-1 min-w-[200px] font-bold`}
+                      aria-label={`Subheading ${i + 1}`}
+                      placeholder="Subheading written for this story"
+                      value={x.heading}
+                      onChange={(e) => setSec(i, { heading: e.target.value })}
+                    />
+                    <select
+                      aria-label={`Section type ${i + 1}`}
+                      className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 py-2 text-sm"
+                      value={x.kind}
+                      onChange={(e) => setSec(i, { kind: e.target.value })}
+                    >
+                      {Object.entries(KIND_LABELS).map(([k, label]) => (
+                        <option key={k} value={k}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <textarea className={inputCls} rows={6} aria-label={`Section ${i + 1} text`} value={x.text} onChange={(e) => setSec(i, { text: e.target.value })} />
+                  <div className="flex gap-3 text-xs font-bold">
+                    <button type="button" onClick={() => moveSec(i, -1)} disabled={i === 0} className="text-gray-600 disabled:opacity-30">↑ Move up</button>
+                    <button type="button" onClick={() => moveSec(i, 1)} disabled={i === secs.length - 1} className="text-gray-600 disabled:opacity-30">↓ Move down</button>
+                    <button type="button" onClick={() => setSecs((all) => all.filter((_, j) => j !== i))} className="text-red-600">Remove section</button>
+                  </div>
+                </div>
+              ))}
+              <button type="button" onClick={() => setSecs((all) => [...all, { heading: '', kind: 'report', text: '' }])} className="text-sm font-bold text-blue-600">
+                + Add a section
+              </button>
+              <label className="block space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-500">What to watch (optional)</span>
+                <input className={inputCls} value={watch} onChange={(e) => setWatch(e.target.value)} />
+              </label>
+              {story.sources && story.sources.length > 0 && (
+                <p className="text-xs text-gray-500">
+                  Built from {story.sources.length} report{story.sources.length > 1 ? 's' : ''}:{' '}
+                  {story.sources.map((x, i) => (
+                    <a key={x.url} href={x.url} target="_blank" rel="noopener" className="text-blue-600 hover:underline">
+                      {x.name}
+                      {i < story.sources!.length - 1 ? ', ' : ''}
+                    </a>
+                  ))}
+                </p>
+              )}
+            </div>
+          ) : (
+            <>
+              {field('content', `Story (${words} words)`, 14)}
+              {field('analysis', 'What it means', 7)}
+              {field('background', 'Background', 4)}
+              {field('what_next', 'What happens next', 3)}
+            </>
+          )}
           {field('poll_question', 'Reader question (leave empty for none)', 1, 'Only for a real public choice. Neutral, agree/disagree.')}
           <div className="space-y-2 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
             <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Featured image</span>
@@ -234,7 +344,6 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
           )}
           {f.key_points.trim() && (
             <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 p-4">
-              <p className="text-xs font-black uppercase text-blue-700 mb-2">The short version</p>
               <ul className="list-disc pl-5 space-y-1">
                 {f.key_points.split('\n').filter((k) => k.trim()).map((k, i) => (
                   <li key={i}>{k}</li>
@@ -242,10 +351,33 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
               </ul>
             </div>
           )}
-          {f.content.split(/\n\s*\n/).map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
-          {f.analysis.trim() && (
+          {flexible ? (
+            <>
+              {lead.split(/\n\s*\n/).filter((p) => p.trim()).map((p, i) => (
+                <p key={`l${i}`}>{p}</p>
+              ))}
+              {secs.map((x, i) => (
+                <div key={`s${i}`} className="space-y-3">
+                  {x.kind === 'analysis' && (
+                    <span className="inline-block text-[10px] font-bold uppercase tracking-widest text-white bg-gray-900 px-2 py-0.5 rounded">Analysis</span>
+                  )}
+                  <h4 className="text-lg font-black">{x.heading}</h4>
+                  {x.text.split(/\n\s*\n/).filter((p) => p.trim()).map((p, j) => (
+                    <p key={j}>{p}</p>
+                  ))}
+                </div>
+              ))}
+              {watch.trim() && (
+                <p>
+                  <strong>What to watch: </strong>
+                  {watch}
+                </p>
+              )}
+            </>
+          ) : (
+            f.content.split(/\n\s*\n/).map((p, i) => <p key={i}>{p}</p>)
+          )}
+          {!flexible && f.analysis.trim() && (
             <>
               <h4 className="text-lg font-black">What it means</h4>
               {f.analysis.split(/\n\s*\n/).map((p, i) => (
@@ -253,20 +385,20 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
               ))}
             </>
           )}
-          {f.background.trim() && (
+          {!flexible && f.background.trim() && (
             <>
               <h4 className="text-lg font-black">Background</h4>
               <p>{f.background}</p>
             </>
           )}
-          {f.what_next.trim() && (
+          {!flexible && f.what_next.trim() && (
             <>
               <h4 className="text-lg font-black">What happens next</h4>
               <p>{f.what_next}</p>
             </>
           )}
           {f.poll_question.trim() && <p className="font-bold">Reader question: {f.poll_question}</p>}
-          <p className="text-xs text-gray-500">Based on reporting by {story.source_name}.</p>
+          <p className="text-xs text-gray-500">Reporting from: {(story.sources?.length ? story.sources.map((x) => x.name) : [story.source_name]).join(', ')}.</p>
         </div>
       )}
 
