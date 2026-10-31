@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { articlePath } from '@/lib/paths';
 import { createClient } from '@/lib/supabase/client';
 import { getCountryByCode } from '@/config/countries';
+import { checkStory, fieldLevel, CheckItem, CheckResult } from '@/lib/editorial/prepublish';
+import type { SourceFacts } from '@/lib/editorial/facts';
 
 type Status = 'pending' | 'approved' | 'rejected';
 
@@ -36,7 +38,65 @@ interface Story {
   sections: { heading: string; kind: string; paragraphs: string[] }[] | null;
   what_to_watch: string | null;
   sources: { name: string; url: string }[] | null;
-  checks: { level: 'ready' | 'check' | 'stop'; items: { level: 'stop' | 'check' | 'tip'; text: string }[] };
+  checks: CheckResult;
+  source_facts: SourceFacts | null;
+  meta_description: string | null;
+  checked_items: string[] | null;
+  updated_at: string | null;
+}
+
+const DOT: Record<'red' | 'amber' | 'green', string> = { red: 'bg-red-600', amber: 'bg-amber-500', green: 'bg-emerald-500' };
+const WORD: Record<'red' | 'amber' | 'green', string> = { red: 'Fix', amber: 'Check', green: 'OK' };
+
+function Light({ level }: { level: 'red' | 'amber' | 'green' }) {
+  return (
+    <span className={`inline-flex items-center gap-1 text-[11px] font-bold normal-case tracking-normal ${level === 'red' ? 'text-red-700' : level === 'amber' ? 'text-amber-700' : 'text-emerald-700'}`}>
+      <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${DOT[level]}`} />
+      {WORD[level]}
+    </span>
+  );
+}
+
+/** The problems found in one part of the story, each with "How do I check?" and "It's correct". */
+function FieldChecks({ result, field, onConfirm }: { result: CheckResult; field: string; onConfirm: (key: string, undo?: boolean) => void }) {
+  const open = result.items.filter((i) => i.field === field);
+  const done = result.confirmed.filter((i) => i.field === field);
+  if (!open.length && !done.length) return null;
+  const row = (i: CheckItem, k: number, confirmed = false) => (
+    <li key={k} className="flex gap-2">
+      <span
+        aria-hidden="true"
+        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${confirmed ? 'bg-emerald-500' : i.level === 'stop' ? 'bg-red-600' : i.level === 'check' ? 'bg-amber-500' : 'bg-gray-400'}`}
+      />
+      <div className="min-w-0 space-y-1">
+        <p className={confirmed ? 'text-gray-500 line-through decoration-gray-300' : i.level === 'stop' ? 'text-red-800 dark:text-red-300 font-semibold' : i.level === 'check' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}>
+          <span className="sr-only">{confirmed ? 'Confirmed: ' : i.level === 'stop' ? 'Must fix: ' : i.level === 'check' ? 'Check: ' : 'Tip: '}</span>
+          {i.text}
+        </p>
+        {!confirmed && i.how && (
+          <details className="text-gray-600 dark:text-gray-400">
+            <summary className="cursor-pointer text-blue-600 font-semibold">How do I check?</summary>
+            <p className="mt-1">{i.how}</p>
+          </details>
+        )}
+        {i.key && (
+          <button
+            type="button"
+            onClick={() => onConfirm(i.key!, confirmed)}
+            className={`text-xs font-bold ${confirmed ? 'text-gray-500 hover:underline' : 'px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'}`}
+          >
+            {confirmed ? 'Undo' : "✓ It's correct"}
+          </button>
+        )}
+      </div>
+    </li>
+  );
+  return (
+    <ul className="rounded-xl bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 p-3 space-y-2.5 text-[13px] leading-snug">
+      {open.map((i, k) => row(i, k))}
+      {done.map((i, k) => row(i, 100 + k, true))}
+    </ul>
+  );
 }
 
 interface EditSection {
@@ -80,7 +140,9 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
     slug: story.slug || '',
     original_image_url: story.original_image_url || '',
     image_credit: story.image_credit || '',
+    meta_description: story.meta_description || '',
   });
+  const [checked, setChecked] = useState<string[]>(story.checked_items || []);
   const [preview, setPreview] = useState(false);
   const [uploading, setUploading] = useState(false);
   // Flexible structure (v3 stories)
@@ -99,6 +161,49 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
       [copy[i], copy[j]] = [copy[j], copy[i]];
       return copy;
     });
+
+  // The checker runs live on what is in the editor right now.
+  const live = useMemo(
+    () =>
+      checkStory({
+        ...story,
+        title: f.title,
+        slug: f.slug,
+        dek: f.dek,
+        key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean),
+        lead: flexible ? lead : null,
+        sections: flexible ? secs.map((x) => ({ heading: x.heading, kind: x.kind, paragraphs: x.text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean) })) : null,
+        what_to_watch: flexible ? watch : null,
+        content: f.content,
+        analysis: f.analysis,
+        background: f.background,
+        what_next: f.what_next,
+        original_image_url: f.original_image_url,
+        image_credit: f.image_credit,
+        meta_description: f.meta_description,
+        checked_items: checked,
+      }),
+    [story, f, lead, secs, watch, checked, flexible]
+  );
+  const confirm = async (key: string, undo = false) => {
+    setErr('');
+    const before = checked;
+    setChecked((c) => (undo ? c.filter((k) => k !== key) : Array.from(new Set([...c, key]))));
+    try {
+      const res = await fetch('/api/admin/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: story.id, action: undo ? 'unconfirm' : 'confirm', key }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not save');
+      setChecked(d.checked_items || []);
+    } catch (e: any) {
+      setChecked(before);
+      setErr(e.message);
+    }
+  };
+  const lv = (field: string) => fieldLevel(live, field);
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -138,6 +243,7 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
                 poll_question: f.poll_question,
                 original_image_url: f.original_image_url,
                 image_credit: f.image_credit,
+                meta_description: f.meta_description,
                 key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean),
                 lead,
                 sections: secs,
@@ -158,9 +264,13 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
     }
   };
 
-  const field = (key: keyof typeof f, label: string, rows: number, hint?: string) => (
+  const field = (key: keyof typeof f, label: string, rows: number, hint?: string, check?: string) => (
+    <div className="space-y-1.5">
     <label className="block space-y-1">
-      <span className="text-xs font-bold uppercase tracking-wider text-gray-500">{label}</span>
+      <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+        {label}
+        {check && <Light level={lv(check)} />}
+      </span>
       {hint && <span className="block text-[11px] text-gray-400">{hint}</span>}
       {rows === 1 ? (
         <input className={inputCls} value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })} />
@@ -168,6 +278,8 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
         <textarea className={inputCls} rows={rows} value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })} />
       )}
     </label>
+    {check && <FieldChecks result={live} field={check} onConfirm={confirm} />}
+    </div>
   );
 
   return (
@@ -181,20 +293,20 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
             Importance {story.importance}/10
           </span>
         )}
-        {story.checks && (
+        {live && (
           <span
             className={`px-2 py-0.5 rounded-full font-bold ${
-              story.checks.level === 'ready'
+              live.level === 'ready'
                 ? 'bg-emerald-100 text-emerald-800'
-                : story.checks.level === 'check'
+                : live.level === 'check'
                 ? 'bg-amber-100 text-amber-800'
                 : 'bg-red-100 text-red-800'
             }`}
           >
-            {story.checks.level === 'ready'
+            {live.level === 'ready'
               ? '● Ready to publish'
-              : story.checks.level === 'check'
-              ? `● Check ${story.checks.items.filter((i) => i.level === 'check').length} item(s)`
+              : live.level === 'check'
+              ? `● Check ${live.items.filter((i) => i.level === 'check').length} item(s)`
               : '● Don’t publish yet'}
           </span>
         )}
@@ -225,26 +337,36 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
         </div>
       </div>
 
-      {story.checks && story.checks.items.length > 0 && (
-        <ul className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 space-y-1.5 text-[13px] leading-snug">
-          {story.checks.items.map((i, k) => (
-            <li key={k} className="flex gap-2">
-              <span
-                aria-hidden="true"
-                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${i.level === 'stop' ? 'bg-red-600' : i.level === 'check' ? 'bg-amber-500' : 'bg-gray-400'}`}
-              />
-              <span className={i.level === 'stop' ? 'text-red-800 dark:text-red-300 font-semibold' : i.level === 'check' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}>
-                <span className="sr-only">{i.level === 'stop' ? 'Must fix: ' : i.level === 'check' ? 'Check: ' : 'Tip: '}</span>
-                {i.text}
-              </span>
-            </li>
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 space-y-2">
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+          {[
+            ['headline', 'Headline'],
+            ['dek', 'Summary'],
+            ['glance', 'At a glance'],
+            ...(flexible
+              ? [['lead', 'Opening'] as [string, string], ...secs.map((x, i) => [`sec:${i}`, x.heading ? (x.heading.length > 22 ? x.heading.slice(0, 22) + '…' : x.heading) : `Section ${i + 1}`] as [string, string])]
+              : [['content', 'Story'] as [string, string], ['analysis', 'What it means'] as [string, string], ['background', 'Background'] as [string, string]]),
+            ['photo', 'Photo'],
+            ['seo', 'Google listing'],
+            ['sources', 'Sources'],
+            ['story', 'Overall'],
+          ].map(([id, label]) => (
+            <span key={id} className="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300">
+              <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${DOT[lv(id)]}`} />
+              {label}
+              <span className="sr-only">: {WORD[lv(id)]}</span>
+            </span>
           ))}
-        </ul>
-      )}
+        </div>
+        {!open && live.level !== 'ready' && (
+          <p className="text-xs text-gray-500">Press Edit to see what to fix or check under each part.</p>
+        )}
+        <FieldChecks result={live} field="story" onConfirm={confirm} />
+      </div>
 
       {open && (
         <div className="space-y-3 pt-1">
-          {field('title', 'Headline', 1)}
+          {field('title', 'Headline', 1, undefined, 'headline')}
           <label className="block space-y-1">
             <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Web address</span>
             <div className="flex items-center rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 overflow-hidden text-sm">
@@ -260,17 +382,23 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
               {story.review_status === 'approved' ? 'Locked after publishing.' : '3-6 key words, e.g. peter-obi-tinubu-campaign-2027. Locked once published.'}
             </span>
           </label>
-          {field('dek', 'Summary line', 2)}
-          {field('key_points', 'At a glance', 4, '2-4 short points, one per line')}
+          {field('dek', 'Summary line', 2, 'One sentence under the headline.', 'dek')}
+          {field('key_points', 'At a glance', 4, '2-4 short points, one per line', 'glance')}
           {flexible ? (
             <div className="space-y-4">
               <label className="block space-y-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Opening ({words} words in the story)</span>
+                <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+                  Opening ({words} words in the story) <Light level={lv('lead')} />
+                </span>
                 <span className="block text-[11px] text-gray-400">No subheading. Leave a blank line between paragraphs.</span>
                 <textarea className={inputCls} rows={5} value={lead} onChange={(e) => setLead(e.target.value)} />
               </label>
+              <FieldChecks result={live} field="lead" onConfirm={confirm} />
               {secs.map((x, i) => (
                 <div key={i} className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Section {i + 1} <Light level={lv(`sec:${i}`)} />
+                  </div>
                   <div className="flex flex-wrap gap-2 items-center">
                     <input
                       className={`${inputCls} flex-1 min-w-[200px] font-bold`}
@@ -293,6 +421,7 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
                     </select>
                   </div>
                   <textarea className={inputCls} rows={6} aria-label={`Section ${i + 1} text`} value={x.text} onChange={(e) => setSec(i, { text: e.target.value })} />
+                  <FieldChecks result={live} field={`sec:${i}`} onConfirm={confirm} />
                   <div className="flex gap-3 text-xs font-bold">
                     <button type="button" onClick={() => moveSec(i, -1)} disabled={i === 0} className="text-gray-600 disabled:opacity-30">↑ Move up</button>
                     <button type="button" onClick={() => moveSec(i, 1)} disabled={i === secs.length - 1} className="text-gray-600 disabled:opacity-30">↓ Move down</button>
@@ -304,9 +433,12 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
                 + Add a section
               </button>
               <label className="block space-y-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-500">What to watch (optional)</span>
+                <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+                  What to watch (optional) <Light level={lv('watch')} />
+                </span>
                 <input className={inputCls} value={watch} onChange={(e) => setWatch(e.target.value)} />
               </label>
+              <FieldChecks result={live} field="watch" onConfirm={confirm} />
               {story.sources && story.sources.length > 0 && (
                 <p className="text-xs text-gray-500">
                   Built from {story.sources.length} report{story.sources.length > 1 ? 's' : ''}:{' '}
@@ -318,18 +450,21 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
                   ))}
                 </p>
               )}
+              <FieldChecks result={live} field="sources" onConfirm={confirm} />
             </div>
           ) : (
             <>
-              {field('content', `Story (${words} words)`, 14)}
-              {field('analysis', 'What it means', 7)}
-              {field('background', 'Background', 4)}
-              {field('what_next', 'What happens next', 3)}
+              {field('content', `Story (${words} words)`, 14, undefined, 'content')}
+              {field('analysis', 'What it means', 7, undefined, 'analysis')}
+              {field('background', 'Background', 4, undefined, 'background')}
+              {field('what_next', 'What happens next', 3, undefined, 'watch')}
             </>
           )}
           {field('poll_question', 'Reader question (leave empty for none)', 1, 'Only for a real public choice. Neutral, agree/disagree.')}
           <div className="space-y-2 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Featured image</span>
+            <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+              Featured image <Light level={lv('photo')} />
+            </span>
             <div className="flex flex-wrap items-center gap-2">
               <label className="px-3 py-2 rounded-xl bg-gray-900 text-white dark:bg-white dark:text-gray-900 text-xs font-bold cursor-pointer">
                 {uploading ? 'Uploading…' : f.original_image_url ? 'Replace photo' : 'Upload photo'}
@@ -356,6 +491,44 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
             <p className="text-[11px] text-gray-500">
               Only use photos you own or have permission to use: your own photos, official government handouts that allow reuse,
               licensed stock, or Wikimedia Commons. Never photos copied from other news sites.
+            </p>
+            <FieldChecks result={live} field="photo" onConfirm={confirm} />
+          </div>
+
+          <div className="space-y-2 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+            <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+              How it looks on Google <Light level={lv('seo')} />
+            </span>
+            <div className="rounded-lg bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 p-3 font-sans">
+              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                voxpolis.app › {articlePath({ slug: f.slug, country_code: story.country_code }).split('/').filter(Boolean).join(' › ')}
+              </p>
+              <p className="text-[17px] leading-snug text-[#1a0dab] dark:text-blue-400">
+                {f.title.length > 65 ? f.title.slice(0, 62).trimEnd() + '…' : f.title} | Voxpolis
+              </p>
+              <p className="text-[13px] text-gray-700 dark:text-gray-300 line-clamp-2">
+                {(() => {
+                  const d = (f.meta_description || f.dek).trim();
+                  return d.length > 160 ? d.slice(0, 157).trimEnd() + '…' : d || 'No description yet.';
+                })()}
+              </p>
+            </div>
+            <label className="block space-y-1">
+              <span className="block text-[11px] text-gray-500">
+                Google description ({(f.meta_description || f.dek).trim().length}/160). Leave empty to use the summary line.
+              </span>
+              <textarea
+                className={inputCls}
+                rows={2}
+                placeholder={f.dek}
+                value={f.meta_description}
+                onChange={(e) => setF({ ...f, meta_description: e.target.value })}
+              />
+            </label>
+            <FieldChecks result={live} field="seo" onConfirm={confirm} />
+            <p className="text-[11px] text-gray-500">
+              Added automatically to every published story: page title and description tags, Google News article data, the news sitemap,
+              the share image for social media, the main web address (canonical) and breadcrumbs.
             </p>
           </div>
         </div>
@@ -439,8 +612,8 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
         {story.review_status !== 'approved' && (
           <button
             type="button"
-            disabled={busy || story.checks?.level === 'stop'}
-            title={story.checks?.level === 'stop' ? 'Fix the red items first, then save' : undefined}
+            disabled={busy || live.level === 'stop'}
+            title={live.level === 'stop' ? 'Fix the red items first' : undefined}
             onClick={() => act('approve')}
             className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold disabled:opacity-50"
           >
@@ -545,7 +718,7 @@ export default function ReviewPage() {
         <details className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 text-sm">
           <summary className="font-bold cursor-pointer">Before you publish: the 6 checks (about 3 minutes)</summary>
           <ol className="mt-3 space-y-2 list-decimal pl-5 leading-relaxed text-gray-700 dark:text-gray-300">
-            <li><strong>Fix every red and amber item</strong> shown on the story. Red items block publishing.</li>
+            <li><strong>Go through the coloured dots.</strong> Red = must fix (Publish stays locked). Amber = check it: open &quot;How do I check?&quot;, and if it&apos;s right press &quot;It&apos;s correct&quot; so it turns green.</li>
             <li><strong>Facts:</strong> open the original report. Check every name, title, number and date in the story against it.</li>
             <li><strong>Fair to all sides:</strong> if there is a dispute, is the other side&apos;s position included? Are claims attributed (&quot;X said&quot;), not stated as fact?</li>
             <li><strong>No opinion in the news:</strong> opinions only in the Analysis section. No praise or attacks on anyone, no &quot;popular&quot;, &quot;disastrous&quot;, &quot;far-right&quot; and similar.</li>

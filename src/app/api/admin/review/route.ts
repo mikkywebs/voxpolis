@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const FIELDS =
-  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, updated_at';
+  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, updated_at';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyAdmin(req);
@@ -45,10 +45,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     editor: auth.name,
     counts: tally,
-    articles: (data || []).map((a: any) => {
-      const { source_facts, ...rest } = a;
-      return { ...rest, poll_question: pollMap.get(a.id) || '', checks: checkStory(a) };
-    }),
+    // source_facts go to the browser too, so the checker can run live while the editor types.
+    articles: (data || []).map((a: any) => ({ ...a, poll_question: pollMap.get(a.id) || '', checks: checkStory(a) })),
   });
 }
 
@@ -64,12 +62,25 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const id = String(body?.id || '');
   const action = String(body?.action || '');
-  if (!id || !['save', 'approve', 'reject', 'reopen', 'remove_photo'].includes(action)) {
+  if (!id || !['save', 'approve', 'reject', 'reopen', 'remove_photo', 'confirm', 'unconfirm'].includes(action)) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 
-  const { data: current } = await supabaseAdmin.from('articles').select('id, slug, country_code, review_status').eq('id', id).maybeSingle();
+  const { data: current } = await supabaseAdmin.from('articles').select('id, slug, country_code, review_status, checked_items').eq('id', id).maybeSingle();
   if (!current) return NextResponse.json({ error: 'Story not found' }, { status: 404 });
+
+  // "It's correct" on an amber check (and undo). Saved straight away, without touching other edits.
+  if (action === 'confirm' || action === 'unconfirm') {
+    const key = String(body?.key || '').slice(0, 300);
+    if (!key) return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+    const list = new Set<string>(current.checked_items || []);
+    if (action === 'confirm') list.add(key);
+    else list.delete(key);
+    const checked_items = Array.from(list).slice(-200);
+    const { error } = await supabaseAdmin.from('articles').update({ checked_items }).eq('id', id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, checked_items });
+  }
 
   const update: Record<string, any> = { updated_at: new Date().toISOString() };
   const f = body?.fields || {};
@@ -158,6 +169,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Images must be uploaded here (or come from Wikimedia Commons).' }, { status: 400 });
       }
     }
+    if (typeof f.meta_description === 'string') update.meta_description = clean(f.meta_description, 200) || null;
     if (typeof f.image_credit === 'string') update.image_credit = f.image_credit.trim().slice(0, 160) || null;
 
     if (typeof f.poll_question === 'string') {
@@ -169,11 +181,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (action === 'approve') {
-    update.review_status = 'approved';
-    update.reviewed_at = new Date().toISOString();
-    update.reviewed_by = auth.name;
-  }
   if (action === 'reject') update.review_status = 'rejected';
   if (action === 'reopen') {
     update.review_status = 'pending';
@@ -186,6 +193,21 @@ export async function POST(req: NextRequest) {
 
   const { error } = await supabaseAdmin.from('articles').update(update).eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Publish: edits are saved above; publish only if the saved story has no red items.
+  if (action === 'approve') {
+    const { data: saved } = await supabaseAdmin.from('articles').select(FIELDS).eq('id', id).maybeSingle();
+    const result = saved ? checkStory(saved as any) : null;
+    if (!result || result.level === 'stop') {
+      const first = result?.items.find((i) => i.level === 'stop')?.text;
+      return NextResponse.json({ error: `Your edits are saved, but the story was not published. Fix the red items first.${first ? ' ' + first : ''}` }, { status: 400 });
+    }
+    const { error: pubErr } = await supabaseAdmin
+      .from('articles')
+      .update({ review_status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: auth.name })
+      .eq('id', id);
+    if (pubErr) return NextResponse.json({ error: pubErr.message }, { status: 500 });
+  }
 
   // Refresh the public pages that show this story.
   try {
