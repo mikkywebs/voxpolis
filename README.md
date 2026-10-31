@@ -3,7 +3,7 @@
 ## How the newsroom works (v2)
 
 1. **Desks** (`src/config/coverage.ts`): 15 country desks + a World desk, each with tested publisher feeds.
-2. **Schedule** (`.github/workflows/ingest.yml`): every hour GitHub Actions calls `/api/ingest?desk=XX` for each Tier 1 desk; Tier 2 every 3 hours. Vercel Cron runs the NG desk daily as a backup.
+2. **Schedule** (Supabase pg_cron, jobs `voxpolis-<DESK>`): Tier 1 desks hourly, spread across the hour; Tier 2 every 6 hours. Each job calls `/api/ingest?desk=XX` with the `voxpolis_cron_secret` stored in Supabase Vault. Vercel Cron runs the NG desk daily as a backup; the GitHub workflow is for manual runs.
 3. **Pipeline** (`src/lib/editorial/`): read feeds → drop old / non-political / already-covered → rank stories carried by several outlets first → read the article → AI writes an original Voxpolis article (headline, summary, key points, story, *What it means*, background, *What happens next*, poll question only when there is a real public choice) → quality gates (politics only, no 8-word copying, minimum length, duplicate check) → save → log to `ingest_log`.
 4. **Pages** render on the server (`src/app/page.tsx`, `src/app/[countrySlug]/page.tsx`, `src/app/news/[slug]/page.tsx`) with full SEO metadata and structured data.
 5. **SEO files**: `/sitemap.xml`, `/news-sitemap.xml` (last 48h), `/feed.xml`, `/robots.txt`, `/ads.txt` (all generated).
