@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { Newsreader } from 'next/font/google';
 import CookieConsentBanner from '@/components/layout/CookieConsentBanner';
 import StickyFooterAd from '@/components/layout/StickyFooterAd';
 import ScrollToTopButton from '@/components/layout/ScrollToTopButton';
@@ -9,8 +8,6 @@ import AdScripts from '@/components/ads/AdScripts';
 import AuthReturn from '@/components/auth/AuthReturn';
 import { getAdsenseClient, getMonetag } from '@/config/ads';
 import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
-
-const newsFont = Newsreader({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-news', display: 'swap' });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -54,7 +51,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const monetag = getMonetag();
 
   return (
-    <html lang="en" className={`scroll-smooth ${newsFont.variable}`}>
+    <html lang="en" className="scroll-smooth">
+      <head>
+        {/* News typeface loaded by the browser (not at build time, so a font-server hiccup can never fail a deploy). */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
+      </head>
       <body className="min-h-screen antialiased flex flex-col justify-between">
         {children}
         <ScrollToTopButton />

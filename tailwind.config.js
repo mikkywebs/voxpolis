@@ -10,7 +10,7 @@ module.exports = {
     extend: {
       fontFamily: {
         // Story text: Newsreader (a typeface made for news reading), falling back to Georgia.
-        serif: ['var(--font-news)', 'Georgia', 'Cambria', 'serif'],
+        serif: ['Newsreader', 'Georgia', 'Cambria', 'serif'],
       },
       colors: {
         vospolis: {
