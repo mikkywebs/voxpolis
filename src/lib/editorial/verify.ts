@@ -88,7 +88,11 @@ function draftText(a: any): string {
 export async function sourceTexts(a: any): Promise<SourceText[]> {
   const { data } = await supabaseAdmin.from('article_source_texts').select('sources').eq('article_id', a.id).maybeSingle();
   const stored: SourceText[] = (data?.sources as SourceText[]) || [];
-  const links: { name: string; url: string }[] = (a.sources || []).filter((s: any) => /^https?:\/\//.test(s?.url || ''));
+  // Newer stories list their reports in "sources"; older ones only have source_url. Fix "&amp;" saved by old feeds.
+  const listed: { name: string; url: string }[] = a.sources?.length ? a.sources : a.source_url ? [{ name: a.source_name || 'Original report', url: a.source_url }] : [];
+  const links = listed
+    .map((l) => ({ name: l.name, url: String(l.url || '').replace(/&amp;/g, '&') }))
+    .filter((l) => /^https?:\/\//.test(l.url));
   const missing = links.filter((l) => !stored.some((s) => s.url === l.url)).slice(0, 4);
   if (!missing.length) return stored;
 
@@ -112,7 +116,7 @@ export async function sourceTexts(a: any): Promise<SourceText[]> {
 export async function verifyArticle(id: string): Promise<Fidelity> {
   const { data: a } = await supabaseAdmin
     .from('articles')
-    .select('id, title, dek, snippet, key_points, lead, sections, content, analysis, background, what_to_watch, what_next, sources')
+    .select('id, title, dek, snippet, key_points, lead, sections, content, analysis, background, what_to_watch, what_next, sources, source_url, source_name')
     .eq('id', id)
     .maybeSingle();
   if (!a) throw new Error('Story not found');

@@ -51,7 +51,7 @@ function parseFeed(xml: string, feed: SourceFeed): FeedItem[] {
     if (!title || !/^https?:\/\//.test(link)) continue;
     out.push({
       title,
-      url: link.trim(),
+      url: link.trim().replace(/&amp;/g, '&'),
       description: text(tag(b, 'description') || tag(b, 'summary')).slice(0, 500),
       publishedAt: d && !isNaN(d.getTime()) ? d.toISOString() : new Date().toISOString(),
       sourceName: feed.name,
