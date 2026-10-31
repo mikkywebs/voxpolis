@@ -103,7 +103,10 @@ async function main() {
     const cutoff = Date.now() - 36 * 3600_000;
     const fresh = items.filter((i) => new Date(i.publishedAt).getTime() >= cutoff && looksPolitical(i));
     const multi = fresh.filter((i) => companionsFor(i, fresh).length > 0);
-    const example = multi[0] ? ` e.g. "${multi[0].title.slice(0, 50)}" + ${companionsFor(multi[0], fresh).map((c) => c.sourceName).join(', ')}` : '';
+    const example = multi
+      .slice(0, 2)
+      .map((m) => ` [${m.sourceName}: "${m.title.slice(0, 45)}" ⇄ ${companionsFor(m, fresh).map((c) => `${c.sourceName}: "${c.title.slice(0, 45)}"`).join(' / ')}]`)
+      .join('');
     out.push(`${d.code} → multi-source ${multi.length}/${fresh.length}${example} || ${res.join(' || ')}`);
   }
   out.forEach((l) => console.log(l));
