@@ -2,7 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { CoverageDesk } from '@/config/coverage';
 import { getCountryByCode } from '@/config/countries';
 import { toSlug, RESERVED_SLUGS } from '@/lib/paths';
-import { readFeeds, looksPolitical, titleTokens, similarity, FeedItem } from './feeds';
+import { readFeeds, looksPolitical, titleTokens, similarity, companionsFor, FeedItem } from './feeds';
 import { extractSourceArticle } from './extract';
 import { writeVoxpolisArticle, checkPiece, EditorialPiece, SourceInput } from './writer';
 import { findLicensedPhoto, LicensedPhoto } from './photos';
@@ -239,20 +239,6 @@ async function writeAndSave(desk: CoverageDesk, used: UsedSource[]): Promise<Ing
   } catch (e: any) {
     return { ...base, outcome: 'error', reason: `save: ${e?.message || e}`, country: piece.country_iso };
   }
-}
-
-/** Other outlets' reports of the same story (same desk feeds, different outlet, similar headline). */
-export function companionsFor(primary: FeedItem, all: FeedItem[], max = 2): FeedItem[] {
-  const tok = titleTokens(primary.title);
-  const seenOutlets = new Set([primary.sourceName]);
-  return all
-    .filter((i) => i.url !== primary.url && !seenOutlets.has(i.sourceName))
-    .map((i) => ({ i, score: similarity(tok, titleTokens(i.title)) }))
-    .filter((x) => x.score >= 0.45)
-    .sort((a, b) => b.score - a.score)
-    .filter((x) => (seenOutlets.has(x.i.sourceName) ? false : (seenOutlets.add(x.i.sourceName), true)))
-    .slice(0, max)
-    .map((x) => x.i);
 }
 
 export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadlineMs?: number } = {}): Promise<IngestReport> {

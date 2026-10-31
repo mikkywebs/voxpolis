@@ -128,3 +128,18 @@ export function similarity(a: Set<string>, b: Set<string>): number {
   });
   return inter / Math.min(a.size, b.size);
 }
+
+/** Other outlets' reports of the same story (same desk feeds, different outlet, similar headline). */
+export function companionsFor(primary: FeedItem, all: FeedItem[], max = 2): FeedItem[] {
+  const tok = titleTokens(primary.title);
+  const seenOutlets = new Set([primary.sourceName]);
+  return all
+    .filter((i) => i.url !== primary.url && !seenOutlets.has(i.sourceName))
+    .map((i) => ({ i, score: similarity(tok, titleTokens(i.title)) }))
+    .filter((x) => x.score >= 0.45)
+    .sort((a, b) => b.score - a.score)
+    .filter((x) => (seenOutlets.has(x.i.sourceName) ? false : (seenOutlets.add(x.i.sourceName), true)))
+    .slice(0, max)
+    .map((x) => x.i);
+}
+

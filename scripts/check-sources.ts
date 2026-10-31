@@ -5,9 +5,8 @@
  *   TRIAL=1 npx tsx scripts/check-sources.ts    → also test candidate replacement feeds
  */
 import { COVERAGE, SourceFeed } from '../src/config/coverage';
-import { readFeeds, looksPolitical } from '../src/lib/editorial/feeds';
+import { readFeeds, looksPolitical, companionsFor } from '../src/lib/editorial/feeds';
 import { extractSourceArticle } from '../src/lib/editorial/extract';
-import { companionsFor } from '../src/lib/editorial/ingest';
 
 const TRIAL: Record<string, SourceFeed[]> = {
   NG: [
