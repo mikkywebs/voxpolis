@@ -6,6 +6,7 @@ import { getCountryByCode, getCountrySlug } from '@/config/countries';
 import { articlePath, isValidSlug, toSlug } from '@/lib/paths';
 import { verifyArticle } from '@/lib/editorial/verify';
 import { autoFixStory } from '@/lib/editorial/autofix';
+import { findPhotoOptions } from '@/lib/editorial/photos';
 import { checkStory } from '@/lib/editorial/prepublish';
 
 export const dynamic = 'force-dynamic';
@@ -109,12 +110,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, id: data.id, slug: data.slug });
   }
 
-  if (!id || !['save', 'approve', 'reject', 'reopen', 'remove_photo', 'confirm', 'unconfirm', 'verify', 'autofix'].includes(action)) {
+  if (!id || !['save', 'approve', 'reject', 'reopen', 'remove_photo', 'confirm', 'unconfirm', 'verify', 'autofix', 'photos'].includes(action)) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 
   const { data: current } = await supabaseAdmin.from('articles').select('id, slug, country_code, review_status, checked_items').eq('id', id).maybeSingle();
   if (!current) return NextResponse.json({ error: 'Story not found' }, { status: 404 });
+
+  // "Find a free photo": licensed Wikimedia options for the people/places in the story. Nothing is changed here.
+  if (action === 'photos') {
+    const { data: art } = await supabaseAdmin.from('articles').select('actors, title, country_code').eq('id', id).maybeSingle();
+    const typed = clean(body?.query, 80);
+    const subjects = typed ? [typed] : ((art?.actors as string[]) || []).slice(0, 3);
+    if (!subjects.length) return NextResponse.json({ ok: true, photos: [], subjects: [] });
+    const country = getCountryByCode(art?.country_code || current.country_code);
+    const photos = await findPhotoOptions(subjects, 6, 9000, country.name);
+    return NextResponse.json({ ok: true, photos, subjects });
+  }
 
   // "Fix it for me": correct the listed problems from the original reports (not saved here; the editor saves).
   if (action === 'autofix') {
@@ -244,6 +256,9 @@ export async function POST(req: NextRequest) {
         if (ours) {
           update.image_license = null;
           update.image_page_url = null;
+        } else {
+          if (typeof f.image_license === 'string') update.image_license = f.image_license.slice(0, 60) || null;
+          if (typeof f.image_page_url === 'string' && /^https:\/\/commons\.wikimedia\.org\//.test(f.image_page_url)) update.image_page_url = f.image_page_url;
         }
       } else {
         return NextResponse.json({ error: 'Images must be uploaded here (or come from Wikimedia Commons).' }, { status: 400 });
