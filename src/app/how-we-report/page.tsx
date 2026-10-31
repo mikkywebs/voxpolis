@@ -28,7 +28,8 @@ export default function HowWeReportPage() {
           <h2 className="text-xl font-black">1. We follow trusted newsrooms</h2>
           <p>
             Each country desk follows the politics sections of established news organisations in that country, plus
-            international outlets for global stories. Stories carried by several outlets are treated as more significant.
+            international outlets for global stories. Stories carried by several outlets are treated as more significant,
+            and we bring their reporting together so you get the full picture in one place.
           </p>
         </section>
 
@@ -44,9 +45,9 @@ export default function HowWeReportPage() {
         <section className="space-y-3">
           <h2 className="text-xl font-black">3. We explain what it means</h2>
           <p>
-            Every article has a short summary, the full story, a &quot;What it means&quot; analysis, background for newcomers
-            and what to watch next. Analysis is grounded in the reported facts and presents the main competing views
-            fairly. We do not endorse parties or candidates.
+            Every story opens with a short summary. After that, the shape follows the news: a political row, a new bill and
+            a court ruling are each told in the way that makes them clearest. Our analysis is always clearly marked, grounded
+            in the reported facts, and gives the strongest argument on the other side. We do not endorse parties or candidates.
           </p>
         </section>
 

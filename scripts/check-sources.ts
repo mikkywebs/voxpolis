@@ -7,6 +7,7 @@
 import { COVERAGE, SourceFeed } from '../src/config/coverage';
 import { readFeeds, looksPolitical } from '../src/lib/editorial/feeds';
 import { extractSourceArticle } from '../src/lib/editorial/extract';
+import { companionsFor } from '../src/lib/editorial/ingest';
 
 const TRIAL: Record<string, SourceFeed[]> = {
   NG: [
@@ -98,7 +99,13 @@ async function main() {
   const desks = COVERAGE.map((d) => ({ code: d.code, feeds: [...d.feeds, ...(process.env.TRIAL ? TRIAL[d.code] || [] : [])] }));
   for (const d of desks) {
     const res = await Promise.all(d.feeds.map(checkOutlet));
-    out.push(`${d.code} → ${res.join(' || ')}`);
+    // Multi-source: how many fresh stories are also covered by another outlet on this desk?
+    const { items } = await readFeeds(d.feeds);
+    const cutoff = Date.now() - 36 * 3600_000;
+    const fresh = items.filter((i) => new Date(i.publishedAt).getTime() >= cutoff && looksPolitical(i));
+    const multi = fresh.filter((i) => companionsFor(i, fresh).length > 0);
+    const example = multi[0] ? ` e.g. "${multi[0].title.slice(0, 50)}" + ${companionsFor(multi[0], fresh).map((c) => c.sourceName).join(', ')}` : '';
+    out.push(`${d.code} → multi-source ${multi.length}/${fresh.length}${example} || ${res.join(' || ')}`);
   }
   out.forEach((l) => console.log(l));
   // One annotation per ~4 desks keeps each message readable via the checks API.

@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const FIELDS =
-  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at';
+  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyAdmin(req);
@@ -99,6 +99,34 @@ export async function POST(req: NextRequest) {
       const { data: taken } = await supabaseAdmin.from('articles').select('id').or(`slug.eq.${slug},previous_slug.eq.${slug}`).neq('id', id).limit(1);
       if (taken && taken.length) return NextResponse.json({ error: 'That web address is already used by another story.' }, { status: 400 });
       update.slug = slug;
+    }
+    // Flexible structure (v3): opening paragraphs, story-specific sections, what to watch.
+    if (typeof f.lead === 'string') update.lead = clean(f.lead, 4000);
+    if (Array.isArray(f.sections)) {
+      const KINDS = ['report', 'response', 'context', 'analysis', 'reaction', 'numbers'];
+      const sections = f.sections
+        .map((x: any) => ({
+          heading: clean(x?.heading, 120) || '',
+          kind: KINDS.includes(x?.kind) ? x.kind : 'report',
+          paragraphs: (typeof x?.text === 'string' ? x.text : Array.isArray(x?.paragraphs) ? x.paragraphs.join('\n\n') : '')
+            .split(/\n\s*\n/)
+            .map((p: string) => p.trim())
+            .filter(Boolean)
+            .slice(0, 12),
+        }))
+        .filter((x: any) => x.paragraphs.length > 0)
+        .slice(0, 8);
+      if (sections.some((x: any) => !x.heading)) return NextResponse.json({ error: 'Every section needs a subheading.' }, { status: 400 });
+      update.sections = sections;
+      // Keep the plain-text copies in step (search, older pages, checks).
+      const leadText = typeof f.lead === 'string' ? f.lead : '';
+      update.content = [leadText, ...sections.filter((x: any) => x.kind !== 'analysis').flatMap((x: any) => x.paragraphs)].filter(Boolean).join('\n\n');
+      update.analysis = sections.filter((x: any) => x.kind === 'analysis').flatMap((x: any) => x.paragraphs).join('\n\n');
+      update.ai_analysis = update.analysis;
+    }
+    if (typeof f.what_to_watch === 'string') {
+      update.what_to_watch = clean(f.what_to_watch, 600) || null;
+      update.what_next = update.what_to_watch;
     }
     const bg = clean(f.background, 2000);
     if (bg !== undefined) update.background = bg;

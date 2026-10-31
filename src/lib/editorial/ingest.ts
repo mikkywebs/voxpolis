@@ -4,7 +4,7 @@ import { getCountryByCode } from '@/config/countries';
 import { toSlug, RESERVED_SLUGS } from '@/lib/paths';
 import { readFeeds, looksPolitical, titleTokens, similarity, FeedItem } from './feeds';
 import { extractSourceArticle } from './extract';
-import { writeVoxpolisArticle, checkPiece, EditorialPiece } from './writer';
+import { writeVoxpolisArticle, checkPiece, EditorialPiece, SourceInput } from './writer';
 import { findLicensedPhoto, LicensedPhoto } from './photos';
 
 /**
@@ -25,7 +25,7 @@ const PHOTO_BUDGET_MS = 4_000;
 export interface IngestOutcome {
   url: string;
   source: string;
-  outcome: 'published' | 'skipped' | 'rejected' | 'error';
+  outcome: 'published' | 'skipped' | 'rejected' | 'error' | 'merged';
   reason?: string;
   slug?: string;
   country?: string;
@@ -91,7 +91,7 @@ async function alreadyHandled(urls: string[]): Promise<Set<string>> {
       .from('ingest_log')
       .select('source_url')
       .in('source_url', urls)
-      .in('outcome', ['rejected', 'published'])
+      .in('outcome', ['rejected', 'published', 'merged'])
       .gte('created_at', since);
     logs?.forEach((r: any) => r.source_url && handled.add(r.source_url));
   } catch {}
@@ -132,14 +132,21 @@ async function uniqueSlug(base: string): Promise<string> {
   return `${root}-${Date.now().toString(36)}`;
 }
 
-async function saveArticle(piece: EditorialPiece, item: FeedItem, src: { finalUrl: string; publishedAt?: string }, photo: LicensedPhoto | null) {
+interface UsedSource {
+  item: FeedItem;
+  src: Extracted;
+}
+
+async function saveArticle(piece: EditorialPiece, used: UsedSource[], photo: LicensedPhoto | null) {
+  const primary = used[0];
   const country = getCountryByCode(piece.country_iso);
   const slug = await uniqueSlug(piece.slug_keywords || piece.headline);
   const content = piece.body.join('\n\n');
-  const wordCount = [content, ...piece.analysis, piece.background, piece.what_next].join(' ').split(/\s+/).filter(Boolean).length;
+  const wordCount = [content, ...piece.analysis, piece.what_to_watch || ''].join(' ').split(/\s+/).filter(Boolean).length;
   const tags = Array.from(new Set([...piece.tags, country.name, 'Politics']));
+  const sources = used.map((u) => ({ name: u.item.sourceName, url: u.item.url }));
 
-  const legacy = {
+  const row = {
     slug,
     title: piece.headline,
     snippet: piece.dek,
@@ -151,43 +158,37 @@ async function saveArticle(piece: EditorialPiece, item: FeedItem, src: { finalUr
     // Only licensed (Wikimedia Commons) photos. Publisher photos are never stored.
     image_mode: photo ? 'original' : 'breaking_logo',
     original_image_url: photo?.url || null,
-    source_name: item.sourceName,
-    source_url: item.url,
+    source_name: primary.item.sourceName,
+    source_url: primary.item.url,
     is_breaking: piece.importance >= 9,
     tags,
     views_count: 0,
     total_reading_time_seconds: Math.max(120, Math.round((wordCount / 220) * 60)),
     created_at: new Date().toISOString(),
-  };
-  const extended = {
-    ...legacy,
     dek: piece.dek,
     key_points: piece.key_points,
     analysis: piece.analysis.join('\n\n'),
-    background: piece.background,
-    what_next: piece.what_next,
+    what_next: piece.what_to_watch,
     seo_title: piece.seo_title,
     meta_description: piece.meta_description,
     importance: piece.importance,
     actors: piece.actors,
-    source_published_at: src.publishedAt || item.publishedAt,
+    source_published_at: primary.src.publishedAt || primary.item.publishedAt,
     word_count: wordCount,
-    editorial_version: 2,
+    editorial_version: 3,
     status: 'published',
     image_credit: photo?.credit || null,
     image_license: photo?.license || null,
     image_page_url: photo?.pageUrl || null,
+    // Flexible structure (v3)
+    story_type: piece.story_type,
+    lead: piece.lead.join('\n\n'),
+    sections: piece.sections,
+    what_to_watch: piece.what_to_watch,
+    sources,
   };
 
-  let { data, error } = await supabaseAdmin.from('articles').insert(extended).select('id, slug').single();
-  if (error && /column/i.test(error.message)) {
-    // Migration not applied: save the core article without a photo (a photo needs its credit columns).
-    ({ data, error } = await supabaseAdmin
-      .from('articles')
-      .insert({ ...legacy, image_mode: 'breaking_logo', original_image_url: null })
-      .select('id, slug')
-      .single());
-  }
+  const { data, error } = await supabaseAdmin.from('articles').insert(row).select('id, slug').single();
   if (error || !data) throw new Error(error?.message || 'insert failed');
 
   if (piece.question) {
@@ -201,25 +202,28 @@ async function saveArticle(piece: EditorialPiece, item: FeedItem, src: { finalUr
 
 type Extracted = Awaited<ReturnType<typeof extractSourceArticle>>;
 
-async function writeAndSave(desk: CoverageDesk, item: FeedItem, src: Extracted): Promise<IngestOutcome> {
-  const base = { url: item.url, source: item.sourceName };
+async function writeAndSave(desk: CoverageDesk, used: UsedSource[]): Promise<IngestOutcome> {
+  const primary = used[0];
+  const base = { url: primary.item.url, source: used.map((u) => u.item.sourceName).join(' + ') };
+  const sources: SourceInput[] = used.map((u) => ({
+    name: u.item.sourceName,
+    url: u.item.url,
+    title: u.src.title || u.item.title,
+    text: u.src.text,
+    publishedAt: u.src.publishedAt || u.item.publishedAt,
+  }));
+
   let piece: EditorialPiece;
   try {
-    piece = await writeVoxpolisArticle({
-      sourceTitle: src.title || item.title,
-      sourceText: src.text,
-      sourceName: item.sourceName,
-      publishedAt: src.publishedAt || item.publishedAt,
-      deskCountry: desk.code,
-    });
+    piece = await writeVoxpolisArticle({ sources, deskCountry: desk.code });
   } catch (e: any) {
     return { ...base, outcome: 'error', reason: `writer: ${e?.message || e}` };
   }
 
-  const problems = checkPiece(piece, src.title || item.title, src.text, MIN_IMPORTANCE);
+  const problems = checkPiece(piece, sources, MIN_IMPORTANCE);
   if (problems.length) return { ...base, outcome: 'rejected', reason: problems.join('; '), country: piece.country_iso };
 
-  const dup = await isDuplicateOfRecent(piece.country_iso, piece.headline, item.title);
+  const dup = await isDuplicateOfRecent(piece.country_iso, piece.headline, primary.item.title);
   if (dup) return { ...base, outcome: 'skipped', reason: `same story as ${dup}`, country: piece.country_iso };
 
   const photo = await findLicensedPhoto(
@@ -230,11 +234,25 @@ async function writeAndSave(desk: CoverageDesk, item: FeedItem, src: Extracted):
   );
 
   try {
-    const slug = await saveArticle(piece, item, src, photo);
-    return { ...base, outcome: 'published', slug, country: piece.country_iso, reason: piece.provider };
+    const slug = await saveArticle(piece, used, photo);
+    return { ...base, outcome: 'published', slug, country: piece.country_iso, reason: `${used.length} source(s) · ${piece.story_type} · ${piece.provider}` };
   } catch (e: any) {
     return { ...base, outcome: 'error', reason: `save: ${e?.message || e}`, country: piece.country_iso };
   }
+}
+
+/** Other outlets' reports of the same story (same desk feeds, different outlet, similar headline). */
+export function companionsFor(primary: FeedItem, all: FeedItem[], max = 2): FeedItem[] {
+  const tok = titleTokens(primary.title);
+  const seenOutlets = new Set([primary.sourceName]);
+  return all
+    .filter((i) => i.url !== primary.url && !seenOutlets.has(i.sourceName))
+    .map((i) => ({ i, score: similarity(tok, titleTokens(i.title)) }))
+    .filter((x) => x.score >= 0.45)
+    .sort((a, b) => b.score - a.score)
+    .filter((x) => (seenOutlets.has(x.i.sourceName) ? false : (seenOutlets.add(x.i.sourceName), true)))
+    .slice(0, max)
+    .map((x) => x.i);
 }
 
 export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadlineMs?: number } = {}): Promise<IngestReport> {
@@ -254,34 +272,59 @@ export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadline
     await log(desk.code, o, Date.now() - t0);
   };
 
-  // Step 1: read the top candidates in parallel (cheap) and keep the readable ones, in rank order.
-  const pool = ranked.slice(0, Math.max(6, max * 4));
+  // Step 1: pick candidate stories and the other outlets covering each; read them all in parallel (cheap).
+  const pool = ranked.slice(0, Math.max(5, max * 3));
+  const groups = pool.map((p) => [p, ...companionsFor(p, fresh)]);
+  const urls = Array.from(new Set(groups.flat().map((i) => i.url)));
   const t0 = Date.now();
   const timeUp: Extracted = { ok: false, reason: 'timed out', finalUrl: '', title: '', text: '', wordCount: 0 };
-  const extracted = await Promise.all(
-    pool.map((item) =>
+  const results = await Promise.all(
+    urls.map((u) =>
       Promise.race([
-        extractSourceArticle(item.url, item.title),
+        extractSourceArticle(u, ''),
         new Promise<Extracted>((resolve) => setTimeout(() => resolve(timeUp), EXTRACT_BUDGET_MS)),
       ])
     )
   );
-  const readable: { item: FeedItem; src: Extracted }[] = [];
-  for (let i = 0; i < pool.length; i++) {
-    if (extracted[i].ok) readable.push({ item: pool[i], src: extracted[i] });
-    else await record({ url: pool[i].url, source: pool[i].sourceName, outcome: 'rejected', reason: `source: ${extracted[i].reason}` }, t0);
+  const byUrl = new Map(urls.map((u, i) => [u, results[i]]));
+
+  const ready: UsedSource[][] = [];
+  const usedUrls = new Set<string>();
+  for (const group of groups) {
+    const [primary, ...rest] = group;
+    if (usedUrls.has(primary.url)) continue;
+    const ps = byUrl.get(primary.url)!;
+    if (!ps.ok) {
+      await record({ url: primary.url, source: primary.sourceName, outcome: 'rejected', reason: `source: ${ps.reason}` }, t0);
+      continue;
+    }
+    const used: UsedSource[] = [{ item: primary, src: ps }];
+    for (const c of rest) {
+      const cs = byUrl.get(c.url);
+      if (cs?.ok && !usedUrls.has(c.url)) used.push({ item: c, src: cs });
+    }
+    used.forEach((u) => usedUrls.add(u.item.url));
+    ready.push(used);
   }
 
-  // Step 2: write the best readable stories with AI, in parallel rounds, until we hit the target or run out of time.
+  // Step 2: write the best stories with AI, in parallel rounds, until the target or the time budget is reached.
   let published = 0;
   let next = 0;
-  while (published < max && next < readable.length && Date.now() < deadline - AI_BUDGET_MS) {
-    const batch = readable.slice(next, next + (max - published));
+  while (published < max && next < ready.length && Date.now() < deadline - AI_BUDGET_MS) {
+    const batch = ready.slice(next, next + (max - published));
     next += batch.length;
     const t1 = Date.now();
-    const results = await Promise.all(batch.map(({ item, src }) => writeAndSave(desk, item, src)));
-    for (const r of results) await record(r, t1);
-    published += results.filter((r) => r.outcome === 'published').length;
+    const done = await Promise.all(batch.map((used) => writeAndSave(desk, used)));
+    for (let i = 0; i < done.length; i++) {
+      await record(done[i], t1);
+      // Supporting reports are marked as used so they don't become separate stories.
+      if (done[i].outcome === 'published') {
+        for (const u of batch[i].slice(1)) {
+          await record({ url: u.item.url, source: u.item.sourceName, outcome: 'merged', reason: `used in ${done[i].slug}`, country: done[i].country }, t1);
+        }
+      }
+    }
+    published += done.filter((r) => r.outcome === 'published').length;
   }
 
   return {

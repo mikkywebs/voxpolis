@@ -47,6 +47,12 @@ export interface ArticleData {
   image_license?: string;
   image_page_url?: string;
   review_status?: 'pending' | 'approved' | 'rejected';
+  // Flexible structure (editorial v3)
+  story_type?: string;
+  lead?: string;
+  sections?: { heading: string; kind: string; paragraphs: string[] }[];
+  what_to_watch?: string;
+  sources?: { name: string; url: string }[];
   reviewed_at?: string;
   reviewed_by?: string;
   poll?: {
