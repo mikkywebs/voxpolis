@@ -36,6 +36,7 @@ interface Story {
   sections: { heading: string; kind: string; paragraphs: string[] }[] | null;
   what_to_watch: string | null;
   sources: { name: string; url: string }[] | null;
+  checks: { level: 'ready' | 'check' | 'stop'; items: { level: 'stop' | 'check' | 'tip'; text: string }[] };
 }
 
 interface EditSection {
@@ -180,6 +181,23 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
             Importance {story.importance}/10
           </span>
         )}
+        {story.checks && (
+          <span
+            className={`px-2 py-0.5 rounded-full font-bold ${
+              story.checks.level === 'ready'
+                ? 'bg-emerald-100 text-emerald-800'
+                : story.checks.level === 'check'
+                ? 'bg-amber-100 text-amber-800'
+                : 'bg-red-100 text-red-800'
+            }`}
+          >
+            {story.checks.level === 'ready'
+              ? '● Ready to publish'
+              : story.checks.level === 'check'
+              ? `● Check ${story.checks.items.filter((i) => i.level === 'check').length} item(s)`
+              : '● Don’t publish yet'}
+          </span>
+        )}
         <span>{ago(story.created_at)}</span>
         <a href={story.source_url} target="_blank" rel="noopener" className="text-blue-600 hover:underline">
           Original: {story.source_name} ↗
@@ -207,9 +225,22 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
         </div>
       </div>
 
-      <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 p-3 text-xs text-amber-900 dark:text-amber-200">
-        Before publishing: open the original, check names, numbers and dates, make sure the analysis is fair to all sides, and check the photo.
-      </div>
+      {story.checks && story.checks.items.length > 0 && (
+        <ul className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 space-y-1.5 text-[13px] leading-snug">
+          {story.checks.items.map((i, k) => (
+            <li key={k} className="flex gap-2">
+              <span
+                aria-hidden="true"
+                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${i.level === 'stop' ? 'bg-red-600' : i.level === 'check' ? 'bg-amber-500' : 'bg-gray-400'}`}
+              />
+              <span className={i.level === 'stop' ? 'text-red-800 dark:text-red-300 font-semibold' : i.level === 'check' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}>
+                <span className="sr-only">{i.level === 'stop' ? 'Must fix: ' : i.level === 'check' ? 'Check: ' : 'Tip: '}</span>
+                {i.text}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {open && (
         <div className="space-y-3 pt-1">
@@ -230,7 +261,7 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
             </span>
           </label>
           {field('dek', 'Summary line', 2)}
-          {field('key_points', 'Summary bullets', 4, 'One point per line')}
+          {field('key_points', 'At a glance', 4, '2-4 short points, one per line')}
           {flexible ? (
             <div className="space-y-4">
               <label className="block space-y-1">
@@ -406,7 +437,13 @@ function StoryEditor({ story, onDone, token }: { story: Story; onDone: (msg: str
 
       <div className="flex flex-wrap gap-2 pt-1">
         {story.review_status !== 'approved' && (
-          <button type="button" disabled={busy} onClick={() => act('approve')} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold disabled:opacity-50">
+          <button
+            type="button"
+            disabled={busy || story.checks?.level === 'stop'}
+            title={story.checks?.level === 'stop' ? 'Fix the red items first, then save' : undefined}
+            onClick={() => act('approve')}
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold disabled:opacity-50"
+          >
             ✓ Publish
           </button>
         )}
@@ -504,6 +541,19 @@ export default function ReviewPage() {
             New stories arrive here as private drafts. Nothing appears on Voxpolis until you press Publish.
           </p>
         </header>
+
+        <details className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 text-sm">
+          <summary className="font-bold cursor-pointer">Before you publish: the 6 checks (about 3 minutes)</summary>
+          <ol className="mt-3 space-y-2 list-decimal pl-5 leading-relaxed text-gray-700 dark:text-gray-300">
+            <li><strong>Fix every red and amber item</strong> shown on the story. Red items block publishing.</li>
+            <li><strong>Facts:</strong> open the original report. Check every name, title, number and date in the story against it.</li>
+            <li><strong>Fair to all sides:</strong> if there is a dispute, is the other side&apos;s position included? Are claims attributed (&quot;X said&quot;), not stated as fact?</li>
+            <li><strong>No opinion in the news:</strong> opinions only in the Analysis section. No praise or attacks on anyone, no &quot;popular&quot;, &quot;disastrous&quot;, &quot;far-right&quot; and similar.</li>
+            <li><strong>Your touch:</strong> sharpen the headline and, where you can, add one sourced fact or piece of context you know.</li>
+            <li><strong>Photo:</strong> right person or place? Only photos you own or that are licensed (Wikimedia, government handouts that allow reuse).</li>
+          </ol>
+          <p className="mt-3 text-xs text-gray-500">The checker catches common problems automatically, but it can&apos;t know everything. If you are unsure about a story, don&apos;t publish it.</p>
+        </details>
 
         <nav className="flex gap-2">
           {(['pending', 'approved', 'rejected'] as Status[]).map((s) => (

@@ -24,7 +24,8 @@ export default function StoryBody({ a, adsAllowed }: { a: ArticleData; adsAllowe
   return (
     <div className="space-y-8 font-serif">
       {keyPoints.length > 0 && (
-        <section aria-label="Summary" className="rounded-xl bg-slate-100/80 dark:bg-slate-900 p-5 sm:p-6 font-sans">
+        <section aria-labelledby="at-a-glance" className="rounded-xl bg-slate-100/80 dark:bg-slate-900 p-5 sm:p-6 font-sans">
+          <h2 id="at-a-glance" className="text-xs font-bold uppercase tracking-[0.15em] text-slate-600 dark:text-slate-300 mb-3">At a glance</h2>
           <ul className="space-y-2 list-disc pl-5 text-[15px] sm:text-base leading-relaxed text-gray-800 dark:text-gray-200">
             {keyPoints.map((k, i) => (
               <li key={i}>{k}</li>

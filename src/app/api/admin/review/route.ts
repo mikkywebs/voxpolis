@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyAdmin } from '@/lib/admin/auth';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
 import { articlePath, isValidSlug } from '@/lib/paths';
+import { checkStory } from '@/lib/editorial/prepublish';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const FIELDS =
-  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources';
+  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, updated_at';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyAdmin(req);
@@ -44,7 +45,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     editor: auth.name,
     counts: tally,
-    articles: (data || []).map((a: any) => ({ ...a, poll_question: pollMap.get(a.id) || '' })),
+    articles: (data || []).map((a: any) => {
+      const { source_facts, ...rest } = a;
+      return { ...rest, poll_question: pollMap.get(a.id) || '', checks: checkStory(a) };
+    }),
   });
 }
 

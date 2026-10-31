@@ -243,3 +243,58 @@ export function checkPiece(piece: EditorialPiece, sources: SourceInput[], minImp
 
   return problems;
 }
+
+/** All copied spans (10+ identical words) between the story and its sources. */
+export function copiedSpans(piece: EditorialPiece, sources: SourceInput[]): string[] {
+  const everything = [piece.headline, piece.dek, ...piece.key_points, ...piece.body, ...piece.analysis, piece.what_to_watch || ''].join('\n');
+  const unquoted = everything.replace(/["“][^"”]{0,200}["”]/g, ' ');
+  const allSources = sources.map((s) => `${s.title}\n${s.text}`).join('\n');
+  return findConsecutiveWordOverlaps(allSources, unquoted, 10).map((o) => o.span).slice(0, 6);
+}
+
+const REPAIR_SYSTEM = `You are a sub-editor. You receive a news story as JSON and a list of phrases that repeat the original reports word for word.
+Rewrite ONLY the sentences containing those phrases so no run of 7+ words matches the original wording. Keep every fact, name, number and date exactly. Lists of names may be restructured (e.g. "the governors of Borno, Adamawa and Sokoto"). Do not change anything else. Return the full story JSON in the same shape.`;
+
+/** One repair pass: rewrite only sentences flagged as copied, then return the updated story. */
+export async function repairCopiedWording(piece: EditorialPiece, sources: SourceInput[]): Promise<EditorialPiece> {
+  const spans = copiedSpans(piece, sources);
+  if (!spans.length) return piece;
+  const story = {
+    headline: piece.headline,
+    dek: piece.dek,
+    key_points: piece.key_points,
+    lead: piece.lead,
+    sections: piece.sections,
+    what_to_watch: piece.what_to_watch,
+  };
+  const schema = {
+    type: 'OBJECT',
+    properties: {
+      headline: STR,
+      dek: STR,
+      key_points: STR_LIST,
+      lead: STR_LIST,
+      sections: RESPONSE_SCHEMA.properties.sections,
+      what_to_watch: { type: 'STRING', nullable: true },
+    },
+    required: ['headline', 'dek', 'key_points', 'lead', 'sections'],
+  };
+  const reply = await callNewsroomLLM(REPAIR_SYSTEM, `Phrases to rewrite:\n- ${spans.join('\n- ')}\n\nStory JSON:\n${JSON.stringify(story)}`, schema);
+  const raw = parseJsonReply<any>(reply.text);
+  const arr = (v: any) => (Array.isArray(v) ? v : []).map((x: any) => String(x).trim()).filter(Boolean);
+  const sections: StorySection[] = (Array.isArray(raw.sections) ? raw.sections : piece.sections)
+    .map((x: any) => ({ heading: String(x?.heading || '').trim(), kind: (KINDS.includes(x?.kind) ? x.kind : 'report') as SectionKind, paragraphs: arr(x?.paragraphs) }))
+    .filter((x: StorySection) => x.paragraphs.length);
+  const lead = arr(raw.lead).length ? arr(raw.lead) : piece.lead;
+  return {
+    ...piece,
+    headline: String(raw.headline || piece.headline).trim(),
+    dek: String(raw.dek || piece.dek).trim(),
+    key_points: arr(raw.key_points).length ? arr(raw.key_points) : piece.key_points,
+    lead,
+    sections: sections.length ? sections : piece.sections,
+    what_to_watch: typeof raw.what_to_watch === 'string' ? raw.what_to_watch.trim() || null : piece.what_to_watch,
+    body: [...lead, ...(sections.length ? sections : piece.sections).filter((x) => x.kind !== 'analysis').flatMap((x) => x.paragraphs)],
+    analysis: (sections.length ? sections : piece.sections).filter((x) => x.kind === 'analysis').flatMap((x) => x.paragraphs),
+  };
+}

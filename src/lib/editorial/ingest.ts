@@ -4,7 +4,8 @@ import { getCountryByCode } from '@/config/countries';
 import { toSlug, RESERVED_SLUGS } from '@/lib/paths';
 import { readFeeds, looksPolitical, titleTokens, similarity, companionsFor, FeedItem } from './feeds';
 import { extractSourceArticle } from './extract';
-import { writeVoxpolisArticle, checkPiece, EditorialPiece, SourceInput } from './writer';
+import { writeVoxpolisArticle, checkPiece, repairCopiedWording, EditorialPiece, SourceInput } from './writer';
+import { extractFacts } from './facts';
 import { findLicensedPhoto, LicensedPhoto } from './photos';
 
 /**
@@ -40,12 +41,14 @@ export interface IngestReport {
   published: number;
   outcomes: IngestOutcome[];
   durationMs: number;
+  note?: string;
 }
 
 async function log(desk: string, o: IngestOutcome, durationMs: number) {
   try {
     await supabaseAdmin.from('ingest_log').insert({
       country_code: o.country || desk,
+      desk,
       source_url: o.url,
       source_name: o.source,
       outcome: o.outcome,
@@ -56,6 +59,27 @@ async function log(desk: string, o: IngestOutcome, durationMs: number) {
   } catch {
     /* log table missing is not fatal */
   }
+}
+
+const DAILY_TOTAL_CAP = Number(process.env.INGEST_DAILY_CAP || 40);
+
+/**
+ * How many new drafts this desk may still make right now.
+ * Daily caps are paced across the day (UTC) so drafts arrive steadily, not all in the morning.
+ */
+async function remainingToday(desk: CoverageDesk): Promise<{ allowed: number; note: string }> {
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const since = dayStart.toISOString();
+  const [{ count: deskCount }, { count: totalCount }] = await Promise.all([
+    supabaseAdmin.from('ingest_log').select('id', { count: 'exact', head: true }).eq('desk', desk.code).eq('outcome', 'published').gte('created_at', since),
+    supabaseAdmin.from('ingest_log').select('id', { count: 'exact', head: true }).eq('outcome', 'published').gte('created_at', since),
+  ]);
+  const hour = new Date().getUTCHours();
+  const pacedDesk = Math.ceil((desk.dailyCap * (hour + 1)) / 24);
+  const pacedTotal = Math.ceil((DAILY_TOTAL_CAP * (hour + 1)) / 24);
+  const allowed = Math.max(0, Math.min(pacedDesk - (deskCount || 0), pacedTotal - (totalCount || 0), desk.dailyCap - (deskCount || 0), DAILY_TOTAL_CAP - (totalCount || 0)));
+  return { allowed, note: `today: desk ${deskCount || 0}/${desk.dailyCap}, all desks ${totalCount || 0}/${DAILY_TOTAL_CAP}` };
 }
 
 /** Rank: stories carried by several outlets first, then newest. */
@@ -186,6 +210,8 @@ async function saveArticle(piece: EditorialPiece, used: UsedSource[], photo: Lic
     sections: piece.sections,
     what_to_watch: piece.what_to_watch,
     sources,
+    // Facts found in the original reports, for the editor's pre-publish check.
+    source_facts: extractFacts(used.map((u) => `${u.src.title}\n${u.src.text}`).join('\n')),
   };
 
   const { data, error } = await supabaseAdmin.from('articles').insert(row).select('id, slug').single();
@@ -220,7 +246,17 @@ async function writeAndSave(desk: CoverageDesk, used: UsedSource[]): Promise<Ing
     return { ...base, outcome: 'error', reason: `writer: ${e?.message || e}` };
   }
 
-  const problems = checkPiece(piece, sources, MIN_IMPORTANCE);
+  let problems = checkPiece(piece, sources, MIN_IMPORTANCE);
+  // One repair pass: if the only problem is copied wording, rewrite just those sentences and check again.
+  if (problems.length && problems.every((p) => p.startsWith('copied wording'))) {
+    try {
+      piece = await repairCopiedWording(piece, sources);
+      problems = checkPiece(piece, sources, MIN_IMPORTANCE);
+      if (!problems.length) piece.provider = `${piece.provider} · repaired copied wording`;
+    } catch (e: any) {
+      problems.push(`repair failed: ${e?.message || e}`);
+    }
+  }
   if (problems.length) return { ...base, outcome: 'rejected', reason: problems.join('; '), country: piece.country_iso };
 
   const dup = await isDuplicateOfRecent(piece.country_iso, piece.headline, primary.item.title);
@@ -244,7 +280,11 @@ async function writeAndSave(desk: CoverageDesk, used: UsedSource[]): Promise<Ing
 export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadlineMs?: number } = {}): Promise<IngestReport> {
   const started = Date.now();
   const deadline = started + (opts.deadlineMs ?? 50_000);
-  const max = opts.max ?? desk.maxPerRun;
+  const quota = await remainingToday(desk);
+  const max = Math.min(opts.max ?? desk.maxPerRun, quota.allowed);
+  if (max <= 0) {
+    return { desk: desk.code, feedsRead: 0, feedErrors: [], itemsSeen: 0, candidates: 0, published: 0, outcomes: [], durationMs: Date.now() - started, note: `daily limit reached (${quota.note})` } as IngestReport;
+  }
 
   const { items, errors } = await readFeeds(desk.feeds);
   const cutoff = Date.now() - MAX_AGE_HOURS * 3600_000;
