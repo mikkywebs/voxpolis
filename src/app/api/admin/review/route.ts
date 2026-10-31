@@ -5,6 +5,7 @@ import { verifyAdmin } from '@/lib/admin/auth';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
 import { articlePath, isValidSlug, toSlug } from '@/lib/paths';
 import { verifyArticle } from '@/lib/editorial/verify';
+import { autoFixStory } from '@/lib/editorial/autofix';
 import { checkStory } from '@/lib/editorial/prepublish';
 
 export const dynamic = 'force-dynamic';
@@ -108,12 +109,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, id: data.id, slug: data.slug });
   }
 
-  if (!id || !['save', 'approve', 'reject', 'reopen', 'remove_photo', 'confirm', 'unconfirm', 'verify'].includes(action)) {
+  if (!id || !['save', 'approve', 'reject', 'reopen', 'remove_photo', 'confirm', 'unconfirm', 'verify', 'autofix'].includes(action)) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 
   const { data: current } = await supabaseAdmin.from('articles').select('id, slug, country_code, review_status, checked_items').eq('id', id).maybeSingle();
   if (!current) return NextResponse.json({ error: 'Story not found' }, { status: 404 });
+
+  // "Fix it for me": correct the listed problems from the original reports (not saved here; the editor saves).
+  if (action === 'autofix') {
+    const problems = (Array.isArray(body?.problems) ? body.problems : [])
+      .map((p: any) => ({ key: typeof p?.key === 'string' ? p.key : undefined, field: String(p?.field || ''), text: String(p?.text || '').slice(0, 600) }))
+      .filter((p: any) => p.text)
+      .slice(0, 25);
+    if (!problems.length || !body?.story) return NextResponse.json({ error: 'Nothing to fix' }, { status: 400 });
+    const { data: art } = await supabaseAdmin.from('articles').select('id, sources, checked_items').eq('id', id).maybeSingle();
+    if (!art) return NextResponse.json({ error: 'Story not found' }, { status: 404 });
+    try {
+      const result = await autoFixStory(art, body.story, problems);
+      // Problems the reports show are correct are marked as checked.
+      if (result.verified.length) {
+        const checked_items = Array.from(new Set([...(art.checked_items || []), ...result.verified.map((v) => v.key)])).slice(-200);
+        await supabaseAdmin.from('articles').update({ checked_items }).eq('id', id);
+        (result as any).checked_items = checked_items;
+      }
+      return NextResponse.json({ ok: true, ...result });
+    } catch (e: any) {
+      return NextResponse.json({ error: `Could not fix it automatically: ${e?.message || e}` }, { status: 500 });
+    }
+  }
 
   // Run the AI accuracy check now (takes 10-30 seconds).
   if (action === 'verify') {

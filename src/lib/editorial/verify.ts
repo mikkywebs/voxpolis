@@ -85,7 +85,7 @@ function draftText(a: any): string {
 }
 
 /** The reports behind a draft: the private copy saved at ingest, or (for the editor's own stories) read from the links now. */
-async function sourceTexts(a: any): Promise<SourceText[]> {
+export async function sourceTexts(a: any): Promise<SourceText[]> {
   const { data } = await supabaseAdmin.from('article_source_texts').select('sources').eq('article_id', a.id).maybeSingle();
   const stored: SourceText[] = (data?.sources as SourceText[]) || [];
   const links: { name: string; url: string }[] = (a.sources || []).filter((s: any) => /^https?:\/\//.test(s?.url || ''));
