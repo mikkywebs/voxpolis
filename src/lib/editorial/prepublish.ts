@@ -165,6 +165,15 @@ export function checkStory(a: CheckInput): CheckResult {
     }
   });
 
+  if (!a.source_facts)
+    items.push({
+      level: 'check',
+      field: 'sources',
+      text: 'This draft was made before automatic fact-checking, so names and numbers were not compared with the original reports.',
+      how: 'Open the original report and compare every name, job title, number and date by hand. When they all match, press "It\'s correct".',
+      key: 'facts:manual',
+    });
+
   if (!hasAnalysis)
     items.push({
       level: 'check',
