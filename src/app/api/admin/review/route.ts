@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
       .filter((p: any) => p.text)
       .slice(0, 25);
     if (!problems.length || !body?.story) return NextResponse.json({ error: 'Nothing to fix' }, { status: 400 });
-    const { data: art } = await supabaseAdmin.from('articles').select('id, sources, checked_items').eq('id', id).maybeSingle();
+    const { data: art } = await supabaseAdmin.from('articles').select('id, sources, source_url, source_name, checked_items').eq('id', id).maybeSingle();
     if (!art) return NextResponse.json({ error: 'Story not found' }, { status: 404 });
     try {
       const result = await autoFixStory(art, body.story, problems);
