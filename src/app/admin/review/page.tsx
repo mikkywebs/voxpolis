@@ -63,7 +63,21 @@ function Light({ level }: { level: 'red' | 'amber' | 'green' }) {
 }
 
 /** The problems found in one part of the story, each with "How do I check?" and "It's correct". */
-function FieldChecks({ result, field, onConfirm }: { result: CheckResult; field: string; onConfirm: (key: string, undo?: boolean) => void }) {
+const canAutoFix = (i: CheckItem) => i.level !== 'tip' && !['photo', 'sources', 'story'].includes(i.field) && !/^(photo|facts|newreports):/.test(i.key || '');
+
+function FieldChecks({
+  result,
+  field,
+  onConfirm,
+  onFix,
+  fixing = false,
+}: {
+  result: CheckResult;
+  field: string;
+  onConfirm: (key: string, undo?: boolean) => void;
+  onFix?: (items: CheckItem[]) => void;
+  fixing?: boolean;
+}) {
   const open = result.items.filter((i) => i.field === field);
   const done = result.confirmed.filter((i) => i.field === field);
   if (!open.length && !done.length) return null;
@@ -83,6 +97,16 @@ function FieldChecks({ result, field, onConfirm }: { result: CheckResult; field:
             <summary className="cursor-pointer text-blue-600 font-semibold">How do I check?</summary>
             <p className="mt-1">{i.how}</p>
           </details>
+        )}
+        {!confirmed && onFix && canAutoFix(i) && (
+          <button
+            type="button"
+            disabled={fixing}
+            onClick={() => onFix([i])}
+            className="mr-2 px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold disabled:opacity-50"
+          >
+            ✨ Fix it for me
+          </button>
         )}
         {i.key && (
           <button
@@ -225,6 +249,83 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
     }
   };
   const lv = (field: string) => fieldLevel(live, field);
+
+  // ---- "Fix it for me" ----
+  const [fixing, setFixing] = useState(false);
+  const [fixMsg, setFixMsg] = useState<{ changes: { before: string; after: string; reason: string }[]; unresolved: string[]; verified: number } | null>(null);
+  const [undoSnap, setUndoSnap] = useState<any>(null);
+  const [after, setAfter] = useState<'' | 'save' | 'verify'>('');
+  const storyPayload = () =>
+    flexible
+      ? {
+          title: f.title,
+          dek: f.dek,
+          key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean),
+          meta_description: f.meta_description,
+          lead: lead.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean),
+          sections: secs.map((x) => ({ heading: x.heading, kind: x.kind, paragraphs: x.text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean) })),
+          what_to_watch: watch,
+        }
+      : {
+          title: f.title,
+          dek: f.dek,
+          key_points: f.key_points.split('\n').map((k) => k.trim()).filter(Boolean),
+          meta_description: f.meta_description,
+          content: f.content,
+          analysis: f.analysis,
+          background: f.background,
+          what_next: f.what_next,
+        };
+  const autoFix = async (items: CheckItem[]) => {
+    if (!items.length) return;
+    setFixing(true);
+    setErr('');
+    setFixMsg(null);
+    try {
+      const res = await fetch('/api/admin/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: story.id, action: 'autofix', story: storyPayload(), problems: items.map((i) => ({ key: i.key, field: i.field, text: i.text })) }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not fix it automatically');
+      setUndoSnap({ f, lead, secs, watch });
+      const x = d.fields;
+      setF((prev) => ({
+        ...prev,
+        title: x.title ?? prev.title,
+        dek: x.dek ?? prev.dek,
+        key_points: (x.key_points || []).join('\n') || prev.key_points,
+        meta_description: x.meta_description ?? prev.meta_description,
+        ...(flexible ? {} : { content: x.content ?? prev.content, analysis: x.analysis ?? prev.analysis, background: x.background ?? prev.background, what_next: x.what_next ?? prev.what_next }),
+      }));
+      if (flexible) {
+        setLead((x.lead || []).join('\n\n'));
+        setSecs((x.sections || []).map((y: any) => ({ heading: y.heading, kind: y.kind, text: (y.paragraphs || []).join('\n\n') })));
+        setWatch(x.what_to_watch || '');
+      }
+      if (Array.isArray(d.checked_items)) setChecked(d.checked_items);
+      setFixMsg({ changes: d.changes || [], unresolved: d.unresolved || [], verified: (d.verified || []).length });
+      setOpen(true);
+      // Save the fixed story; after "Fix all", also run the accuracy check again on the new text.
+      setAfter(items.length > 1 && (story.sources?.length || 0) > 0 ? 'verify' : 'save');
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setFixing(false);
+    }
+  };
+  const undoFix = () => {
+    if (!undoSnap) return;
+    setF(undoSnap.f);
+    setLead(undoSnap.lead);
+    setSecs(undoSnap.secs);
+    setWatch(undoSnap.watch);
+    setUndoSnap(null);
+    setFixMsg(null);
+    setAfter('save');
+  };
+  const fixableItems = live.items.filter(canAutoFix);
   const runVerify = async () => {
     setVerifying(true);
     setErr('');
@@ -245,6 +346,15 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
       setVerifying(false);
     }
   };
+
+  useEffect(() => {
+    if (!after) return;
+    const what = after;
+    setAfter('');
+    if (what === 'verify') runVerify();
+    else act('save', true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [after]);
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -321,7 +431,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
         <textarea className={inputCls} rows={rows} value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })} />
       )}
     </label>
-    {check && <FieldChecks result={live} field={check} onConfirm={confirm} />}
+    {check && <FieldChecks result={live} field={check} onConfirm={confirm} onFix={autoFix} fixing={fixing} />}
     </div>
   );
 
@@ -405,6 +515,49 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
         {!open && live.level !== 'ready' && (
           <p className="text-xs text-gray-500">Press Edit to see what to fix or check under each part.</p>
         )}
+        {fixableItems.length > 0 && (
+          <button
+            type="button"
+            disabled={fixing || verifying}
+            onClick={() => autoFix(fixableItems)}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold disabled:opacity-60"
+          >
+            {fixing ? '✨ Fixing… (about 30 seconds)' : `✨ Fix all ${fixableItems.length} problem${fixableItems.length > 1 ? 's' : ''} for me`}
+          </button>
+        )}
+        {verifying && !fixing && <p className="text-xs text-gray-500">Checking the fixed story against the reports…</p>}
+        {fixMsg && (
+          <div className="rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-900 p-3 space-y-2 text-[13px]">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-bold">
+                {fixMsg.changes.length ? `Done: ${fixMsg.changes.length} change${fixMsg.changes.length > 1 ? 's' : ''} made and saved.` : 'No changes were needed.'}
+                {fixMsg.verified ? ` ${fixMsg.verified} item${fixMsg.verified > 1 ? 's were' : ' was'} confirmed correct by the reports.` : ''}
+              </p>
+              {undoSnap && (
+                <button type="button" onClick={undoFix} className="text-xs font-bold text-gray-600 hover:underline shrink-0">
+                  Undo
+                </button>
+              )}
+            </div>
+            {fixMsg.changes.length > 0 && (
+              <details>
+                <summary className="cursor-pointer text-violet-700 dark:text-violet-300 font-semibold">See what changed</summary>
+                <ul className="mt-2 space-y-2">
+                  {fixMsg.changes.map((c, k) => (
+                    <li key={k} className="space-y-0.5">
+                      {c.before && <p className="text-gray-500 line-through">{c.before}</p>}
+                      {c.after ? <p className="text-gray-900 dark:text-gray-100">{c.after}</p> : <p className="text-gray-500 italic">Removed.</p>}
+                      <p className="text-xs text-gray-500">{c.reason}</p>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {fixMsg.unresolved.length > 0 && (
+              <p className="text-amber-800 dark:text-amber-300">Still needs you: {fixMsg.unresolved.join(' ')}</p>
+            )}
+          </div>
+        )}
         {fidelity?.status === 'done' && (
           <p className="text-xs text-gray-500">
             Accuracy check: {new Date(fidelity.checked_at).toLocaleString()} ·{' '}
@@ -412,7 +565,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
           </p>
         )}
         {fidelity?.status === 'no_sources' && <p className="text-xs text-amber-700">Accuracy check: the original reports could not be read. Check the facts by hand.</p>}
-        <FieldChecks result={live} field="story" onConfirm={confirm} />
+        <FieldChecks result={live} field="story" onConfirm={confirm} onFix={autoFix} fixing={fixing} />
       </div>
 
       {open && (
@@ -444,7 +597,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
                 <span className="block text-[11px] text-gray-400">No subheading. Leave a blank line between paragraphs.</span>
                 <textarea className={inputCls} rows={5} value={lead} onChange={(e) => setLead(e.target.value)} />
               </label>
-              <FieldChecks result={live} field="lead" onConfirm={confirm} />
+              <FieldChecks result={live} field="lead" onConfirm={confirm} onFix={autoFix} fixing={fixing} />
               {secs.map((x, i) => (
                 <div key={i} className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 space-y-2">
                   <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-500">
@@ -472,7 +625,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
                     </select>
                   </div>
                   <textarea className={inputCls} rows={6} aria-label={`Section ${i + 1} text`} value={x.text} onChange={(e) => setSec(i, { text: e.target.value })} />
-                  <FieldChecks result={live} field={`sec:${i}`} onConfirm={confirm} />
+                  <FieldChecks result={live} field={`sec:${i}`} onConfirm={confirm} onFix={autoFix} fixing={fixing} />
                   <div className="flex gap-3 text-xs font-bold">
                     <button type="button" onClick={() => moveSec(i, -1)} disabled={i === 0} className="text-gray-600 disabled:opacity-30">↑ Move up</button>
                     <button type="button" onClick={() => moveSec(i, 1)} disabled={i === secs.length - 1} className="text-gray-600 disabled:opacity-30">↓ Move down</button>
@@ -489,7 +642,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
                 </span>
                 <input className={inputCls} value={watch} onChange={(e) => setWatch(e.target.value)} />
               </label>
-              <FieldChecks result={live} field="watch" onConfirm={confirm} />
+              <FieldChecks result={live} field="watch" onConfirm={confirm} onFix={autoFix} fixing={fixing} />
               {story.sources && story.sources.length > 0 && (
                 <p className="text-xs text-gray-500">
                   Built from {story.sources.length} report{story.sources.length > 1 ? 's' : ''}:{' '}
@@ -525,7 +678,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
                 </a>
               ))}
             </div>
-            <FieldChecks result={live} field="sources" onConfirm={confirm} />
+            <FieldChecks result={live} field="sources" onConfirm={confirm} onFix={autoFix} fixing={fixing} />
           </div>
           {field('poll_question', 'Reader question (leave empty for none)', 1, 'Only for a real public choice. Neutral, agree/disagree.')}
           <div className="space-y-2 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
@@ -559,7 +712,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
               Only use photos you own or have permission to use: your own photos, official government handouts that allow reuse,
               licensed stock, or Wikimedia Commons. Never photos copied from other news sites.
             </p>
-            <FieldChecks result={live} field="photo" onConfirm={confirm} />
+            <FieldChecks result={live} field="photo" onConfirm={confirm} onFix={autoFix} fixing={fixing} />
           </div>
 
           <div className="space-y-2 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
@@ -592,7 +745,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
                 onChange={(e) => setF({ ...f, meta_description: e.target.value })}
               />
             </label>
-            <FieldChecks result={live} field="seo" onConfirm={confirm} />
+            <FieldChecks result={live} field="seo" onConfirm={confirm} onFix={autoFix} fixing={fixing} />
             <p className="text-[11px] text-gray-500">
               Added automatically to every published story: page title and description tags, Google News article data, the news sitemap,
               the share image for social media, the main web address (canonical) and breadcrumbs.
