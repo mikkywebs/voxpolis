@@ -85,7 +85,7 @@ async function search(query: string, signal: AbortSignal): Promise<any[]> {
 
 type Verdict = { photo: LicensedPhoto | null; score: number; reason: string; title: string };
 
-function evaluate(page: any, subject: string, person: boolean, countryName?: string): Verdict {
+function evaluate(page: any, subject: string, person: boolean, countryName?: string, loose = false): Verdict {
   const title: string = page?.title || '';
   const no = (reason: string): Verdict => ({ photo: null, score: -99, reason, title });
   const info = page?.imageinfo?.[0];
@@ -106,7 +106,11 @@ function evaluate(page: any, subject: string, person: boolean, countryName?: str
   const full = normalise(subject);
   let score = 0;
 
-  if (person) {
+  if (loose) {
+    // Editor's own search words: only licence and quality rules, plus at least one search word in the file.
+    if (!words.some((w) => haystack.includes(w))) return no('search words not in file');
+    score = 3 + words.filter((w) => cleanTitle.includes(w)).length;
+  } else if (person) {
     const surname = words[words.length - 1];
     if (!surname || !haystack.includes(surname)) return no('name not in file');
     if (cleanTitle.includes(full)) score += 5;
@@ -193,7 +197,7 @@ export async function findLicensedPhoto(
  * Several licensed options for the editor to choose from ("Find a free photo").
  * Same licence and quality rules as the automatic pick; nothing is applied until the editor clicks.
  */
-export async function findPhotoOptions(subjects: string[], max = 6, budgetMs = 9000, countryName?: string): Promise<(LicensedPhoto & { score: number })[]> {
+export async function findPhotoOptions(subjects: string[], max = 6, budgetMs = 9000, countryName?: string, loose = false): Promise<(LicensedPhoto & { score: number })[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), budgetMs);
   const found: (LicensedPhoto & { score: number })[] = [];
@@ -201,12 +205,12 @@ export async function findPhotoOptions(subjects: string[], max = 6, budgetMs = 9
     const unique = Array.from(new Set(subjects.map((s) => s.trim()).filter((s) => s.length > 2))).slice(0, 3);
     await Promise.all(
       unique.map(async (subject, rank) => {
-        const person = looksLikePerson(subject);
-        const queries = person ? [`intitle:"${subject}"`, `"${subject}"`] : [`intitle:"${subject}"`, subject];
+        const person = !loose && looksLikePerson(subject);
+        const queries = loose ? [subject, `intitle:${subject}`] : person ? [`intitle:"${subject}"`, `"${subject}"`] : [`intitle:"${subject}"`, subject];
         for (const q of queries) {
           try {
             (await search(q, controller.signal)).forEach((p) => {
-              const v = evaluate(p, subject, person, countryName);
+              const v = evaluate(p, subject, person, countryName, loose);
               // Earlier subjects (the main person) rank higher.
               if (v.photo) found.push({ ...v.photo, score: v.score - rank * 2 });
             });

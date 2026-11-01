@@ -185,6 +185,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
     meta_description: story.meta_description || '',
     image_license: '',
     image_page_url: '',
+    country_code: story.country_code,
   });
   const [checked, setChecked] = useState<string[]>(story.checked_items || []);
   const [preview, setPreview] = useState(false);
@@ -330,13 +331,14 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
   const fixableItems = live.items.filter(canAutoFix);
 
   // ---- "Find a free photo" (Wikimedia Commons, licensed for reuse). Nothing changes until "Use this photo". ----
-  const [ph, setPh] = useState<{ open: boolean; busy: boolean; query: string; results: any[]; searched: string[]; note: string }>({
+  const [ph, setPh] = useState<{ open: boolean; busy: boolean; query: string; results: any[]; searched: string[]; note: string; suggestions: string[] }>({
     open: false,
     busy: false,
     query: '',
     results: [],
     searched: [],
     note: '',
+    suggestions: [],
   });
   const findPhotos = async (query = '') => {
     setPh((x) => ({ ...x, open: true, busy: true, note: '' }));
@@ -353,7 +355,8 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
         busy: false,
         results: d.photos || [],
         searched: d.subjects || [],
-        note: (d.photos || []).length ? '' : (d.subjects || []).length ? 'No free photo found. Try another name (e.g. the full name of the main person) or leave the Voxpolis card.' : 'Type the name of the main person or place and press Search.',
+        suggestions: d.suggestions || x.suggestions,
+        note: (d.photos || []).length ? '' : (d.subjects || []).length ? 'No free photo found. Try other words, e.g. a full name, a place, or a topic like "Iran flag", or leave the Voxpolis card.' : 'Type the name of the main person or place and press Search.',
       }));
     } catch (e: any) {
       setPh((x) => ({ ...x, busy: false, note: e.message }));
@@ -428,6 +431,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
                 original_image_url: f.original_image_url,
                 image_credit: f.image_credit,
                 meta_description: f.meta_description,
+                country_code: f.country_code,
                 image_license: f.image_license,
                 image_page_url: f.image_page_url,
                 sources: srcList(),
@@ -621,6 +625,19 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
               {story.review_status === 'approved' ? 'Locked after publishing.' : '3-6 key words, e.g. peter-obi-tinubu-campaign-2027. Locked once published.'}
             </span>
           </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Country</span>
+            <select className={inputCls} value={f.country_code} onChange={(e) => setF({ ...f, country_code: e.target.value })}>
+              {ALL_COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.flag} {c.name}
+                </option>
+              ))}
+            </select>
+            <span className="block text-[11px] text-gray-400">
+              The country whose own politics the story is about. Use World for other countries and international affairs (wars, summits, sanctions).
+            </span>
+          </label>
           {field('dek', 'Summary line', 2, 'One sentence under the headline.', 'dek')}
           {field('key_points', 'At a glance', 4, '2-4 short points, one per line', 'glance')}
           {flexible ? (
@@ -753,7 +770,7 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
                   <div className="flex gap-2">
                     <input
                       className={inputCls}
-                      placeholder={ph.searched[0] ? `Searched: ${ph.searched.join(', ')}. Type another name…` : 'Name of the person or place, e.g. Mary Peltola'}
+                      placeholder='Search anything: a name, place or topic (e.g. "Ali Khamenei", "Tehran", "Iran flag")'
                       value={ph.query}
                       onChange={(e) => setPh((x) => ({ ...x, query: e.target.value }))}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), findPhotos(ph.query))}
@@ -762,6 +779,21 @@ function StoryEditor({ story, onDone, token, autoOpen = false }: { story: Story;
                       {ph.busy ? 'Searching…' : 'Search'}
                     </button>
                   </div>
+                  {ph.suggestions.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-[11px] text-gray-500 self-center">From this story:</span>
+                      {ph.suggestions.map((sg) => (
+                        <button
+                          key={sg}
+                          type="button"
+                          onClick={() => (setPh((x) => ({ ...x, query: sg })), findPhotos(sg))}
+                          className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-[11px] font-semibold hover:bg-blue-100"
+                        >
+                          {sg}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {ph.note && <p className="text-xs text-gray-500">{ph.note}</p>}
                   {ph.results.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

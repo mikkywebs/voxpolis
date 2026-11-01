@@ -143,9 +143,9 @@ function words(s: string) {
 
 export async function writeVoxpolisArticle(input: { sources: SourceInput[]; deskCountry: string }): Promise<EditorialPiece> {
   const countryHint =
-    input.deskCountry === 'WORLD'
-      ? 'These came from an international desk. Set country_iso to the ISO-3166 alpha-2 code of the ONE country whose politics the story is mainly about.'
-      : `These came from the ${input.deskCountry} desk. Use country_iso="${input.deskCountry}" unless the story is clearly about another country's politics.`;
+    `COUNTRY: set country_iso to the ONE country whose own domestic politics the story is mainly about, using one of these codes: ${ALL_COUNTRIES.filter((c) => c.code !== 'WORLD').map((c) => c.code).join(', ')}. ` +
+    `Use "WORLD" when the story is mainly about another country (e.g. Iran, France, China), or about relations between countries (wars, strikes, summits, sanctions, treaties), even if it was reported by an outlet from one of these countries.` +
+    (input.deskCountry === 'WORLD' ? ' These reports came from an international desk.' : ` These reports came from the ${input.deskCountry} desk, but only use "${input.deskCountry}" if the story is about ${input.deskCountry}'s own politics.`);
 
   // Keep the prompt within budget: the lead source gets the most room.
   const budget = [7000, 4000, 3000, 2500];
@@ -193,7 +193,7 @@ ${reports}`;
 
   return {
     is_political: raw.is_political !== false,
-    country_iso: str(raw.country_iso).toUpperCase().slice(0, 2),
+    country_iso: ((c) => (ALL_COUNTRIES.some((x) => x.code === c) ? c : 'WORLD'))(str(raw.country_iso).toUpperCase().trim()),
     importance: Math.max(1, Math.min(10, Number(raw.importance) || 5)),
     story_type: STORY_TYPES.includes(raw.story_type) ? raw.story_type : 'development',
     headline: str(raw.headline),

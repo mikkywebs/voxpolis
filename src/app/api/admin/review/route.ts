@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyAdmin } from '@/lib/admin/auth';
-import { getCountryByCode, getCountrySlug } from '@/config/countries';
+import { getCountryByCode, getCountrySlug, isCoveredCountry } from '@/config/countries';
 import { articlePath, isValidSlug, toSlug } from '@/lib/paths';
 import { verifyArticle } from '@/lib/editorial/verify';
 import { autoFixStory } from '@/lib/editorial/autofix';
 import { findPhotoOptions } from '@/lib/editorial/photos';
+import { namesIn } from '@/lib/editorial/facts';
 import { checkStory } from '@/lib/editorial/prepublish';
 
 export const dynamic = 'force-dynamic';
@@ -121,11 +122,15 @@ export async function POST(req: NextRequest) {
   if (action === 'photos') {
     const { data: art } = await supabaseAdmin.from('articles').select('actors, title, country_code').eq('id', id).maybeSingle();
     const typed = clean(body?.query, 80);
-    const subjects = typed ? [typed] : ((art?.actors as string[]) || []).slice(0, 3);
-    if (!subjects.length) return NextResponse.json({ ok: true, photos: [], subjects: [] });
     const country = getCountryByCode(art?.country_code || current.country_code);
-    const photos = await findPhotoOptions(subjects, 6, 9000, country.name);
-    return NextResponse.json({ ok: true, photos, subjects });
+    // Suggestions the editor can tap: people/bodies named in the story and in the headline.
+    const fromTitle = namesIn(art?.title || '').filter((n) => n.split(' ').length <= 4);
+    const suggestions = Array.from(new Set([...(((art?.actors as string[]) || []).slice(0, 4)), ...fromTitle].map((x) => x.trim()).filter((x) => x.length > 2))).slice(0, 6);
+    const subjects = typed ? [typed] : suggestions.slice(0, 3);
+    if (!subjects.length) return NextResponse.json({ ok: true, photos: [], subjects: [], suggestions });
+    // Typed searches are free-form ("Iran flag", "Lagos protest"); automatic ones use the strict name rules.
+    const photos = await findPhotoOptions(subjects, 8, 9000, country.code === 'WORLD' ? undefined : country.name, !!typed);
+    return NextResponse.json({ ok: true, photos, subjects, suggestions });
   }
 
   // "Fix it for me": correct the listed problems from the original reports (not saved here; the editor saves).
@@ -277,6 +282,10 @@ export async function POST(req: NextRequest) {
         update.source_name = list[0].name;
       }
     }
+    // Country (e.g. move an international story from Nigeria to World). The old address redirects automatically.
+    if (typeof f.country_code === 'string' && f.country_code && f.country_code.toUpperCase() !== current.country_code && isCoveredCountry(f.country_code)) {
+      update.country_code = f.country_code.toUpperCase();
+    }
     if (typeof f.meta_description === 'string') update.meta_description = clean(f.meta_description, 200) || null;
     if (typeof f.image_credit === 'string') update.image_credit = f.image_credit.trim().slice(0, 160) || null;
 
@@ -320,6 +329,10 @@ export async function POST(req: NextRequest) {
   // Refresh the public pages that show this story.
   try {
     revalidatePath(articlePath({ slug: update.slug || current.slug, country_code: current.country_code }));
+    if (update.country_code) {
+      revalidatePath(articlePath({ slug: update.slug || current.slug, country_code: update.country_code }));
+      revalidatePath(`/${getCountrySlug(getCountryByCode(update.country_code))}`);
+    }
     revalidatePath(`/${getCountrySlug(getCountryByCode(current.country_code))}`);
     revalidatePath('/');
     revalidatePath('/sitemap.xml');

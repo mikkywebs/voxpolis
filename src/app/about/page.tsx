@@ -22,7 +22,7 @@ export default function AboutPage() {
   const [pageData, setPageData] = useState({
     badge: 'Global Independent News & Civic Voice',
     title: 'Unbiased Political News Tailored to Your Nation',
-    subtitle: `Voxpolis delivers real-time, independent political coverage and executive fact summaries from ${ALL_COUNTRIES.length} supported nations. Access direct regional political developments and active civic sentiment polls with zero paywalls.`,
+    subtitle: `Voxpolis delivers real-time, independent political coverage and executive fact summaries from ${ALL_COUNTRIES.length - 1} countries, plus world affairs. Access direct regional political developments and active civic sentiment polls with zero paywalls.`,
     mission: 'Our mission is to bring concise, factual news straight to citizens\' doorsteps worldwide, with balanced regional perspectives and civic participation without corporate paywalls.',
   });
 
@@ -88,7 +88,7 @@ export default function AboutPage() {
                 <Globe2 className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-2xl font-black text-white">{ALL_COUNTRIES.length}</div>
+                <div className="text-2xl font-black text-white">{ALL_COUNTRIES.length - 1}</div>
                 <div className="text-xs font-bold text-gray-200">Nations Covered</div>
                 <div className="text-[11px] text-gray-400">Direct regional reporting</div>
               </div>
@@ -138,7 +138,7 @@ export default function AboutPage() {
                 <span>Verified Ingestion</span>
               </h3>
               <p className="text-xs text-gray-300 leading-relaxed">
-                We gather news directly from reputable national press outlets and verified official digests across {ALL_COUNTRIES.length} countries.
+                We gather news directly from reputable national press outlets and verified official digests across {ALL_COUNTRIES.length - 1} countries.
               </p>
             </div>
 

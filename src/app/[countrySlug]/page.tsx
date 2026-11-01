@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import LiveFeed from '@/components/feed/LiveFeed';
 import { articlePath } from '@/lib/paths';
-import { ALL_COUNTRIES, CountryConfig, findCountryBySlug, getCountrySlug } from '@/config/countries';
+import { ALL_COUNTRIES, CountryConfig, findCountryBySlug, getCountrySlug, isFormerCountrySlug } from '@/config/countries';
 import { getLatestForCountry, getLatestWorld } from '@/lib/articles';
 import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
 
@@ -18,6 +18,8 @@ function resolve(slug: string): CountryConfig {
   // Old links like /ng → /nigeria
   const byCode = ALL_COUNTRIES.find((c) => c.code.toLowerCase() === slug.toLowerCase());
   if (byCode) permanentRedirect(`/${getCountrySlug(byCode)}`);
+  // Countries we no longer cover → World page.
+  if (isFormerCountrySlug(slug)) permanentRedirect('/world');
   return notFound();
 }
 

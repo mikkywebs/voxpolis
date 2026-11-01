@@ -3,7 +3,9 @@ export interface LanguageOption {
   name: string;
 }
 
-export type Continent = 'Africa' | 'Americas' | 'Europe' | 'Asia' | 'Oceania';
+import { COVERED_COUNTRY_CODES } from './coverage';
+
+export type Continent = 'Africa' | 'Americas' | 'Europe' | 'Asia' | 'Oceania' | 'Global';
 
 export interface CountryConfig {
   code: string;
@@ -24,7 +26,8 @@ export interface RegionGroup {
   countries: CountryConfig[];
 }
 
-export const ALL_COUNTRIES: CountryConfig[] = [
+/** Every country we know about (used only to recognise old addresses and old data). */
+const KNOWN_COUNTRIES: CountryConfig[] = [
   // --- AFRICA ---
   // West Africa
   { code: 'NG', name: 'Nigeria', flag: '🇳🇬', capital: 'Abuja', lat: 9.0765, lon: 7.3986, continent: 'Africa', region: 'West Africa', languages: [{ code: 'en', name: 'English' }] },
@@ -182,7 +185,33 @@ export const ALL_COUNTRIES: CountryConfig[] = [
   { code: 'NZ', name: 'New Zealand', flag: '🇳🇿', capital: 'Wellington', lat: -41.2865, lon: 174.7762, continent: 'Oceania', region: 'Oceania', languages: [{ code: 'en', name: 'English' }] },
 ];
 
+/** "World": stories about countries we don't cover, and international affairs (wars, summits, sanctions). */
+export const WORLD: CountryConfig = {
+  code: 'WORLD',
+  name: 'World',
+  flag: '🌍',
+  capital: '',
+  lat: 0,
+  lon: 0,
+  continent: 'Global',
+  region: 'International',
+  languages: [{ code: 'en', name: 'English' }],
+};
+
+/**
+ * The countries Voxpolis covers (its desks in coverage.ts, same order) plus World.
+ * Every list, menu and page on the site uses this, so adding a desk in coverage.ts adds the country everywhere.
+ */
+export const ALL_COUNTRIES: CountryConfig[] = [
+  ...COVERED_COUNTRY_CODES.map((code) => KNOWN_COUNTRIES.find((c) => c.code === code)).filter((c): c is CountryConfig => !!c),
+  WORLD,
+];
+
 export const SUPPORTED_COUNTRIES = ALL_COUNTRIES;
+
+export function isCoveredCountry(code?: string | null): boolean {
+  return !!code && ALL_COUNTRIES.some((c) => c.code === code.toUpperCase());
+}
 
 // Region Groupings
 export function getGroupedRegions(): RegionGroup[] {
@@ -213,6 +242,7 @@ export function getGroupedRegions(): RegionGroup[] {
     'Southeast Asia': '🌏',
     'Middle East': '🕌',
     'Oceania': '🌏',
+    'International': '🌍',
   };
 
   const result: RegionGroup[] = [];
@@ -229,11 +259,9 @@ export function getGroupedRegions(): RegionGroup[] {
   return result;
 }
 
+/** A country we cover, or World for anything else. */
 export function getCountryByCode(code: string): CountryConfig {
-  const found = ALL_COUNTRIES.find((c) => c.code.toUpperCase() === code.toUpperCase());
-  if (found) return found;
-  const us = ALL_COUNTRIES.find((c) => c.code === 'US');
-  return us || ALL_COUNTRIES[0];
+  return ALL_COUNTRIES.find((c) => c.code.toUpperCase() === (code || '').toUpperCase()) || WORLD;
 }
 
 export function getCountrySlug(c: CountryConfig): string {
@@ -246,11 +274,17 @@ export function getCountryBySlug(slug: string): CountryConfig {
     const nameSlug = getCountrySlug(c);
     return nameSlug === s || c.code.toLowerCase() === s;
   });
-  return found || getCountryByCode('US');
+  return found || WORLD;
 }
 
 /** Strict lookup: returns undefined for unknown slugs (so the page can 404 instead of showing the US). */
 export function findCountryBySlug(slug: string): CountryConfig | undefined {
   const s = (slug || '').toLowerCase();
   return ALL_COUNTRIES.find((c) => getCountrySlug(c) === s);
+}
+
+/** A country we used to have a page for but no longer cover (e.g. /spain): its page now redirects to /world. */
+export function isFormerCountrySlug(slug: string): boolean {
+  const s = (slug || '').toLowerCase();
+  return KNOWN_COUNTRIES.some((c) => !isCoveredCountry(c.code) && (getCountrySlug(c) === s || c.code.toLowerCase() === s));
 }
