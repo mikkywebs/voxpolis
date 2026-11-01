@@ -18,6 +18,8 @@ export function getVisitorCountryCode(): string {
     const h = headers();
     const ip = h.get('x-vercel-ip-country') || h.get('cf-ipcountry');
     if (valid(ip)) return ip!.toUpperCase();
+    // Visitors from countries we don't cover start on the World page.
+    if (ip && /^[A-Z]{2}$/i.test(ip)) return 'WORLD';
   } catch {}
   return DEFAULT_COUNTRY;
 }

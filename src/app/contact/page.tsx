@@ -112,7 +112,7 @@ export default function ContactPage() {
 
             <div className="p-4 rounded-2xl bg-blue-950/40 border border-blue-800/50 text-[11px] text-gray-300 leading-relaxed flex items-start gap-2">
               <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-              <span>Voxpolis operates an independent political journalism and civic reporting network serving readers across {ALL_COUNTRIES.length} countries.</span>
+              <span>Voxpolis operates an independent political journalism and civic reporting network serving readers across {ALL_COUNTRIES.length - 1} countries.</span>
             </div>
           </div>
 

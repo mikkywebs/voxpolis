@@ -43,6 +43,7 @@ export default function LeftWidgetRail({
 
   useEffect(() => {
     let isMounted = true;
+    if (country.code === 'WORLD') return;
     async function loadWeather() {
       try {
         const res = await fetch(`/api/weather?country=${country.code}&lat=${country.lat}&lon=${country.lon}`);
@@ -77,6 +78,8 @@ export default function LeftWidgetRail({
   if (variant === 'mobile_strip') {
     return (
       <div className="w-full space-y-3 lg:hidden my-4">
+        {country.code !== 'WORLD' && (
+          <>
         {/* Compact Weather Bar */}
         <div className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3.5 shadow-xs flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -102,6 +105,8 @@ export default function LeftWidgetRail({
             </button>
           </div>
         </div>
+          </>
+        )}
 
         {cpoll && <ReaderPoll poll={cpoll} variant="rail" label={`Reader poll · ${country.name}`} />}
       </div>
@@ -111,6 +116,8 @@ export default function LeftWidgetRail({
   // Desktop Left Widget Rail
   return (
     <aside className="w-full space-y-4">
+      {country.code !== 'WORLD' && (
+        <>
       {/* Widget 1: Local Weather & Air Quality Card */}
       <section className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-xs transition-colors">
         <div className="flex items-center justify-between text-xs mb-3">
@@ -177,6 +184,8 @@ export default function LeftWidgetRail({
           </div>
         </div>
       </section>
+        </>
+      )}
 
       {/* Widget 2: Ad space. Shows nothing until AdSense or Monetag is switched on. */}
       <AdSlot slotLocation="sidebar" />

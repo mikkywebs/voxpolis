@@ -353,7 +353,7 @@ async function writeAndSave(desk: CoverageDesk, used: UsedSource[], deadline: nu
   const early = await findSameEvent(piece.country_iso, eventText);
   const photo = early
     ? null
-    : await findLicensedPhoto([...piece.image_subjects, ...piece.actors.slice(0, 2)], PHOTO_BUDGET_MS, undefined, getCountryByCode(piece.country_iso).name);
+    : await findLicensedPhoto([...piece.image_subjects, ...piece.actors.slice(0, 2)], PHOTO_BUDGET_MS, undefined, piece.country_iso === 'WORLD' ? undefined : getCountryByCode(piece.country_iso).name);
 
   const decision = await oneAtATime(async () => {
     const same = early || (await findSameEvent(piece.country_iso, eventText));
