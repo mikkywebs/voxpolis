@@ -19,17 +19,22 @@ export default function Footer() {
           <h2 id="footer-countries" className="text-[11px] font-bold uppercase tracking-[0.15em] text-gray-500">
             Political news by country
           </h2>
-          <ul className="flex items-center justify-center flex-wrap gap-x-4 gap-y-2 text-xs text-gray-400">
-            {COVERED_COUNTRY_CODES.map((code) => {
-              const c = getCountryByCode(code);
-              return (
-                <li key={code}>
-                  <Link href={`/${getCountrySlug(c)}`} title={`${c.name} political news`} className="hover:text-blue-400 transition">
-                    {c.name}
+          <ul className="flex items-center justify-center flex-wrap gap-2 text-xs">
+            {COVERED_COUNTRY_CODES.map((code) => getCountryByCode(code))
+              .sort((x, y) => x.name.localeCompare(y.name))
+              .map((c) => (
+                <li key={c.code}>
+                  {/* The short code is for the eye; the country name stays in the link so Google knows the page is about that country. */}
+                  <Link
+                    href={`/${getCountrySlug(c)}`}
+                    title={`${c.name} political news`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-gray-800 hover:border-blue-500 px-2.5 py-1 text-gray-400 hover:text-white transition"
+                  >
+                    <span className="font-black tracking-wider text-gray-200">{c.code === 'GB' ? 'UK' : c.code}</span>
+                    <span>{c.name}</span>
                   </Link>
                 </li>
-              );
-            })}
+              ))}
           </ul>
         </nav>
 
