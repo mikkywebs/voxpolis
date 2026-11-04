@@ -23,6 +23,8 @@ export interface CoverageDesk {
   feeds: SourceFeed[];
 }
 
+// Tested 4 Nov 2026 (feed + article text readable). Not usable (they block automatic reading):
+// TheCable (403), The Guardian Nigeria (403), BusinessDay (no readable text), Africanews (406).
 export const COVERAGE: CoverageDesk[] = [
   {
     // Several outlets so different leanings balance each other; official statements come through their reports.
@@ -32,10 +34,7 @@ export const COVERAGE: CoverageDesk[] = [
       { name: 'Punch', url: 'https://punchng.com/topics/politics/feed/' },
       { name: 'Vanguard', url: 'https://www.vanguardngr.com/category/politics/feed/' },
       { name: 'Channels TV', url: 'https://www.channelstv.com/feed/' },
-      { name: 'TheCable', url: 'https://www.thecable.ng/category/politics/feed' },
       { name: 'Daily Trust', url: 'https://dailytrust.com/topics/politics/feed/' },
-      { name: 'BusinessDay', url: 'https://businessday.ng/category/politics/feed/' },
-      { name: 'The Guardian Nigeria', url: 'https://guardian.ng/category/politics/feed/' },
       { name: 'Daily Post', url: 'https://dailypost.ng/politics/feed/' },
     ],
   },
@@ -45,7 +44,6 @@ export const COVERAGE: CoverageDesk[] = [
     feeds: [
       { name: 'BBC News Africa', url: 'https://feeds.bbci.co.uk/news/world/africa/rss.xml' },
       { name: 'The Africa Report', url: 'https://www.theafricareport.com/feed/' },
-      { name: 'Africanews', url: 'https://www.africanews.com/feed/rss' },
       { name: 'MyJoyOnline', url: 'https://www.myjoyonline.com/news/politics/feed/' },
       { name: 'Capital FM', url: 'https://www.capitalfm.co.ke/news/category/kenya/politics/feed/' },
       { name: 'Daily Maverick', url: 'https://www.dailymaverick.co.za/dmrss/' },
