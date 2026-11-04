@@ -1,5 +1,5 @@
 import { headers, cookies } from 'next/headers';
-import { ALL_COUNTRIES } from '@/config/countries';
+import { ALL_COUNTRIES, sectionForCountry } from '@/config/countries';
 
 export const COUNTRY_COOKIE = 'voxpolis_country';
 const DEFAULT_COUNTRY = 'NG';
@@ -17,9 +17,8 @@ export function getVisitorCountryCode(): string {
   try {
     const h = headers();
     const ip = h.get('x-vercel-ip-country') || h.get('cf-ipcountry');
-    if (valid(ip)) return ip!.toUpperCase();
-    // Visitors from countries we don't cover start on the World page.
-    if (ip && /^[A-Z]{2}$/i.test(ip)) return 'WORLD';
+    // Nigeria → Nigeria; other African countries → Africa; everywhere else → World.
+    if (ip && /^[A-Z]{2}$/i.test(ip)) return sectionForCountry(ip);
   } catch {}
   return DEFAULT_COUNTRY;
 }

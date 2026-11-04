@@ -1,14 +1,11 @@
 /**
  * Voxpolis coverage plan.
  *
- * Which countries we actively report on, how often, and from which publishers.
- * Chosen for: audience size, strong English-language political press,
- * search demand, and ad value. Everything else is picked up by the
- * WORLD desk, where the AI assigns the country.
- *
- * Tier 1 → polled every hour.  Tier 2 → every 6 hours.
- * Quality over volume: only importance 6+ stories, 1-2 per desk per run,
- * a daily cap per desk (paced through the day) and at most 40 drafts a day in total (INGEST_DAILY_CAP).
+ * Focus (Nov 2026): Nigeria ~80%, Africa ~10%, World ~10%.
+ * Three desks: NG (Nigerian politics), AFRICA (politics in other African countries, AU, ECOWAS),
+ * WORLD (everything else, and relations between countries).
+ * Sized to stay inside the free AI allowance: about 10 drafts a day in total (INGEST_DAILY_CAP),
+ * paced through the day, with a cap on AI attempts so rejected drafts can't use up the allowance.
  * Feeds must be direct publisher feeds (not Google News redirect links),
  * otherwise the article page can't be read and rewritten.
  */
@@ -19,7 +16,7 @@ export interface SourceFeed {
 }
 
 export interface CoverageDesk {
-  code: string;          // ISO country code, or 'WORLD'
+  code: string;          // 'NG', 'AFRICA' or 'WORLD'
   tier: 1 | 2;
   maxPerRun: number;     // new drafts per run
   dailyCap: number;      // new drafts per day (paced across the day)
@@ -27,128 +24,41 @@ export interface CoverageDesk {
 }
 
 export const COVERAGE: CoverageDesk[] = [
-  // Every outlet below was tested on 29 Oct 2026: feed readable AND article text extractable.
-  // ---------- Tier 1 ----------
   {
-    code: 'NG', tier: 1, maxPerRun: 2, dailyCap: 10,
+    // Several outlets so different leanings balance each other; official statements come through their reports.
+    code: 'NG', tier: 1, maxPerRun: 1, dailyCap: 8,
     feeds: [
+      { name: 'Premium Times', url: 'https://www.premiumtimesng.com/category/news/politics/feed' },
       { name: 'Punch', url: 'https://punchng.com/topics/politics/feed/' },
       { name: 'Vanguard', url: 'https://www.vanguardngr.com/category/politics/feed/' },
-      { name: 'Premium Times', url: 'https://www.premiumtimesng.com/category/news/politics/feed' },
-      { name: 'Daily Post', url: 'https://dailypost.ng/politics/feed/' },
       { name: 'Channels TV', url: 'https://www.channelstv.com/feed/' },
+      { name: 'TheCable', url: 'https://www.thecable.ng/category/politics/feed' },
+      { name: 'Daily Trust', url: 'https://dailytrust.com/topics/politics/feed/' },
+      { name: 'BusinessDay', url: 'https://businessday.ng/category/politics/feed/' },
+      { name: 'The Guardian Nigeria', url: 'https://guardian.ng/category/politics/feed/' },
+      { name: 'Daily Post', url: 'https://dailypost.ng/politics/feed/' },
     ],
   },
   {
-    // Mix of outlets across the US political spectrum.
-    code: 'US', tier: 1, maxPerRun: 2, dailyCap: 5,
+    // Politics in other African countries, the African Union and ECOWAS.
+    code: 'AFRICA', tier: 1, maxPerRun: 1, dailyCap: 1,
     feeds: [
-      { name: 'CBS News', url: 'https://www.cbsnews.com/latest/rss/politics' },
-      { name: 'NBC News', url: 'https://feeds.nbcnews.com/nbcnews/public/politics' },
-      { name: 'ABC News', url: 'https://abcnews.go.com/abcnews/politicsheadlines' },
-      { name: 'Fox News', url: 'https://moxie.foxnews.com/google-publisher/politics.xml' },
-    ],
-  },
-  {
-    code: 'GB', tier: 1, maxPerRun: 2, dailyCap: 5,
-    feeds: [
-      { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/politics/rss.xml' },
-      { name: 'The Guardian', url: 'https://www.theguardian.com/politics/rss' },
-    ],
-  },
-  {
-    code: 'GH', tier: 1, maxPerRun: 1, dailyCap: 3,
-    feeds: [
+      { name: 'BBC News Africa', url: 'https://feeds.bbci.co.uk/news/world/africa/rss.xml' },
+      { name: 'The Africa Report', url: 'https://www.theafricareport.com/feed/' },
+      { name: 'Africanews', url: 'https://www.africanews.com/feed/rss' },
       { name: 'MyJoyOnline', url: 'https://www.myjoyonline.com/news/politics/feed/' },
-      { name: 'Graphic Online', url: 'https://www.graphic.com.gh/news/politics.feed?type=rss' },
-    ],
-  },
-  {
-    code: 'KE', tier: 1, maxPerRun: 1, dailyCap: 3,
-    feeds: [
-      { name: 'The Standard', url: 'https://www.standardmedia.co.ke/rss/politics.php' },
       { name: 'Capital FM', url: 'https://www.capitalfm.co.ke/news/category/kenya/politics/feed/' },
-    ],
-  },
-  {
-    code: 'ZA', tier: 1, maxPerRun: 1, dailyCap: 3,
-    feeds: [
       { name: 'Daily Maverick', url: 'https://www.dailymaverick.co.za/dmrss/' },
-      { name: 'IOL', url: 'https://iol.co.za/rss/iol/news/politics/' },
     ],
   },
   {
-    code: 'IN', tier: 1, maxPerRun: 1, dailyCap: 3,
-    feeds: [
-      { name: 'Hindustan Times', url: 'https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml' },
-      { name: 'NDTV', url: 'https://feeds.feedburner.com/ndtvnews-india-news' },
-      { name: 'Times of India', url: 'https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms' },
-    ],
-  },
-  {
-    code: 'CA', tier: 1, maxPerRun: 1, dailyCap: 2,
-    feeds: [
-      { name: 'Global News', url: 'https://globalnews.ca/politics/feed/' },
-      { name: 'CBC News', url: 'https://www.cbc.ca/webfeed/rss/rss-politics' },
-    ],
-  },
-  {
-    code: 'AU', tier: 1, maxPerRun: 1, dailyCap: 2,
-    feeds: [
-      { name: 'The Guardian Australia', url: 'https://www.theguardian.com/australia-news/australian-politics/rss' },
-      { name: 'ABC News', url: 'https://www.abc.net.au/news/feed/51120/rss.xml' },
-    ],
-  },
-  {
-    code: 'WORLD', tier: 1, maxPerRun: 2, dailyCap: 5,
+    code: 'WORLD', tier: 1, maxPerRun: 1, dailyCap: 1,
     feeds: [
       { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
-      { name: 'The Guardian', url: 'https://www.theguardian.com/world/rss' },
       { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
-      { name: 'DW', url: 'https://rss.dw.com/rdf/rss-en-world' },
+      { name: 'The Guardian', url: 'https://www.theguardian.com/world/rss' },
       { name: 'France 24', url: 'https://www.france24.com/en/rss' },
-    ],
-  },
-
-  // ---------- Tier 2 ----------
-  {
-    code: 'UG', tier: 2, maxPerRun: 1, dailyCap: 2,
-    feeds: [
-      { name: 'Nile Post', url: 'https://nilepost.co.ug/feed' },
-      { name: 'The Independent', url: 'https://www.independent.co.ug/feed/' },
-    ],
-  },
-  {
-    code: 'ZW', tier: 2, maxPerRun: 1, dailyCap: 1,
-    feeds: [
-      { name: 'NewZimbabwe', url: 'https://www.newzimbabwe.com/feed/' },
-      { name: 'Nehanda Radio', url: 'https://nehandaradio.com/feed/' },
-    ],
-  },
-  {
-    code: 'IE', tier: 2, maxPerRun: 1, dailyCap: 1,
-    feeds: [
-      { name: 'RTÉ News', url: 'https://www.rte.ie/feeds/rss/?index=/news/politics/' },
-      { name: 'TheJournal.ie', url: 'https://www.thejournal.ie/feed/' },
-    ],
-  },
-  {
-    code: 'NZ', tier: 2, maxPerRun: 1, dailyCap: 1,
-    feeds: [{ name: 'RNZ', url: 'https://www.rnz.co.nz/rss/political.xml' }],
-  },
-  {
-    code: 'PK', tier: 2, maxPerRun: 1, dailyCap: 2,
-    feeds: [
-      { name: 'Dawn', url: 'https://www.dawn.com/feeds/home' },
-      { name: 'The Express Tribune', url: 'https://tribune.com.pk/feed/pakistan' },
-      { name: 'Geo News', url: 'https://www.geo.tv/rss/1/1' },
-    ],
-  },
-  {
-    code: 'PH', tier: 2, maxPerRun: 1, dailyCap: 1,
-    feeds: [
-      { name: 'Philstar', url: 'https://www.philstar.com/rss/nation' },
-      { name: 'GMA News', url: 'https://data.gmanetwork.com/gno/rss/news/nation/feed.xml' },
+      { name: 'DW', url: 'https://rss.dw.com/rdf/rss-en-world' },
     ],
   },
 ];
@@ -161,5 +71,5 @@ export function deskCodesForTier(tier: 1 | 2): string[] {
   return COVERAGE.filter((d) => d.tier === tier).map((d) => d.code);
 }
 
-/** Countries that have a dedicated Voxpolis desk (excludes WORLD). */
+/** The site's sections, in desk order: NG, AFRICA (WORLD is added by countries.ts). */
 export const COVERED_COUNTRY_CODES = COVERAGE.filter((d) => d.code !== 'WORLD').map((d) => d.code);

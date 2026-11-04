@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import LiveFeed from '@/components/feed/LiveFeed';
-import { getCountryByCode } from '@/config/countries';
-import { getLatestForCountry, getLatestWorld } from '@/lib/articles';
+import { getCountryByCode, sectionOrderFor } from '@/config/countries';
+import { getLatestForCountry } from '@/lib/articles';
 import { getVisitorCountryCode } from '@/lib/geo';
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 
@@ -16,7 +16,10 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   const code = getVisitorCountryCode();
   const country = getCountryByCode(code);
-  const [articles, world] = await Promise.all([getLatestForCountry(country.code, 40), getLatestWorld(country.code, 24)]);
+  // Visitor's own section first, then the other two in the order for their region.
+  const [, second, third] = sectionOrderFor(country.code);
+  const [articles, more2, more3] = await Promise.all([getLatestForCountry(country.code, 40), getLatestForCountry(second, 8), getLatestForCountry(third, 8)]);
+  const world = [...more2, ...more3];
 
   const orgLd = {
     '@context': 'https://schema.org',

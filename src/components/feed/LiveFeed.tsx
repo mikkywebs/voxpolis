@@ -110,7 +110,7 @@ export default function LiveFeed({ mode, initialCountryCode, initialArticles, wo
       user={user}
       onSelectCountry={handleSelect}
       secondaryFeeds={secondary}
-      secondaryTitle={user && followed.length > 0 ? 'Countries you follow' : 'Around the world'}
+      secondaryTitle={user && followed.length > 0 ? 'Sections you follow' : 'More political news'}
       heading={mode === 'home' && country.code !== initialCountryCode ? `${country.name} political news` : heading}
       intro={intro}
     />

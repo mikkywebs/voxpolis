@@ -83,8 +83,17 @@ const LOADED: [RegExp, string][] = [
 const OPINION = /\b(overwhelming(?:ly)?|clearly|obviously|undoubtedly|undeniably|of course|everyone knows|beloved|brilliant|disastrous|best|worst|finally|sadly|unfortunately|thankfully|hugely popular|very popular)\b/gi;
 
 // Opinions or arguments given to unnamed groups: the most common way a rewrite drifts from the reports.
-const UNNAMED =
-  /\b(?:critics|supporters|observers|analysts|experts|commentators|opponents|detractors|proponents|skeptics|sceptics|many(?: \w+)?|some(?: \w+)?)(?:\s+of\s+(?:the\s+)?\w+(?:\s+\w+)?)?\s+(?:often\s+|have\s+|would\s+|also\s+)?(?:argue|argued|say|said|note|noted|believe|believed|contend|maintain|warn|warned|point out|suggest|fear|feel|insist|claim)\b|\bit is (?:widely )?(?:believed|argued|felt|said)\b/gi;
+const UNNAMED = new RegExp(
+  [
+    // "critics argue", "observers and reports have frequently noted", "supporters of the party often say"
+    String.raw`\b(?:critics|supporters|observers|analysts|experts|commentators|opponents|detractors|proponents|skeptics|sceptics|stakeholders|watchers|insiders|sources|reports|many(?: \w+)?|some(?: \w+)?|others)(?:\s+(?:and|or)\s+\w+)?(?:\s+of\s+(?:the\s+)?\w+(?:\s+\w+)?)?\s+(?:have\s+|had\s+|would\s+|also\s+|often\s+|frequently\s+|long\s+|widely\s+|repeatedly\s+)*(?:argue|argued|say|said|note|noted|believe|believed|contend|contended|maintain|maintained|warn|warned|point(?:ed)? out|suggest|suggested|fear|feared|feel|felt|insist|insisted|claim|claimed|observe|observed|allege|alleged)\b`,
+    // "it is widely believed", "it has been noted"
+    String.raw`\bit (?:is|has been|was) (?:widely |often |generally )?(?:believed|argued|felt|said|noted|reported|claimed|alleged)\b`,
+    // "according to observers", "according to analysts"
+    String.raw`\baccording to (?:observers|analysts|critics|experts|sources|reports|commentators|many|some)\b`,
+  ].join('|'),
+  'gi'
+);
 
 const HOW = {
   unnamed:

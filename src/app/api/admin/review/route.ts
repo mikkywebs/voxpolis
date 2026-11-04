@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     const subjects = typed ? [typed] : suggestions.slice(0, 3);
     if (!subjects.length) return NextResponse.json({ ok: true, photos: [], subjects: [], suggestions });
     // Typed searches are free-form ("Iran flag", "Lagos protest"); automatic ones use the strict name rules.
-    const photos = await findPhotoOptions(subjects, 8, 9000, country.code === 'WORLD' ? undefined : country.name, !!typed);
+    const photos = await findPhotoOptions(subjects, 8, 9000, country.code === 'NG' ? 'Nigeria' : undefined, !!typed);
     return NextResponse.json({ ok: true, photos, subjects, suggestions });
   }
 

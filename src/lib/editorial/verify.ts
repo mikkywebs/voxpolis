@@ -40,7 +40,7 @@ Go through the draft sentence by sentence. Flag a sentence only when one of thes
 - not_in_sources: it states a fact, event, figure or claim that no report contains.
 - meaning_changed: it says something the reports say, but stronger, weaker or different (e.g. "said" became "admitted", "plans to" became "will", an allegation stated as fact, "about 300" became "300").
 - wrong_detail: a name, title, number, date or place differs from the reports.
-- unattributed_opinion: an opinion or argument given to unnamed people ("critics argue", "many believe") that the reports do not give.
+- unattributed_opinion: an opinion, argument or background claim credited to vague or unnamed sources ("critics argue", "many believe", "observers note", "reports have noted", "analysts say", "it is widely believed"). Flag these EVEN IF a report says something similar: the story must name who said it.
 - invented_reaction: a response, reaction or "other side" position that no report contains.
 - loaded_framing: emotive or one-sided wording the reports don't use, presented as the site's own voice.
 Do NOT flag: correct paraphrases; the labelled analysis section when it only interprets reported facts; stable, certain general background (e.g. what an institution does); sentences saying the reports did not include a response.

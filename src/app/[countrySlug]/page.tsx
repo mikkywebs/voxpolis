@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import LiveFeed from '@/components/feed/LiveFeed';
 import { articlePath } from '@/lib/paths';
-import { ALL_COUNTRIES, CountryConfig, findCountryBySlug, getCountrySlug, isFormerCountrySlug } from '@/config/countries';
-import { getLatestForCountry, getLatestWorld } from '@/lib/articles';
+import { ALL_COUNTRIES, CountryConfig, findCountryBySlug, getCountrySlug, formerCountryTarget, sectionOrderFor } from '@/config/countries';
+import { getLatestForCountry } from '@/lib/articles';
 import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
 
 export const revalidate = 300;
@@ -18,8 +18,9 @@ function resolve(slug: string): CountryConfig {
   // Old links like /ng → /nigeria
   const byCode = ALL_COUNTRIES.find((c) => c.code.toLowerCase() === slug.toLowerCase());
   if (byCode) permanentRedirect(`/${getCountrySlug(byCode)}`);
-  // Countries we no longer cover → World page.
-  if (isFormerCountrySlug(slug)) permanentRedirect('/world');
+  // Countries without their own section any more → Africa or World page.
+  const moved = formerCountryTarget(slug);
+  if (moved) permanentRedirect(moved);
   return notFound();
 }
 
@@ -42,7 +43,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CountryPage({ params }: Props) {
   const country = resolve(params.countrySlug);
-  const [articles, world] = await Promise.all([getLatestForCountry(country.code, 40), getLatestWorld(country.code, 24)]);
+  const [, second, third] = sectionOrderFor(country.code);
+  const [articles, more2, more3] = await Promise.all([getLatestForCountry(country.code, 40), getLatestForCountry(second, 8), getLatestForCountry(third, 8)]);
+  const world = [...more2, ...more3];
   const path = `/${getCountrySlug(country)}`;
 
   const ld = {
