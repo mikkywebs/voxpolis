@@ -2,8 +2,7 @@
 
 import Link from 'next/link';
 import SiteLogo from '@/components/branding/SiteLogo';
-import { COVERED_COUNTRY_CODES } from '@/config/coverage';
-import { getCountryByCode, getCountrySlug } from '@/config/countries';
+import { ALL_COUNTRIES, getCountrySlug } from '@/config/countries';
 
 export default function Footer() {
   return (
@@ -14,27 +13,23 @@ export default function Footer() {
           <SiteLogo variant="dark" className="h-12 sm:h-14 w-auto mx-auto" />
         </Link>
 
-        {/* Country pages: one crawlable link to each covered country (helps Google find every country page). */}
-        <nav aria-labelledby="footer-countries" className="space-y-2 max-w-4xl">
-          <h2 id="footer-countries" className="text-[11px] font-bold uppercase tracking-[0.15em] text-gray-500">
-            Political news by country
+        {/* Section pages: Nigeria, Africa, World (crawlable links for Google). */}
+        <nav aria-labelledby="footer-sections" className="space-y-2">
+          <h2 id="footer-sections" className="text-[11px] font-bold uppercase tracking-[0.15em] text-gray-500">
+            Political news
           </h2>
           <ul className="flex items-center justify-center flex-wrap gap-2 text-xs">
-            {COVERED_COUNTRY_CODES.map((code) => getCountryByCode(code))
-              .sort((x, y) => x.name.localeCompare(y.name))
-              .map((c) => (
-                <li key={c.code}>
-                  {/* The short code is for the eye; the country name stays in the link so Google knows the page is about that country. */}
-                  <Link
-                    href={`/${getCountrySlug(c)}`}
-                    title={`${c.name} political news`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-gray-800 hover:border-blue-500 px-2.5 py-1 text-gray-400 hover:text-white transition"
-                  >
-                    <span className="font-black tracking-wider text-gray-200">{c.code === 'GB' ? 'UK' : c.code}</span>
-                    <span>{c.name}</span>
-                  </Link>
-                </li>
-              ))}
+            {ALL_COUNTRIES.map((c) => (
+              <li key={c.code}>
+                <Link
+                  href={`/${getCountrySlug(c)}`}
+                  title={`${c.name} political news`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gray-800 hover:border-blue-500 px-3 py-1 text-gray-300 hover:text-white transition font-semibold"
+                >
+                  {c.name}
+                </Link>
+              </li>
+            ))}
           </ul>
         </nav>
 

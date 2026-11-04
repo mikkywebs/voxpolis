@@ -185,11 +185,24 @@ const KNOWN_COUNTRIES: CountryConfig[] = [
   { code: 'NZ', name: 'New Zealand', flag: '🇳🇿', capital: 'Wellington', lat: -41.2865, lon: 174.7762, continent: 'Oceania', region: 'Oceania', languages: [{ code: 'en', name: 'English' }] },
 ];
 
+/** "Africa": politics in African countries other than Nigeria, the African Union and ECOWAS. */
+export const AFRICA: CountryConfig = {
+  code: 'AFRICA',
+  name: 'Africa',
+  flag: '🌍',
+  capital: '',
+  lat: 0,
+  lon: 0,
+  continent: 'Africa',
+  region: 'Africa',
+  languages: [{ code: 'en', name: 'English' }],
+};
+
 /** "World": stories about countries we don't cover, and international affairs (wars, summits, sanctions). */
 export const WORLD: CountryConfig = {
   code: 'WORLD',
   name: 'World',
-  flag: '🌍',
+  flag: '🌐',
   capital: '',
   lat: 0,
   lon: 0,
@@ -203,7 +216,7 @@ export const WORLD: CountryConfig = {
  * Every list, menu and page on the site uses this, so adding a desk in coverage.ts adds the country everywhere.
  */
 export const ALL_COUNTRIES: CountryConfig[] = [
-  ...COVERED_COUNTRY_CODES.map((code) => KNOWN_COUNTRIES.find((c) => c.code === code)).filter((c): c is CountryConfig => !!c),
+  ...COVERED_COUNTRY_CODES.map((code) => (code === 'AFRICA' ? AFRICA : KNOWN_COUNTRIES.find((c) => c.code === code))).filter((c): c is CountryConfig => !!c),
   WORLD,
 ];
 
@@ -259,9 +272,13 @@ export function getGroupedRegions(): RegionGroup[] {
   return result;
 }
 
-/** A country we cover, or World for anything else. */
+/** One of the site's sections (Nigeria, Africa, World). Other country codes map to their section, e.g. GH → Africa, US → World. */
 export function getCountryByCode(code: string): CountryConfig {
-  return ALL_COUNTRIES.find((c) => c.code.toUpperCase() === (code || '').toUpperCase()) || WORLD;
+  const c = (code || '').toUpperCase();
+  const direct = ALL_COUNTRIES.find((x) => x.code === c);
+  if (direct) return direct;
+  const section = sectionForCountry(c);
+  return ALL_COUNTRIES.find((x) => x.code === section) || WORLD;
 }
 
 export function getCountrySlug(c: CountryConfig): string {
@@ -283,8 +300,33 @@ export function findCountryBySlug(slug: string): CountryConfig | undefined {
   return ALL_COUNTRIES.find((c) => getCountrySlug(c) === s);
 }
 
-/** A country we used to have a page for but no longer cover (e.g. /spain): its page now redirects to /world. */
-export function isFormerCountrySlug(slug: string): boolean {
+/**
+ * Where an old country page now lives: African countries → /africa, the rest → /world (e.g. /ghana → /africa, /spain → /world).
+ * Returns null when the slug isn't a known country.
+ */
+export function formerCountryTarget(slug: string): '/africa' | '/world' | null {
   const s = (slug || '').toLowerCase();
-  return KNOWN_COUNTRIES.some((c) => !isCoveredCountry(c.code) && (getCountrySlug(c) === s || c.code.toLowerCase() === s));
+  const c = KNOWN_COUNTRIES.find((x) => !isCoveredCountry(x.code) && (getCountrySlug(x) === s || x.code.toLowerCase() === s));
+  if (!c) return null;
+  return c.continent === 'Africa' ? '/africa' : '/world';
+}
+
+/** Section for a story about a given ISO country: Nigeria, other African countries → Africa, everything else → World. */
+export function sectionForCountry(iso?: string | null): 'NG' | 'AFRICA' | 'WORLD' {
+  const code = (iso || '').toUpperCase();
+  if (code === 'NG') return 'NG';
+  if (code === 'AFRICA') return 'AFRICA';
+  const c = KNOWN_COUNTRIES.find((x) => x.code === code);
+  return c?.continent === 'Africa' ? 'AFRICA' : 'WORLD';
+}
+
+/**
+ * The order of sections for a visitor (decided by the visitor's country, from their IP address):
+ * Nigeria → Nigeria, Africa, World. Rest of Africa → Africa, Nigeria, World. Elsewhere → World, Africa, Nigeria.
+ */
+export function sectionOrderFor(visitorIso?: string | null): ('NG' | 'AFRICA' | 'WORLD')[] {
+  const s = sectionForCountry(visitorIso);
+  if (s === 'NG') return ['NG', 'AFRICA', 'WORLD'];
+  if (s === 'AFRICA') return ['AFRICA', 'NG', 'WORLD'];
+  return ['WORLD', 'AFRICA', 'NG'];
 }

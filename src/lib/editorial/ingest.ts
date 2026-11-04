@@ -61,7 +61,9 @@ async function log(desk: string, o: IngestOutcome, durationMs: number) {
   }
 }
 
-const DAILY_TOTAL_CAP = Number(process.env.INGEST_DAILY_CAP || 40);
+const DAILY_TOTAL_CAP = Number(process.env.INGEST_DAILY_CAP || 30);
+// AI attempts per desk per day (a rejected draft still uses the AI): at most 2 tries per draft we want.
+const ATTEMPTS_PER_DRAFT = 2;
 
 /**
  * How many new drafts this desk may still make right now.
@@ -71,15 +73,25 @@ async function remainingToday(desk: CoverageDesk): Promise<{ allowed: number; no
   const dayStart = new Date();
   dayStart.setUTCHours(0, 0, 0, 0);
   const since = dayStart.toISOString();
-  const [{ count: deskCount }, { count: totalCount }] = await Promise.all([
+  const [{ count: deskCount }, { count: totalCount }, { count: attempts }] = await Promise.all([
     supabaseAdmin.from('ingest_log').select('id', { count: 'exact', head: true }).eq('desk', desk.code).eq('outcome', 'published').gte('created_at', since),
     supabaseAdmin.from('ingest_log').select('id', { count: 'exact', head: true }).eq('outcome', 'published').gte('created_at', since),
+    // Stories the AI actually wrote today (published or rejected after writing), not ones skipped before writing.
+    supabaseAdmin
+      .from('ingest_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('desk', desk.code)
+      .in('outcome', ['published', 'rejected', 'error'])
+      .not('reason', 'like', 'source:%')
+      .not('reason', 'like', 'skipped before writing%')
+      .gte('created_at', since),
   ]);
+  const attemptsLeft = desk.dailyCap * ATTEMPTS_PER_DRAFT - (attempts || 0);
   const hour = new Date().getUTCHours();
   const pacedDesk = Math.ceil((desk.dailyCap * (hour + 1)) / 24);
   const pacedTotal = Math.ceil((DAILY_TOTAL_CAP * (hour + 1)) / 24);
-  const allowed = Math.max(0, Math.min(pacedDesk - (deskCount || 0), pacedTotal - (totalCount || 0), desk.dailyCap - (deskCount || 0), DAILY_TOTAL_CAP - (totalCount || 0)));
-  return { allowed, note: `today: desk ${deskCount || 0}/${desk.dailyCap}, all desks ${totalCount || 0}/${DAILY_TOTAL_CAP}` };
+  const allowed = Math.max(0, Math.min(pacedDesk - (deskCount || 0), pacedTotal - (totalCount || 0), desk.dailyCap - (deskCount || 0), DAILY_TOTAL_CAP - (totalCount || 0), attemptsLeft));
+  return { allowed, note: `today: desk ${deskCount || 0}/${desk.dailyCap}, all desks ${totalCount || 0}/${DAILY_TOTAL_CAP}, AI attempts left ${Math.max(0, attemptsLeft)}` };
 }
 
 /** Rank: stories carried by several outlets first, then newest. */
@@ -176,12 +188,13 @@ interface SameEvent {
 }
 
 /** A draft or story from the last 36 hours, same country, about the same event. */
-async function findSameEvent(country: string, text: string): Promise<SameEvent | null> {
+async function findSameEvent(country: string | null, text: string): Promise<SameEvent | null> {
   const since = new Date(Date.now() - 36 * 3600_000).toISOString();
-  const { data } = await supabaseAdmin
+  let q = supabaseAdmin
     .from('articles')
-    .select('id, slug, title, dek, key_points, lead, review_status, created_at, updated_at, checked_items, sources, source_url, source_name')
-    .eq('country_code', country)
+    .select('id, slug, title, dek, key_points, lead, review_status, created_at, updated_at, checked_items, sources, source_url, source_name');
+  if (country) q = q.eq('country_code', country);
+  const { data } = await q
     .in('review_status', ['pending', 'approved'])
     .gte('created_at', since)
     .order('created_at', { ascending: false })
@@ -353,7 +366,7 @@ async function writeAndSave(desk: CoverageDesk, used: UsedSource[], deadline: nu
   const early = await findSameEvent(piece.country_iso, eventText);
   const photo = early
     ? null
-    : await findLicensedPhoto([...piece.image_subjects, ...piece.actors.slice(0, 2)], PHOTO_BUDGET_MS, undefined, piece.country_iso === 'WORLD' ? undefined : getCountryByCode(piece.country_iso).name);
+    : await findLicensedPhoto([...piece.image_subjects, ...piece.actors.slice(0, 2)], PHOTO_BUDGET_MS, undefined, piece.country_iso === 'NG' ? 'Nigeria' : undefined);
 
   const decision = await oneAtATime(async () => {
     const same = early || (await findSameEvent(piece.country_iso, eventText));
@@ -438,6 +451,25 @@ async function mergeIntoExisting(
   return { ...base, outcome: 'merged', slug: same.slug, country, reason: `added as extra source to ${same.slug}` };
 }
 
+// Opinion columns, editorials and op-eds are not news: never rewrite them as news stories.
+const OPINION_URL = /\/(opinion|opinions|columns?|columnists?|editorials?|op-?eds?|commentary|letters)\//i;
+const OPINION_TITLE = /^(opinion|editorial|op-?ed|column|comment|letter)\s*[:|\-–]/i;
+function looksLikeOpinion(item: FeedItem, text = ''): boolean {
+  if (OPINION_URL.test(item.url) || OPINION_TITLE.test(item.title)) return true;
+  // Many sites print "Opinion" (with the date and columnist's name) at the top of the article text.
+  return /\b(opinion|editorial|op-?ed|column(ist)?)\b/i.test(text.slice(0, 220));
+}
+
+/** Another outlet's report of an event we already have: add it as an extra source, without spending AI on a rewrite. */
+async function addAsSource(same: SameEvent, item: FeedItem) {
+  if (same.sources.some((x) => x.url === item.url)) return;
+  const sources = [...same.sources, { name: item.sourceName, url: item.url }].slice(0, 8);
+  await supabaseAdmin
+    .from('articles')
+    .update({ sources, ...(same.touched ? { new_reports_at: new Date().toISOString() } : {}) })
+    .eq('id', same.id);
+}
+
 export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadlineMs?: number } = {}): Promise<IngestReport> {
   const started = Date.now();
   const deadline = started + (opts.deadlineMs ?? 50_000);
@@ -449,7 +481,7 @@ export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadline
 
   const { items, errors } = await readFeeds(desk.feeds);
   const cutoff = Date.now() - MAX_AGE_HOURS * 3600_000;
-  const fresh = items.filter((i) => new Date(i.publishedAt).getTime() >= cutoff && !/news\.google\.com/.test(i.url) && looksPolitical(i));
+  const fresh = items.filter((i) => new Date(i.publishedAt).getTime() >= cutoff && !/news\.google\.com/.test(i.url) && looksPolitical(i) && !looksLikeOpinion(i));
   const handled = await alreadyHandled(fresh.map((i) => i.url));
   const ranked = rankCandidates(fresh.filter((i) => !handled.has(i.url)));
 
@@ -485,6 +517,18 @@ export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadline
       await record({ url: primary.url, source: primary.sourceName, outcome: 'rejected', reason: `source: ${ps.reason}` }, t0);
       continue;
     }
+    if (looksLikeOpinion(primary, ps.text)) {
+      await record({ url: primary.url, source: primary.sourceName, outcome: 'rejected', reason: 'source: opinion column, not news' }, t0);
+      continue;
+    }
+    // Already covered (any section)? Add this outlet to that story instead of spending AI on a new draft.
+    const already = await findSameEvent(desk.code === 'NG' ? 'NG' : null, `${primary.title}. ${primary.description || ''}`);
+    if (already) {
+      await addAsSource(already, primary);
+      await record({ url: primary.url, source: primary.sourceName, outcome: 'merged', reason: `skipped before writing: added as source to ${already.slug}` }, t0);
+      usedUrls.add(primary.url);
+      continue;
+    }
     const used: UsedSource[] = [{ item: primary, src: ps }];
     for (const c of rest) {
       const cs = byUrl.get(c.url);
@@ -497,8 +541,9 @@ export async function runDesk(desk: CoverageDesk, opts: { max?: number; deadline
   // Step 2: write the best stories with AI, in parallel rounds, until the target or the time budget is reached.
   let published = 0;
   let next = 0;
-  while (published < max && next < ready.length && Date.now() < deadline - AI_BUDGET_MS) {
-    const batch = ready.slice(next, next + (max - published));
+  const maxTries = max + 1; // one spare try per run, so rejections can't use up the free AI allowance
+  while (published < max && next < ready.length && next < maxTries && Date.now() < deadline - AI_BUDGET_MS) {
+    const batch = ready.slice(next, Math.min(next + (max - published), maxTries));
     next += batch.length;
     const t1 = Date.now();
     const done = await Promise.all(batch.map((used) => writeAndSave(desk, used, deadline)));

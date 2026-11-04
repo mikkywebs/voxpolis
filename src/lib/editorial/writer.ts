@@ -1,6 +1,6 @@
 import { callNewsroomLLM, parseJsonReply } from './llm';
 import { findConsecutiveWordOverlaps } from '@/lib/pipeline/overlap';
-import { ALL_COUNTRIES } from '@/config/countries';
+import { ALL_COUNTRIES, sectionForCountry } from '@/config/countries';
 
 /**
  * The Voxpolis writer (v3).
@@ -81,7 +81,7 @@ WRITING
 HARD RULES
 1. ORIGINAL WORDS. Never copy 7 or more consecutive words from any report, except short quotes in quotation marks with attribution (max 2 quotes, each under 20 words).
 2. FACTS ONLY FROM THE REPORTS. Keep names, titles, numbers, dates and places exact. Never invent quotes, reactions, figures, critics or outcomes. You may add stable, widely known context only if certain (e.g. the role of an institution).
-   NO UNNAMED VOICES: never write "critics argue", "supporters say", "observers note", "analysts believe", "many Nigerians feel" or similar unless a report says it and names or quotes them. Write who said it.
+   NO UNNAMED VOICES: never write "critics argue", "supporters say", "observers note", "reports have noted", "analysts believe", "it is widely believed", "many Nigerians feel" or similar. Every claim, opinion or background point names who said or reported it (a person, party, institution or the outlet). If you can't name the source, leave it out.
 3a. SAME MEANING, NEW WORDS. Rewording must not change the meaning. Do not strengthen or soften: "said" stays said (not admitted, claimed, slammed, conceded); "alleged" stays alleged; "about 320,000" keeps "about"; "plans to" is not "will". Do not add drama or adjectives the reports don't support (mounting pressure, soaring, intense, deep concern, fierce). Keep what is reported as fact separate from what someone claims.
 3. COMBINE SOURCES. Report 1 is the main story. Use details from every other report about the SAME development; completely ignore any report that is about a different event. If reports disagree on a fact, say so and attribute each version ("Punch put the figure at X; Vanguard reported Y").
 4. ATTRIBUTE every claim to who made it. Separate confirmed facts from allegations.
@@ -143,9 +143,9 @@ function words(s: string) {
 
 export async function writeVoxpolisArticle(input: { sources: SourceInput[]; deskCountry: string }): Promise<EditorialPiece> {
   const countryHint =
-    `COUNTRY: set country_iso to the ONE country whose own domestic politics the story is mainly about, using one of these codes: ${ALL_COUNTRIES.filter((c) => c.code !== 'WORLD').map((c) => c.code).join(', ')}. ` +
-    `Use "WORLD" when the story is mainly about another country (e.g. Iran, France, China), or about relations between countries (wars, strikes, summits, sanctions, treaties), even if it was reported by an outlet from one of these countries.` +
-    (input.deskCountry === 'WORLD' ? ' These reports came from an international desk.' : ` These reports came from the ${input.deskCountry} desk, but only use "${input.deskCountry}" if the story is about ${input.deskCountry}'s own politics.`);
+    'SECTION (country_iso): "NG" when the story is about Nigeria\'s own politics; "AFRICA" when it is mainly about another African country, ' +
+    'the African Union or ECOWAS; "WORLD" for everything else, including relations between countries (wars, strikes, summits, sanctions) ' +
+    `even if a Nigerian outlet reported it. These reports came from the ${input.deskCountry} desk.`;
 
   // Keep the prompt within budget: the lead source gets the most room.
   const budget = [7000, 4000, 3000, 2500];
@@ -193,7 +193,7 @@ ${reports}`;
 
   return {
     is_political: raw.is_political !== false,
-    country_iso: ((c) => (ALL_COUNTRIES.some((x) => x.code === c) ? c : 'WORLD'))(str(raw.country_iso).toUpperCase().trim()),
+    country_iso: sectionForCountry(str(raw.country_iso).toUpperCase().trim()),
     importance: Math.max(1, Math.min(10, Number(raw.importance) || 5)),
     story_type: STORY_TYPES.includes(raw.story_type) ? raw.story_type : 'development',
     headline: str(raw.headline),

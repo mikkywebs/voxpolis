@@ -43,7 +43,7 @@ export default function LeftWidgetRail({
 
   useEffect(() => {
     let isMounted = true;
-    if (country.code === 'WORLD') return;
+    if (country.code !== 'NG') return; // weather only for Nigeria (Abuja); Africa and World are regions
     async function loadWeather() {
       try {
         const res = await fetch(`/api/weather?country=${country.code}&lat=${country.lat}&lon=${country.lon}`);
@@ -78,7 +78,7 @@ export default function LeftWidgetRail({
   if (variant === 'mobile_strip') {
     return (
       <div className="w-full space-y-3 lg:hidden my-4">
-        {country.code !== 'WORLD' && (
+        {country.code === 'NG' && (
           <>
         {/* Compact Weather Bar */}
         <div className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3.5 shadow-xs flex items-center justify-between">
@@ -116,7 +116,7 @@ export default function LeftWidgetRail({
   // Desktop Left Widget Rail
   return (
     <aside className="w-full space-y-4">
-      {country.code !== 'WORLD' && (
+      {country.code === 'NG' && (
         <>
       {/* Widget 1: Local Weather & Air Quality Card */}
       <section className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-xs transition-colors">
