@@ -1,10 +1,10 @@
 /**
  * Voxpolis coverage plan.
  *
- * Focus (Nov 2026): Nigeria ~80%, Africa ~10%, World ~10%.
+ * Focus (Nov 2026): at most 20 Nigeria, 5 Africa, 5 World drafts a day (maximums, not targets).
  * Three desks: NG (Nigerian politics), AFRICA (politics in other African countries, AU, ECOWAS),
  * WORLD (everything else, and relations between countries).
- * Sized to stay inside the free AI allowance: about 10 drafts a day in total (INGEST_DAILY_CAP),
+ * Sized for the free AI allowance: at most 30 drafts a day in total (INGEST_DAILY_CAP),
  * paced through the day, with a cap on AI attempts so rejected drafts can't use up the allowance.
  * Feeds must be direct publisher feeds (not Google News redirect links),
  * otherwise the article page can't be read and rewritten.
@@ -28,7 +28,7 @@ export interface CoverageDesk {
 export const COVERAGE: CoverageDesk[] = [
   {
     // Several outlets so different leanings balance each other; official statements come through their reports.
-    code: 'NG', tier: 1, maxPerRun: 1, dailyCap: 8,
+    code: 'NG', tier: 1, maxPerRun: 2, dailyCap: 20,
     feeds: [
       { name: 'Premium Times', url: 'https://www.premiumtimesng.com/category/news/politics/feed' },
       { name: 'Punch', url: 'https://punchng.com/topics/politics/feed/' },
@@ -40,7 +40,7 @@ export const COVERAGE: CoverageDesk[] = [
   },
   {
     // Politics in other African countries, the African Union and ECOWAS.
-    code: 'AFRICA', tier: 1, maxPerRun: 1, dailyCap: 1,
+    code: 'AFRICA', tier: 1, maxPerRun: 1, dailyCap: 5,
     feeds: [
       { name: 'BBC News Africa', url: 'https://feeds.bbci.co.uk/news/world/africa/rss.xml' },
       { name: 'The Africa Report', url: 'https://www.theafricareport.com/feed/' },
@@ -50,7 +50,7 @@ export const COVERAGE: CoverageDesk[] = [
     ],
   },
   {
-    code: 'WORLD', tier: 1, maxPerRun: 1, dailyCap: 1,
+    code: 'WORLD', tier: 1, maxPerRun: 1, dailyCap: 5,
     feeds: [
       { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
       { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },

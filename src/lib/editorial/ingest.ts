@@ -61,9 +61,9 @@ async function log(desk: string, o: IngestOutcome, durationMs: number) {
   }
 }
 
-const DAILY_TOTAL_CAP = Number(process.env.INGEST_DAILY_CAP || 10);
-// AI attempts per desk per day (a rejected draft still uses the AI): at most 3 tries per draft we want.
-const ATTEMPTS_PER_DRAFT = 3;
+const DAILY_TOTAL_CAP = Number(process.env.INGEST_DAILY_CAP || 30);
+// AI attempts per desk per day (a rejected draft still uses the AI): at most 2 tries per draft we want.
+const ATTEMPTS_PER_DRAFT = 2;
 
 /**
  * How many new drafts this desk may still make right now.
