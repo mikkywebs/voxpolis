@@ -28,14 +28,24 @@ export async function GET(req: NextRequest) {
   if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const status = req.nextUrl.searchParams.get('status') || 'pending';
-  const { data, error } = await supabaseAdmin
+  const attention = status === 'approved' && req.nextUrl.searchParams.get('attention') === '1';
+  const { data: rows, error } = await supabaseAdmin
     .from('articles')
     .select(FIELDS)
     .eq('review_status', status)
     .order(status === 'pending' ? 'importance' : 'reviewed_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
-    .limit(60);
+    .limit(status === 'approved' ? 500 : 60);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Published stories that need attention: anything red or amber, worst first (see checkStory).
+  const RANK = { stop: 0, check: 1, ready: 2 } as Record<string, number>;
+  const checked = (rows || []).map((a: any) => ({ a, c: checkStory(a) }));
+  const needs = checked.filter((x) => x.c.level !== 'ready');
+  const attentionCount = status === 'approved' ? needs.length : undefined;
+  const data = attention
+    ? needs.sort((x, y) => RANK[x.c.level] - RANK[y.c.level] || y.c.items.length - x.c.items.length).map((x) => x.a)
+    : (rows || []).slice(0, 60);
 
   const ids = (data || []).map((a: any) => a.id);
   const { data: polls } = ids.length
@@ -50,6 +60,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     editor: auth.name,
     counts: tally,
+    attentionCount,
     // source_facts go to the browser too, so the checker can run live while the editor types.
     articles: (data || []).map((a: any) => ({ ...a, poll_question: pollMap.get(a.id) || '', checks: checkStory(a) })),
   });

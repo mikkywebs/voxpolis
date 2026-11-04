@@ -51,6 +51,7 @@ export interface CheckInput {
   new_reports_at?: string | null;
   category?: string | null;
   origin?: string | null;
+  editorial_version?: number | null;
   fidelity?: {
     checked_at: string;
     status: 'done' | 'no_sources' | 'failed';
@@ -192,6 +193,15 @@ export function checkStory(a: CheckInput): CheckResult {
         });
     }
   });
+
+  if (a.editorial_version != null && a.editorial_version < 3)
+    items.push({
+      level: 'check',
+      field: 'story',
+      text: 'Older story, written before the current quality rules (often one source, no accuracy check).',
+      how: 'Press "Check accuracy" and "Fix all", then read it once. If it is thin or out of date, Unpublish it: a few strong stories help Google and AdSense more than many weak ones. When it is good, press "It\'s correct".',
+      key: 'oldformat',
+    });
 
   if (a.new_reports_at)
     items.push({
