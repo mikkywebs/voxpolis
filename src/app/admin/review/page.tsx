@@ -1003,6 +1003,8 @@ export default function ReviewPage() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(false);
+  const [attention, setAttention] = useState(false);
+  const [attentionCount, setAttentionCount] = useState<number | null>(null);
   const [newId, setNewId] = useState('');
   const [nw, setNw] = useState({ open: false, title: '', country: 'NG', category: 'politics', busy: false, err: '' });
 
@@ -1039,18 +1041,19 @@ export default function ReviewPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/admin/review?status=${status}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+      const res = await fetch(`/api/admin/review?status=${status}${status === 'approved' && attention ? '&attention=1' : ''}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not load stories');
       setStories(d.articles);
       setCounts(d.counts || {});
+      if (typeof d.attentionCount === 'number') setAttentionCount(d.attentionCount);
       setEditor(d.editor || '');
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [token, status]);
+  }, [token, status, attention]);
 
   useEffect(() => {
     load();
@@ -1150,6 +1153,31 @@ export default function ReviewPage() {
             </button>
           ))}
         </nav>
+
+        {status === 'approved' && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <button
+              type="button"
+              onClick={() => setAttention(false)}
+              className={`px-3 py-1.5 rounded-lg font-bold ${!attention ? 'bg-gray-200 dark:bg-gray-800' : 'text-gray-600'}`}
+            >
+              Latest
+            </button>
+            <button
+              type="button"
+              onClick={() => setAttention(true)}
+              className={`px-3 py-1.5 rounded-lg font-bold ${attention ? 'bg-amber-100 text-amber-900' : 'text-amber-700'}`}
+            >
+              ⚠ Needs attention {attentionCount != null && `(${attentionCount})`}
+            </button>
+            {attention && (
+              <p className="w-full text-xs text-gray-600 dark:text-gray-400">
+                Published stories with red or amber items, worst first. For each one: press <strong>Fix all</strong> and check it, or <strong>Unpublish</strong>{' '}
+                if it is thin or out of date. Fewer, stronger stories help Google and AdSense more than many weak ones.
+              </p>
+            )}
+          </div>
+        )}
 
         {toast && (
           <div className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm px-4 py-2" role="status">
