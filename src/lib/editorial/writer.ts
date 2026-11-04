@@ -147,6 +147,17 @@ export async function writeVoxpolisArticle(input: { sources: SourceInput[]; desk
     'the African Union or ECOWAS; "WORLD" for everything else, including relations between countries (wars, strikes, summits, sanctions) ' +
     `even if a Nigerian outlet reported it. These reports came from the ${input.deskCountry} desk.`;
 
+  // Keep the prompt within budget: the lead source gets the most room.
+  const budget = [7000, 4000, 3000, 2500];
+  const reports = input.sources
+    .slice(0, 4)
+    .map(
+      (s, i) => `--- REPORT ${i + 1}: ${s.name}${s.publishedAt ? ` (${s.publishedAt.slice(0, 10)})` : ''}
+Headline: ${s.title}
+${s.text.slice(0, budget[i])}`
+    )
+    .join('\n\n');
+
   const user = `${countryHint}
 Today: ${new Date().toISOString().slice(0, 10)}
 Number of reports: ${Math.min(input.sources.length, 4)}
