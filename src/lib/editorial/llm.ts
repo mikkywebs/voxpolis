@@ -163,6 +163,17 @@ async function callOpenAICompatible(
   }
 }
 
+/** Kimi keys from platform.moonshot.ai only work on the international address; China keys on .cn. Try the right one first. */
+async function callKimi(system: string, user: string, notes: string[]): Promise<LLMResult | null> {
+  const bases = process.env.KIMI_BASE_URL ? [process.env.KIMI_BASE_URL] : ['https://api.moonshot.ai/v1', 'https://api.moonshot.cn/v1'];
+  for (const [i, base] of bases.entries()) {
+    const name = i === 0 ? 'kimi' : 'kimi-cn';
+    const r = await callOpenAICompatible(name, `${base.replace(/\/$/, '')}/chat/completions`, process.env.KIMI_API_KEY, process.env.KIMI_MODEL || 'moonshot-v1-32k', system, user, notes);
+    if (r) return r;
+  }
+  return null;
+}
+
 export async function callNewsroomLLM(system: string, user: string, schema?: object): Promise<LLMResult> {
   const notes: string[] = [];
   const result =
@@ -176,15 +187,7 @@ export async function callNewsroomLLM(system: string, user: string, schema?: obj
       user,
       notes
     )) ||
-    (await callOpenAICompatible(
-      'kimi',
-      `${(process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1').replace(/\/$/, '')}/chat/completions`,
-      process.env.KIMI_API_KEY,
-      process.env.KIMI_MODEL || 'moonshot-v1-32k',
-      system,
-      user,
-      notes
-    ));
+    (await callKimi(system, user, notes));
 
   if (!result) {
     throw new Error(`No AI provider answered: ${notes.join(' | ') || 'no keys set (GOOGLE_STUDIO_API_KEY / DEEPSEEK_API_KEY / KIMI_API_KEY)'}`);
