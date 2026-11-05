@@ -81,7 +81,8 @@ async function remainingToday(desk: CoverageDesk): Promise<{ allowed: number; no
       .from('ingest_log')
       .select('id', { count: 'exact', head: true })
       .eq('desk', desk.code)
-      .in('outcome', ['published', 'rejected', 'error'])
+      // AI outages ('error') don't count: nothing was written.
+      .in('outcome', ['published', 'rejected'])
       .not('reason', 'like', 'source:%')
       .not('reason', 'like', 'skipped before writing%')
       .gte('created_at', since),
