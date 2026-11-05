@@ -166,7 +166,8 @@ async function callOpenAICompatible(
 /** Kimi keys from platform.moonshot.ai only work on the international address; China keys on .cn. Try the right one first. */
 async function callKimi(system: string, user: string, notes: string[]): Promise<LLMResult | null> {
   const bases = process.env.KIMI_BASE_URL ? [process.env.KIMI_BASE_URL] : ['https://api.moonshot.ai/v1', 'https://api.moonshot.cn/v1'];
-  for (const [i, base] of bases.entries()) {
+  for (let i = 0; i < bases.length; i++) {
+    const base = bases[i];
     const name = i === 0 ? 'kimi' : 'kimi-cn';
     const r = await callOpenAICompatible(name, `${base.replace(/\/$/, '')}/chat/completions`, process.env.KIMI_API_KEY, process.env.KIMI_MODEL || 'moonshot-v1-32k', system, user, notes);
     if (r) return r;
