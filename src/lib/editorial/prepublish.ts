@@ -48,6 +48,7 @@ export interface CheckInput {
   image_credit?: string | null;
   meta_description?: string | null;
   checked_items?: string[] | null;
+  review_status?: string | null;
   new_reports_at?: string | null;
   category?: string | null;
   origin?: string | null;
@@ -143,8 +144,16 @@ export function checkStory(a: CheckInput): CheckResult {
 
   // --- Whole story ---
   if (words < 200) items.push({ level: 'stop', field: firstField, text: `The story is only ${words} words. Add facts from the original report, or discard it.` });
+  // Stale news: only for drafts that aren't published yet, and only as a reminder (amber), never a block.
   const ageH = (Date.now() - new Date(a.created_at).getTime()) / 3600_000;
-  if (ageH > 72) items.push({ level: 'stop', field: 'story', text: `This draft is ${Math.round(ageH / 24)} days old. Check the story hasn't moved on before publishing.` });
+  if (a.review_status !== 'approved' && ageH > 72)
+    items.push({
+      level: 'check',
+      field: 'story',
+      text: `This draft is ${Math.round(ageH / 24)} days old.`,
+      how: 'Check the story hasn\'t moved on (new developments, a response, a correction). Update it if needed, then press "It\'s correct".',
+      key: `stale:${a.created_at.slice(0, 10)}`,
+    });
   if (!(a.sources?.length || a.source_url?.startsWith('http')))
     items.push({ level: 'stop', field: 'sources', text: 'No original report is linked. Every story must credit its source.' });
   else if ((a.sources?.length || 1) === 1) items.push({ level: 'tip', field: 'sources', text: 'Only one outlet is used. Take extra care with names and numbers.' });
