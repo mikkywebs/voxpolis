@@ -20,7 +20,7 @@ const MIN_IMPORTANCE = Number(process.env.INGEST_MIN_IMPORTANCE || 6);
 const RETRY_AFTER_HOURS = 72;
 // Time budget inside one 60s serverless call: feeds ≤8s, reading articles ≤12s, AI writing ≤34s.
 const EXTRACT_BUDGET_MS = 12_000;
-const AI_BUDGET_MS = 34_000;
+const AI_BUDGET_MS = 50_000; // Gemma can take up to 45s
 const PHOTO_BUDGET_MS = 4_000;
 
 export interface IngestOutcome {

@@ -5,7 +5,7 @@ import { runDesk } from '@/lib/editorial/ingest';
 import { getCountryByCode, getCountrySlug } from '@/config/countries';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * Runs ONE coverage desk.
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   if (!desk) return NextResponse.json({ error: `Unknown desk "${code}"` }, { status: 400 });
 
   const maxParam = Number(req.nextUrl.searchParams.get('max'));
-  const report = await runDesk(desk, { max: maxParam > 0 ? Math.min(maxParam, 5) : undefined, deadlineMs: 57_000 });
+  const report = await runDesk(desk, { max: maxParam > 0 ? Math.min(maxParam, 5) : undefined, deadlineMs: 115_000 });
 
   if (report.published > 0) {
     revalidatePath('/');

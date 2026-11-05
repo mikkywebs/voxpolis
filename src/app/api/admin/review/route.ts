@@ -11,7 +11,7 @@ import { namesIn } from '@/lib/editorial/facts';
 import { checkStory } from '@/lib/editorial/prepublish';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * Editor review queue.

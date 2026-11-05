@@ -1,6 +1,6 @@
 /**
  * Thin multi-provider LLM client for the newsroom.
- * Order: Gemini → DeepSeek → Kimi. The first one with a key that answers wins.
+ * Order: Gemini (Flash-Lite, Gemma 3, Flash) → Groq → DeepSeek → Kimi. The first one with a key that answers wins.
  * Models are configurable with env vars so you never need a code change
  * when a provider renames a model.
  *
@@ -17,9 +17,9 @@ export interface LLMResult {
 
 const TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS || 28_000);
 
-async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>, ms = TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), ms);
   try {
     return await fn(controller.signal);
   } finally {
@@ -43,7 +43,8 @@ async function callGemini(system: string, user: string, notes: string[], schema?
   }
   // Lite first: fast and reliable within our time budget. Each model has its own free daily allowance,
   // so several models give more free capacity. Override with GEMINI_MODELS.
-  const models = (process.env.GEMINI_MODELS || 'gemini-flash-lite-latest,gemini-2.5-flash-lite,gemini-flash-latest,gemini-2.5-flash')
+  // Gemma 3 (Google's open model) has a very large free allowance (about 14,400 requests a day) on the same key.
+  const models = (process.env.GEMINI_MODELS || 'gemini-flash-lite-latest,gemma-3-27b-it,gemini-flash-latest')
     .split(',')
     .map((m) => m.trim())
     .filter(Boolean);
@@ -56,8 +57,30 @@ async function callGemini(system: string, user: string, notes: string[], schema?
       continue;
     }
     const t0 = Date.now();
+    const gemma = model.startsWith('gemma');
     const attempt = async (withThinking: boolean, withSchema: boolean) =>
-      withTimeout((signal) =>
+      gemma
+        ? // Gemma takes no system instruction, JSON mode or thinking settings: instructions go first in the message
+          // and the JSON is read from the reply. It is slower, so it gets more time.
+          withTimeout(
+            (signal) =>
+              fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+                method: 'POST',
+                signal,
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+                body: JSON.stringify({
+                  contents: [
+                    {
+                      role: 'user',
+                      parts: [{ text: `${system}\n\nReply with ONE JSON object only, no other text.${schema ? `\nJSON fields (schema): ${JSON.stringify(schema)}` : ''}\n\n${user}` }],
+                    },
+                  ],
+                  generationConfig: { temperature: 0.4, maxOutputTokens: 8192 },
+                }),
+              }),
+            Number(process.env.GEMMA_TIMEOUT_MS || 45_000)
+          )
+        : withTimeout((signal) =>
         fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: 'POST',
           signal,
@@ -78,12 +101,12 @@ async function callGemini(system: string, user: string, notes: string[], schema?
       );
     try {
       let res = await attempt(thinkingBudget >= 0, true);
-      if (res.status === 400 && thinkingBudget >= 0) {
+      if (!gemma && res.status === 400 && thinkingBudget >= 0) {
         // Model doesn't accept a thinking budget: retry without it.
         notes.push(`gemini:${model} 400 with thinkingBudget (${(await res.clone().text()).slice(0, 60).replace(/\s+/g, ' ')})`);
         res = await attempt(false, true);
       }
-      if (res.status === 400 && schema) {
+      if (!gemma && res.status === 400 && schema) {
         // Model doesn't accept the output template: plain JSON mode still works (parser repairs small slips).
         notes.push(`gemini:${model} 400 with schema (${(await res.clone().text()).slice(0, 60).replace(/\s+/g, ' ')})`);
         res = await attempt(false, false);
@@ -93,6 +116,8 @@ async function callGemini(system: string, user: string, notes: string[], schema?
         notes.push(`gemini:${model} busy (503), retrying`);
         await sleep(2500);
         res = await attempt(thinkingBudget >= 0, true);
+        // Still busy: skip this model for 15 minutes so the next runs go straight to the others.
+        if (res.status === 503) rest(`gemini:${model}`, 15);
       }
       if (!res.ok) {
         if (res.status === 429) rest(`gemini:${model}`, 60);
@@ -179,6 +204,16 @@ export async function callNewsroomLLM(system: string, user: string, schema?: obj
   const notes: string[] = [];
   const result =
     (await callGemini(system, user, notes, schema)) ||
+    // Groq: free plan, no card (about 1,000 requests and 100K tokens a day on Llama 3.3 70B). Needs GROQ_API_KEY.
+    (await callOpenAICompatible(
+      'groq',
+      'https://api.groq.com/openai/v1/chat/completions',
+      process.env.GROQ_API_KEY,
+      process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      system,
+      user,
+      notes
+    )) ||
     (await callOpenAICompatible(
       'deepseek',
       'https://api.deepseek.com/chat/completions',
