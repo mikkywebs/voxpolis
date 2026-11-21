@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import SiteLogo from '@/components/branding/SiteLogo';
 import RegionalCountrySelectorModal from '@/components/layout/RegionalCountrySelectorModal';
 import AuthPromptModal from '@/components/auth/AuthPromptModal';
@@ -46,6 +46,9 @@ export default function Header({
   const [memberSince, setMemberSince] = useState<string | null>(null);
 
   const countryDropdownRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname() || '/';
+  // Inside a section (/nigeria, /africa, /world and their stories) show its name; elsewhere just "Sections".
+  const inSection = pathname.startsWith(`/${getCountrySlug(selectedCountry)}`);
 
   // Seamless country switcher: saves preferences and opens the dedicated country landing page
   const handleCountrySelect = (c: CountryConfig) => {
@@ -230,9 +233,7 @@ export default function Header({
               className="flex items-center gap-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 hover:from-blue-100 hover:to-indigo-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs font-extrabold px-3 py-1.5 rounded-xl border border-blue-300 dark:border-gray-600 shadow-sm transition cursor-pointer shrink-0"
               title="Choose a section"
             >
-              <span className="text-base leading-none">{selectedCountry.flag}</span>
-              <span className="font-bold">{selectedCountry.code}</span>
-              <span className="hidden md:inline font-semibold">{selectedCountry.name}</span>
+              <span className="font-bold">{inSection ? selectedCountry.name : 'Sections'}</span>
               <ChevronDown className={`w-3.5 h-3.5 text-blue-600 dark:text-blue-400 transition-transform ${isCountryDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
