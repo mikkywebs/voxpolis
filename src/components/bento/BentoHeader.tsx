@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import SiteLogo from '@/components/branding/SiteLogo';
-import { CountryConfig } from '@/config/countries';
+import { CountryConfig, getCountrySlug } from '@/config/countries';
 import { Sun, Moon, Search, ChevronDown, User, Newspaper, Sparkles } from 'lucide-react';
 
 interface BentoHeaderProps {
@@ -23,6 +24,8 @@ export default function BentoHeader({
   onOpenCountryModal,
   onSearchClick,
 }: BentoHeaderProps) {
+  const pathname = usePathname() || "/";
+  const inSection = pathname.startsWith(`/${getCountrySlug(selectedCountry)}`);
   const [greeting, setGreeting] = useState('Good day');
   const [formattedDate, setFormattedDate] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -69,11 +72,10 @@ export default function BentoHeader({
             onClick={onOpenCountryModal}
             type="button"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 hover:border-blue-500 dark:hover:border-blue-400 transition text-gray-800 dark:text-gray-200 font-semibold cursor-pointer shrink-0 shadow-xs"
-            title="Change active country edition"
+            title="Choose a section"
           >
-            <span className="text-sm leading-none">{selectedCountry.flag}</span>
             <span className="font-bold text-xs truncate max-w-[80px] sm:max-w-[110px]">
-              {selectedCountry.name}
+              {inSection ? selectedCountry.name : 'Sections'}
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
           </button>
