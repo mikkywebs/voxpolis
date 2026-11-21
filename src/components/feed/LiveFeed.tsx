@@ -28,17 +28,6 @@ function groupByCountry(list: ArticleData[], max = 4): Feed[] {
   return Array.from(map, ([code, articles]) => ({ country: getCountryByCode(code), articles })).slice(0, max);
 }
 
-async function fetchCountry(code: string): Promise<ArticleData[]> {
-  try {
-    const res = await fetch(`/api/news?country=${code}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data.articles) ? data.articles : [];
-  } catch {
-    return [];
-  }
-}
-
 function rememberCountry(code: string) {
   try {
     document.cookie = `voxpolis_country=${code}; path=/; max-age=31536000; samesite=lax`;
@@ -48,14 +37,13 @@ function rememberCountry(code: string) {
 
 /**
  * Feed page shell. The server already rendered the articles (good for Google);
- * this only adds the signed-in member's personal choices on top.
+ * this only adds the signed-in member's name on top. Everyone sees the same sections.
  */
 export default function LiveFeed({ mode, initialCountryCode, initialArticles, worldArticles, heading, intro }: LiveFeedProps) {
   const router = useRouter();
-  const [country, setCountry] = useState<CountryConfig>(getCountryByCode(initialCountryCode));
-  const [articles, setArticles] = useState<ArticleData[]>(initialArticles);
+  const country = getCountryByCode(initialCountryCode);
+  const articles = initialArticles;
   const [user, setUser] = useState<any>(null);
-  const [followed, setFollowed] = useState<Feed[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -64,7 +52,6 @@ export default function LiveFeed({ mode, initialCountryCode, initialArticles, wo
     async function load(sessionUser: any) {
       if (!sessionUser) {
         setUser(null);
-        setFollowed([]);
         return;
       }
       const meta = sessionUser.user_metadata || {};
@@ -72,20 +59,9 @@ export default function LiveFeed({ mode, initialCountryCode, initialArticles, wo
         id: sessionUser.id,
         email: sessionUser.email,
         fullName: meta.full_name || sessionUser.email?.split('@')[0] || 'Member',
-        primaryCountry: meta.primary_country,
-        followedCountries: Array.isArray(meta.followed_countries) ? meta.followed_countries : [],
       };
+      // Same Voxpolis mix for every visitor and member: no per-country homepages any more.
       setUser(u);
-
-      // Members: homepage follows their own primary country.
-      if (mode === 'home' && u.primaryCountry && u.primaryCountry !== initialCountryCode) {
-        setCountry(getCountryByCode(u.primaryCountry));
-        setArticles(await fetchCountry(u.primaryCountry));
-      }
-
-      const codes: string[] = u.followedCountries.filter((c: string) => c !== (mode === 'home' ? u.primaryCountry || initialCountryCode : initialCountryCode)).slice(0, 5);
-      const feeds = await Promise.all(codes.map(async (c) => ({ country: getCountryByCode(c), articles: (await fetchCountry(c)).slice(0, 3) })));
-      setFollowed(feeds.filter((f) => f.articles.length > 0));
     }
 
     supabase.auth.getSession().then(({ data }) => load(data?.session?.user));
@@ -99,8 +75,7 @@ export default function LiveFeed({ mode, initialCountryCode, initialArticles, wo
     router.push(`/${getCountrySlug(c)}`);
   };
 
-  const worldFeeds = groupByCountry(worldArticles.filter((a) => a.country_code !== country.code));
-  const secondary = user && followed.length > 0 ? followed : worldFeeds;
+  const secondary = groupByCountry(worldArticles.filter((a) => a.country_code !== country.code));
 
   return (
     <BentoFeedLayout
@@ -110,8 +85,8 @@ export default function LiveFeed({ mode, initialCountryCode, initialArticles, wo
       user={user}
       onSelectCountry={handleSelect}
       secondaryFeeds={secondary}
-      secondaryTitle={user && followed.length > 0 ? 'Sections you follow' : 'More political news'}
-      heading={mode === 'home' && country.code !== initialCountryCode ? `${country.name} political news` : heading}
+      secondaryTitle="More political news"
+      heading={heading}
       intro={intro}
     />
   );

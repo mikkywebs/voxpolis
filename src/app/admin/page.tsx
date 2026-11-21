@@ -907,7 +907,7 @@ export default function AdminDashboardPage() {
                     {isLoadingAnalytics ? '...' : (analyticsData?.metrics?.totalNewsCount ?? 0).toLocaleString()}
                   </span>
                   <span className="text-[10px] text-emerald-400 font-medium block">
-                    {analyticsData?.metrics?.databaseArticlesCount || 0} DB custom + 119 country desks
+                    {analyticsData?.metrics?.databaseArticlesCount || 0} DB stories · 3 sections
                   </span>
                 </div>
 
@@ -953,7 +953,7 @@ export default function AdminDashboardPage() {
                     </p>
                   </div>
                   <span className="text-[11px] text-gray-400 font-mono">
-                    Computed across 119 sovereign desks
+                    Across Nigeria, Africa and World
                   </span>
                 </div>
 
@@ -1298,7 +1298,7 @@ export default function AdminDashboardPage() {
                       <span>Active Political News Catalog by Country Desk</span>
                     </h3>
                     <p className="text-[11px] text-gray-400">
-                      Slide through all 119 sovereign country desks or use instant search to find any national desk.
+                      Nigeria, Africa and World sections.
                     </p>
                   </div>
 
@@ -1313,7 +1313,7 @@ export default function AdminDashboardPage() {
                           setCatalogSearchQuery(e.target.value);
                           setCatalogCurrentSlide(1);
                         }}
-                        placeholder="Search 119 country desks..."
+                        placeholder="Search sections..."
                         className="text-xs pl-7 pr-3 py-1.5 bg-slate-950 border border-gray-800 text-white rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 w-52"
                       />
                     </div>
@@ -1504,7 +1504,7 @@ export default function AdminDashboardPage() {
                             <Eye className="w-5 h-5 mx-auto mb-2 text-gray-500" />
                             <div className="font-semibold text-gray-300">No article reads recorded yet in this session</div>
                             <div className="text-[11px] text-gray-500 mt-1 max-w-md mx-auto">
-                              Live tracking is active across all 119 country desks. Reads will increment automatically here when visitors and registered members view articles.
+                              Live tracking is active across all sections. Reads will increment automatically here when visitors and registered members view articles.
                             </div>
                           </td>
                         </tr>

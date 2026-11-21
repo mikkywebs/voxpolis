@@ -363,13 +363,6 @@ export default function Header({
                     <User className="w-3.5 h-3.5 text-blue-500" />
                     <span>My Profile & Badges</span>
                   </Link>
-                  <Link
-                    href="/onboarding"
-                    className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
-                    <Globe className="w-3.5 h-3.5 text-gray-400" />
-                    <span>Country Preferences</span>
-                  </Link>
                   <button
                     onClick={async () => {
                       setIsUserMenuOpen(false);
