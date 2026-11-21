@@ -27,6 +27,7 @@ function rowToArticle(r: any): ArticleData {
     image_mode: isUsablePhoto(r.original_image_url, r.image_credit) ? 'original' : 'breaking_logo',
     original_image_url: isUsablePhoto(r.original_image_url, r.image_credit) ? r.original_image_url : undefined,
     image_credit: r.image_credit || undefined,
+    image_alt: r.image_alt || undefined,
     image_license: r.image_license || undefined,
     image_page_url: r.image_page_url || undefined,
     review_status: r.review_status || 'pending',

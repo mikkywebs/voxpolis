@@ -189,7 +189,7 @@ export default async function ArticlePage({ params }: Props) {
             {a.original_image_url && (
               <figure className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.original_image_url} alt={a.title} className="w-full max-h-[460px] object-cover object-top" loading="eager" />
+                <img src={a.original_image_url} alt={a.image_alt || a.title} className="w-full max-h-[460px] object-cover object-top" loading="eager" />
                 <figcaption className="px-3 py-2 text-[11px] text-gray-500 bg-gray-100 dark:bg-gray-900">
                   {a.image_credit ? <span className="font-semibold">File photo. </span> : <span>Photo: Voxpolis</span>}
                   {a.image_page_url ? (

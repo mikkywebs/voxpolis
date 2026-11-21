@@ -763,7 +763,7 @@ export default function AdminDashboardPage() {
           </button>
 
           <button
-            onClick={() => setActiveTab('publish')}
+            onClick={() => (window.location.href = '/admin/write')}
             className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition text-left ${
               activeTab === 'publish'
                 ? 'bg-blue-600 text-white shadow'
@@ -1724,8 +1724,8 @@ export default function AdminDashboardPage() {
                 Your own stories now go through the Newsroom drafts page, with the same red, amber and green checks, the Google preview and
                 the accuracy check. Nothing goes live until every red item is fixed and you press Publish.
               </p>
-              <a href="/admin/review" className="inline-block px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold">
-                Open Newsroom drafts → &quot;+ Write your own story&quot;
+              <a href="/admin/write" className="inline-block px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold">
+                Open the story editor
               </a>
             </div>
           )}
@@ -1743,7 +1743,7 @@ export default function AdminDashboardPage() {
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => setActiveTab('publish')}
+                    onClick={() => (window.location.href = '/admin/write')}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow"
                   >
                     <PlusCircle className="w-3.5 h-3.5" />
