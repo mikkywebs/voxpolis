@@ -82,7 +82,8 @@ export const getArticleBySlug = cache(async (slug: string): Promise<ArticleData 
     const { data, error } = await supabaseAdmin.from('articles').select('*').eq('slug', slug).maybeSingle();
     if (error || !data) return null;
     // Draft mode: only stories the editor has published are visible to the public.
-    if (!isPublished(data) || data.review_status !== 'approved') return null;
+    // Archived stories still open (no broken links) but are hidden from lists, sitemaps and Google.
+    if (!isPublished(data) || (data.review_status !== 'approved' && data.review_status !== 'archived')) return null;
     const article = rowToArticle(data);
     const { data: poll } = await supabaseAdmin
       .from('polls')

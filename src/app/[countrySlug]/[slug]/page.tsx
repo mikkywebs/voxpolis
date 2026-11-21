@@ -74,7 +74,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: description(a),
     keywords: a.tags,
     alternates: { canonical: articlePath(a) },
-    robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
+    robots: a.review_status === 'archived'
+      ? { index: false, follow: true }
+      : { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
     openGraph: {
       type: 'article',
       title: a.title,
