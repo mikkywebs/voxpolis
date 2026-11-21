@@ -47,6 +47,8 @@ export interface CheckInput {
   original_image_url?: string | null;
   image_credit?: string | null;
   meta_description?: string | null;
+  focus_keyword?: string | null;
+  image_alt?: string | null;
   checked_items?: string[] | null;
   review_status?: string | null;
   new_reports_at?: string | null;
@@ -141,6 +143,8 @@ export function checkStory(a: CheckInput): CheckResult {
   const words = bodyParts.map((p) => p.text).join(' ').split(/\s+/).filter(Boolean).length;
   const hasAnalysis = flexible ? sections.some((s) => s.kind === 'analysis') : !!(a.analysis || '').trim();
   const firstField = flexible ? 'lead' : 'content';
+  // The editor's own reporting: no outside reports to compare against, so the feed-only checks are skipped.
+  const own = a.origin === 'editor';
 
   // --- Whole story ---
   if (words < 200) items.push({ level: 'stop', field: firstField, text: `The story is only ${words} words. Add facts from the original report, or discard it.` });
@@ -154,7 +158,9 @@ export function checkStory(a: CheckInput): CheckResult {
       how: 'Check the story hasn\'t moved on (new developments, a response, a correction). Update it if needed, then press "It\'s correct".',
       key: `stale:${a.created_at.slice(0, 10)}`,
     });
-  if (!(a.sources?.length || a.source_url?.startsWith('http')))
+  if (own) {
+    // nothing: your own stories don't need an outside report
+  } else if (!(a.sources?.length || a.source_url?.startsWith('http')))
     items.push({ level: 'stop', field: 'sources', text: 'No original report is linked. Every story must credit its source.' });
   else if ((a.sources?.length || 1) === 1) items.push({ level: 'tip', field: 'sources', text: 'Only one outlet is used. Take extra care with names and numbers.' });
 
@@ -221,7 +227,7 @@ export function checkStory(a: CheckInput): CheckResult {
       key: `newreports:${a.new_reports_at}`,
     });
 
-  if (!a.source_facts)
+  if (!a.source_facts && !own)
     items.push({
       level: 'check',
       field: 'sources',
@@ -260,7 +266,7 @@ export function checkStory(a: CheckInput): CheckResult {
     items.push({ level: 'tip', field: 'story', text: 'The automatic accuracy check has not run yet (it runs every 10 minutes). You can press "Check accuracy" now.' });
   }
 
-  if (!hasAnalysis && a.category !== 'opinion')
+  if (!hasAnalysis && a.category !== 'opinion' && !own)
     items.push({
       level: 'check',
       field: flexible ? 'lead' : 'analysis',
@@ -268,7 +274,9 @@ export function checkStory(a: CheckInput): CheckResult {
       how: 'Readers come to Voxpolis for what the news means, so most stories should have one. For a short breaking update it can wait: press "It\'s correct".',
       key: 'analysis:none',
     });
-  if (!(a.key_points || []).length) items.push({ level: 'check', field: 'glance', text: 'No "At a glance" points. Add 2-4 short bullets.' });
+  if (own) {
+    // "At a glance" points are optional in the SEO editor
+  } else if (!(a.key_points || []).length) items.push({ level: 'check', field: 'glance', text: 'No "At a glance" points. Add 2-4 short bullets.' });
   else if ((a.key_points || []).length > 4) items.push({ level: 'tip', field: 'glance', text: 'More than 4 points. Keep the best 3 or 4.' });
 
   // --- Photo ---
@@ -304,6 +312,9 @@ export function checkStory(a: CheckInput): CheckResult {
     items.push({ level: 'stop', field: 'photo', text: 'This photo comes from a website we cannot verify.', how: 'Upload the photo here, or use one from Wikimedia Commons.' });
   }
 
+  if (img && !(a.image_alt || '').trim())
+    items.push({ level: 'check', field: 'photo', text: 'The photo has no alt text. Describe what it shows in a few words (Google Images and screen readers use it).' });
+
   // --- Google listing (SEO) ---
   const desc = (a.meta_description || a.dek || '').trim();
   if (!desc) items.push({ level: 'check', field: 'seo', text: 'No Google description. Write one or two sentences saying what happened.' });
@@ -313,9 +324,25 @@ export function checkStory(a: CheckInput): CheckResult {
   if (a.slug && (/\d{4}-\d{2}-\d{2}/.test(a.slug) || /-[a-z0-9]{4}$/.test(a.slug) && /\d/.test(a.slug.slice(-4))))
     items.push({ level: 'tip', field: 'seo', text: 'The web address has a date or random code in it. Shorter, clearer words rank better (while it is still a draft you can change it).' });
 
+  // --- Focus keyword: the words people would type into Google to find this story ---
+  const kw = (a.focus_keyword || '').trim().toLowerCase();
+  if (!kw) {
+    if (own) items.push({ level: 'check', field: 'seo', text: 'No focus keyword. Add the 2-4 words people would search for, e.g. "2027 budget".' });
+  } else {
+    const has = (t?: string | null) => (t || '').toLowerCase().includes(kw);
+    const slugKw = kw.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const firstPara = (flexible ? a.lead || '' : a.content || '').split(/\n\s*\n/)[0];
+    if (!has(a.title)) items.push({ level: 'check', field: 'seo', text: `The focus keyword "${a.focus_keyword}" is not in the headline.` });
+    if (!has(firstPara)) items.push({ level: 'check', field: 'seo', text: `The focus keyword is not in the first paragraph.` });
+    if (!has(desc)) items.push({ level: 'check', field: 'seo', text: `The focus keyword is not in the Google description.` });
+    if (a.slug && slugKw && !a.slug.includes(slugKw)) items.push({ level: 'tip', field: 'seo', text: `The web address doesn't contain the focus keyword.` });
+  }
+  if (own && flexible && sections.length === 0 && words > 350)
+    items.push({ level: 'tip', field: 'lead', text: 'Long story with no subheadings. Add a line starting with "## " to break it up (Google reads these as H2 headings).' });
+
   // --- Good practice ---
   const edited = a.updated_at && new Date(a.updated_at).getTime() - new Date(a.created_at).getTime() > 60_000;
-  if (!edited) items.push({ level: 'tip', field: 'story', text: 'Add your own touch: sharpen the headline or add one sentence of context you know.' });
+  if (!edited && !own) items.push({ level: 'tip', field: 'story', text: 'Add your own touch: sharpen the headline or add one sentence of context you know.' });
 
   // Amber items the editor already confirmed turn green.
   const ok = new Set(a.checked_items || []);

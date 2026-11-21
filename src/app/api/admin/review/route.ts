@@ -21,11 +21,20 @@ export const maxDuration = 60;
  */
 
 const FIELDS =
-  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, new_reports_at, fidelity, origin, category, editorial_version, updated_at';
+  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, new_reports_at, fidelity, origin, category, editorial_version, updated_at, seo_title, focus_keyword, image_alt, tags, image_license';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyAdmin(req);
   if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  // One story, for the full-page editor (/admin/write?id=...).
+  const one = req.nextUrl.searchParams.get('id');
+  if (one) {
+    const { data: a, error: e1 } = await supabaseAdmin.from('articles').select(FIELDS).eq('id', one).maybeSingle();
+    if (e1 || !a) return NextResponse.json({ error: 'Story not found' }, { status: 404 });
+    const { data: poll } = await supabaseAdmin.from('polls').select('question').eq('article_id', one).maybeSingle();
+    return NextResponse.json({ editor: auth.name, article: { ...a, poll_question: poll?.question || '', checks: checkStory(a as any) } });
+  }
 
   const status = req.nextUrl.searchParams.get('status') || 'pending';
   const attention = status === 'approved' && req.nextUrl.searchParams.get('attention') === '1';
@@ -54,7 +63,7 @@ export async function GET(req: NextRequest) {
   const pollMap = new Map((polls || []).map((p: any) => [p.article_id, p.question]));
 
   const { data: counts } = await supabaseAdmin.from('articles').select('review_status');
-  const tally = { pending: 0, approved: 0, rejected: 0 } as Record<string, number>;
+  const tally = { pending: 0, approved: 0, archived: 0, rejected: 0 } as Record<string, number>;
   (counts || []).forEach((r: any) => (tally[r.review_status] = (tally[r.review_status] || 0) + 1));
 
   return NextResponse.json({
@@ -122,7 +131,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, id: data.id, slug: data.slug });
   }
 
-  if (!id || !['save', 'approve', 'reject', 'reopen', 'remove_photo', 'confirm', 'unconfirm', 'verify', 'autofix', 'photos'].includes(action)) {
+  if (!id || !['save', 'approve', 'reject', 'archive', 'reopen', 'remove_photo', 'confirm', 'unconfirm', 'verify', 'autofix', 'photos'].includes(action)) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 
@@ -298,6 +307,13 @@ export async function POST(req: NextRequest) {
       update.country_code = f.country_code.toUpperCase();
     }
     if (typeof f.meta_description === 'string') update.meta_description = clean(f.meta_description, 200) || null;
+    if (typeof f.seo_title === 'string') update.seo_title = clean(f.seo_title, 120) || null;
+    if (typeof f.focus_keyword === 'string') update.focus_keyword = clean(f.focus_keyword, 80) || null;
+    if (typeof f.image_alt === 'string') update.image_alt = clean(f.image_alt, 200) || null;
+    if (Array.isArray(f.tags)) {
+      update.tags = Array.from(new Set(f.tags.map((t: unknown) => clean(t, 40)).filter(Boolean))).slice(0, 10);
+    }
+    if (f.category === 'opinion' || f.category === 'politics') update.category = f.category;
     if (typeof f.image_credit === 'string') update.image_credit = f.image_credit.trim().slice(0, 160) || null;
 
     if (typeof f.poll_question === 'string') {
@@ -310,6 +326,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'reject') update.review_status = 'rejected';
+  if (action === 'archive') update.review_status = 'archived';
   if (action === 'reopen') {
     update.review_status = 'pending';
     update.reviewed_at = null;

@@ -39,6 +39,7 @@ export interface ArticleData {
   background?: string;
   what_next?: string;
   seo_title?: string;
+  image_alt?: string;
   meta_description?: string;
   importance?: number;
   updated_at?: string;
