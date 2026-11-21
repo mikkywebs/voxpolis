@@ -159,7 +159,7 @@ export default function ColumnistSubmitPage() {
           </h2>
 
           <p className="text-xs text-gray-300 leading-relaxed">
-            Voxpolis provides an open, authoritative civic platform for analysts, scholars, citizens, and political commentators across 119 nations. We invite well-reasoned, independent opinions strictly focused on political and public affairs.
+            Voxpolis provides an open, authoritative civic platform for analysts, scholars, citizens, and political commentators across Nigeria, Africa and the world. We invite well-reasoned, independent opinions strictly focused on political and public affairs.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">

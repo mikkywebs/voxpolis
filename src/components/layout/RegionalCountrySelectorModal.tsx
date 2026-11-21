@@ -113,7 +113,7 @@ export default function RegionalCountrySelectorModal({
                   Select Country & Region
                 </h3>
                 <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
-                  Switch political coverage between 119 countries
+                  Nigeria, Africa and World politics
                 </p>
               </div>
             </div>
@@ -136,7 +136,7 @@ export default function RegionalCountrySelectorModal({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search 119 countries (e.g. Nigeria, Ghana, United States)..."
+                placeholder="Search sections"
                 className="w-full text-xs p-3 pl-10 pr-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               />
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
