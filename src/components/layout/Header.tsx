@@ -228,7 +228,7 @@ export default function Header({
               onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
               type="button"
               className="flex items-center gap-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 hover:from-blue-100 hover:to-indigo-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs font-extrabold px-3 py-1.5 rounded-xl border border-blue-300 dark:border-gray-600 shadow-sm transition cursor-pointer shrink-0"
-              title="Select Country Coverage"
+              title="Choose a section"
             >
               <span className="text-base leading-none">{selectedCountry.flag}</span>
               <span className="font-bold">{selectedCountry.code}</span>
@@ -241,10 +241,7 @@ export default function Header({
               <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl z-50 py-2 text-xs">
                 <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-700/60 flex items-center justify-between">
                   <span className="font-extrabold text-[11px] text-gray-400 uppercase tracking-wider">
-                    Quick Country Switch
-                  </span>
-                  <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold px-1.5 py-0.5 rounded">
-                    119 Nations
+                    Sections
                   </span>
                 </div>
 
@@ -270,19 +267,6 @@ export default function Header({
                   })}
                 </div>
 
-                <div className="p-2 border-t border-gray-100 dark:border-gray-700/60">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCountryDropdownOpen(false);
-                      setIsModalOpen(true);
-                    }}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5"
-                  >
-                    <Globe className="w-3.5 h-3.5" />
-                    <span>Explore All 119 Countries...</span>
-                  </button>
-                </div>
               </div>
             )}
           </div>
@@ -379,17 +363,6 @@ export default function Header({
                     <User className="w-3.5 h-3.5 text-blue-500" />
                     <span>My Profile & Badges</span>
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      setIsModalOpen(true);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 text-left font-medium cursor-pointer"
-                  >
-                    <Globe className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Switch Country Newsroom</span>
-                  </button>
                   <Link
                     href="/onboarding"
                     className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
