@@ -8,7 +8,7 @@ import { getCountryByCode, ALL_COUNTRIES } from '@/config/countries';
 import { checkStory, fieldLevel, CheckItem, CheckResult } from '@/lib/editorial/prepublish';
 import type { SourceFacts } from '@/lib/editorial/facts';
 
-type Status = 'pending' | 'approved' | 'rejected';
+type Status = 'pending' | 'approved' | 'rejected' | 'archived';
 
 interface Story {
   id: string;
@@ -1142,7 +1142,7 @@ export default function ReviewPage() {
         </section>
 
         <nav className="flex gap-2">
-          {(['pending', 'approved', 'rejected'] as Status[]).map((s) => (
+          {(['pending', 'approved', 'archived', 'rejected'] as Status[]).map((s) => (
             <button
               key={s}
               type="button"

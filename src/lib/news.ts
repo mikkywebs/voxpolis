@@ -46,7 +46,7 @@ export interface ArticleData {
   image_credit?: string;
   image_license?: string;
   image_page_url?: string;
-  review_status?: 'pending' | 'approved' | 'rejected';
+  review_status?: 'pending' | 'approved' | 'rejected' | 'archived';
   // Flexible structure (editorial v3)
   story_type?: string;
   lead?: string;
