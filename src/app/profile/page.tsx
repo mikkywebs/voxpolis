@@ -217,11 +217,11 @@ export default function ProfilePage() {
         {/* Top Navigation */}
         <div className="flex items-center justify-between">
           <Link
-            href={`/${getCountrySlug(countryObj)}`}
+            href="/"
             className="inline-flex items-center gap-2 text-xs font-bold text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Return to {countryObj.flag} {countryObj.name} Newsroom</span>
+            <span>Back to Voxpolis</span>
           </Link>
 
           <Link href="/">
@@ -250,10 +250,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="text-right">
-              <span className="text-2xl">{countryObj.flag}</span>
-              <p className="text-[11px] text-gray-300 font-semibold">{countryObj.name}</p>
-            </div>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
@@ -368,182 +364,6 @@ export default function ProfilePage() {
                   className="w-full text-xs p-3 pl-9 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              </div>
-            </div>
-
-            {/* Primary Country Desk Selector with Typeahead Search */}
-            <div ref={countryPickerRef} className="space-y-2">
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
-                  Primary Country Newsroom *
-                </label>
-                <Link
-                  href={`/${getCountrySlug(countryObj)}`}
-                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                >
-                  <span>Open {countryObj.flag} {countryObj.name} Feed</span>
-                  <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-
-              {/* Active Selected Country Banner */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{countryObj.flag}</span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-gray-900 dark:text-white">
-                        {countryObj.name}
-                      </span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-blue-600 text-white">
-                        {countryObj.code}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                      Capital: {countryObj.capital || 'National'} • Active National Newsroom
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-gray-700 transition flex items-center gap-1 shadow-sm"
-                >
-                  <span>{isCountryDropdownOpen ? 'Close List' : 'Change Country'}</span>
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isCountryDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-
-              {/* Searchable Input & Floating Results Dropdown */}
-              <div className="relative">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={countrySearchQuery}
-                    onFocus={() => setIsCountryDropdownOpen(true)}
-                    onChange={(e) => {
-                      setCountrySearchQuery(e.target.value);
-                      setIsCountryDropdownOpen(true);
-                    }}
-                    placeholder="Type country name or code to search (e.g. Syria, Nigeria, France)..."
-                    className="w-full text-xs p-3 pl-9 pr-9 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-                  />
-                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
-                  {countrySearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setCountrySearchQuery('')}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Floating Suggestions List when open */}
-                {isCountryDropdownOpen && (
-                  <div className="absolute z-30 left-0 right-0 mt-1.5 max-h-64 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl divide-y divide-gray-100 dark:divide-gray-800">
-                    <div className="p-2 bg-gray-50 dark:bg-gray-800/80 sticky top-0 z-10 flex items-center justify-between text-[11px] font-bold text-gray-500 dark:text-gray-400 px-3">
-                      <span>Matching Countries ({filteredPrimaryCountries.length})</span>
-                      <span className="text-[10px] font-normal">Click country to select</span>
-                    </div>
-
-                    {filteredPrimaryCountries.length === 0 ? (
-                      <div className="p-6 text-center text-xs text-gray-500 dark:text-gray-400">
-                        No countries found matching &ldquo;{countrySearchQuery}&rdquo;. Try another name or code.
-                      </div>
-                    ) : (
-                      filteredPrimaryCountries.map((c) => {
-                        const isSelected = c.code === primaryCountry;
-                        return (
-                          <button
-                            key={c.code}
-                            type="button"
-                            onClick={() => {
-                              setPrimaryCountry(c.code);
-                              setCountrySearchQuery('');
-                              setIsCountryDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition hover:bg-blue-50 dark:hover:bg-blue-950/60 ${
-                              isSelected
-                                ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-bold'
-                                : 'text-gray-800 dark:text-gray-200'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <span className="text-xl">{c.flag}</span>
-                              <div>
-                                <span className="font-semibold text-xs block">{c.name}</span>
-                                <span className="text-[10px] text-gray-400 font-normal">
-                                  {c.capital ? `${c.capital} • ` : ''}Code: {c.code}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
-                                {c.code}
-                              </span>
-                              {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />}
-                            </div>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Followed Countries for My VoxPolis (Up to 5) */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
-                  Followed Countries for My VoxPolis (Choose up to 5)
-                </label>
-                <span className="text-[10px] text-gray-400 font-semibold">{followedCountries.length} of 5 selected</span>
-              </div>
-
-              {/* Quick filter input for followed countries */}
-              <div className="relative">
-                <input
-                  type="text"
-                  value={followedSearchQuery}
-                  onChange={(e) => setFollowedSearchQuery(e.target.value)}
-                  placeholder="Type to filter countries to follow..."
-                  className="w-full text-xs p-2 pl-8 pr-7 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" />
-                {followedSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setFollowedSearchQuery('')}
-                    className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1.5 flex-wrap max-h-36 overflow-y-auto p-2 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800/40">
-                {filteredFollowedCountries.map((c) => {
-                  const isFollowed = followedCountries.includes(c.code);
-                  return (
-                    <button
-                      key={c.code}
-                      type="button"
-                      onClick={() => toggleFollowed(c.code)}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition cursor-pointer ${
-                        isFollowed
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-blue-400'
-                      }`}
-                    >
-                      <span>{c.flag}</span>
-                      <span>{c.name}</span>
-                      {isFollowed && <Check className="w-3 h-3" />}
-                    </button>
-                  );
-                })}
               </div>
             </div>
 
