@@ -1,210 +1,97 @@
-'use client';
-
-export const dynamic = 'force-dynamic';
-
-import { useState, useEffect } from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import { ALL_COUNTRIES, CountryConfig } from '@/config/countries';
-import {
-  Globe2,
-  FileText,
-  Users,
-  ShieldCheck,
-  Newspaper,
-  Vote,
-  ArrowRight,
-  CheckCircle2,
-} from 'lucide-react';
+import ArticleChrome from '@/components/article/ArticleChrome';
+import Footer from '@/components/layout/Footer';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
-export default function AboutPage() {
-  const [selectedCountry, setSelectedCountry] = useState<CountryConfig>(ALL_COUNTRIES[0]);
-  const [pageData, setPageData] = useState({
-    badge: 'Global Independent News & Civic Voice',
-    title: 'Unbiased Political News Tailored to Your Nation',
-    subtitle: `Voxpolis delivers real-time, independent political coverage and executive fact summaries from ${ALL_COUNTRIES.length - 1} countries, plus world affairs. Access direct regional political developments and active civic sentiment polls with zero paywalls.`,
-    mission: 'Our mission is to bring concise, factual news straight to citizens\' doorsteps worldwide, with balanced regional perspectives and civic participation without corporate paywalls.',
-  });
+export const revalidate = 600;
 
-  useEffect(() => {
-    async function loadPage() {
-      try {
-        const res = await fetch('/api/site-pages?page=about');
-        if (res.ok) {
-          const json = await res.json();
-          if (json.data) {
-            setPageData((prev) => ({ ...prev, ...json.data }));
-          }
-        }
-      } catch (e) {
-        console.warn('Using default about content', e);
-      }
-    }
-    loadPage();
-  }, []);
+export const metadata: Metadata = {
+  title: 'About Voxpolis',
+  description: 'Voxpolis explains Nigerian, African and world politics clearly: who did what, why it matters and what comes next.',
+  alternates: { canonical: '/about' },
+};
 
+const DEFAULTS = {
+  title: 'Political news, explained',
+  subtitle:
+    'Voxpolis explains the political stories that matter: mostly Nigeria, then the rest of Africa, and the world events that affect them. Who did what, why it matters, and what comes next.',
+  mission:
+    'Our aim is simple: clear, fair and accurate political news that anyone can read for free, with room for readers to say what they think.',
+  headquarters: 'Abuja, Nigeria',
+  founded_year: '2026',
+};
+
+async function pageData() {
+  try {
+    const { data } = await supabaseAdmin.from('site_pages').select('data').eq('page_key', 'about').maybeSingle();
+    return { ...DEFAULTS, ...((data?.data as Record<string, string>) || {}) };
+  } catch {
+    return DEFAULTS;
+  }
+}
+
+export default async function AboutPage() {
+  const d = await pageData();
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col selection:bg-blue-600 selection:text-white">
-      <Header selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col">
+      <ArticleChrome countryCode="NG" />
+      <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-10 space-y-8 text-[16px] leading-relaxed">
+        <header className="space-y-3">
+          <h1 className="text-3xl sm:text-4xl font-black">{d.title}</h1>
+          <p className="text-lg text-gray-600 dark:text-gray-300">{d.subtitle}</p>
+        </header>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-12 sm:py-16 space-y-16">
-        {/* Hero Section */}
-        <section className="text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-900/40 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-wider shadow-sm">
-            <Globe2 className="w-3.5 h-3.5 text-blue-400" />
-            <span>{pageData.badge}</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight max-w-3xl mx-auto">
-            {pageData.title}
-          </h1>
-
-          <p className="text-sm sm:text-base text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            {pageData.subtitle}
+        <section className="space-y-3">
+          <h2 className="text-xl font-black">What we cover</h2>
+          <p>
+            Most of our stories are about Nigerian politics: the Presidency, the National Assembly, the courts, the parties and
+            the states. We also cover major political news from across Africa, and world events when they matter to our readers.
           </p>
+          <ul className="flex flex-wrap gap-2 text-sm">
+            <li><Link href="/nigeria" className="inline-block px-3 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:border-blue-500">Nigeria</Link></li>
+            <li><Link href="/africa" className="inline-block px-3 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:border-blue-500">Africa</Link></li>
+            <li><Link href="/world" className="inline-block px-3 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:border-blue-500">World</Link></li>
+          </ul>
+        </section>
 
-          <div className="flex items-center justify-center gap-4 pt-2 flex-wrap">
-            <Link
-              href="/signup"
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center gap-2"
-            >
-              <span>Join Voxpolis Free</span>
-              <ArrowRight className="w-4 h-4" />
+        <section className="space-y-3">
+          <h2 className="text-xl font-black">How a story is made</h2>
+          <p>
+            Our editor follows official statements, press releases, court and government documents, and other outlets&apos;
+            reports. Every story is written and checked by our editor before it is published, and every source is credited.
+            You can read the details in{' '}
+            <Link href="/how-we-report" className="text-blue-600 dark:text-blue-400 underline">
+              How we report
             </Link>
-            <Link
-              href="/news"
-              className="px-6 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-300 hover:text-white font-bold text-xs rounded-xl transition"
-            >
-              Explore Verified News →
-            </Link>
-          </div>
+            .
+          </p>
         </section>
 
-        {/* Global Impact Stat Cards with Accurate Figures */}
-        <section className="w-full">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 p-6 rounded-3xl bg-gray-900/60 border border-gray-800/80 backdrop-blur-md shadow-2xl">
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-800/40 border border-gray-700/40">
-              <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400">
-                <Globe2 className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="text-2xl font-black text-white">{ALL_COUNTRIES.length - 1}</div>
-                <div className="text-xs font-bold text-gray-200">Nations Covered</div>
-                <div className="text-[11px] text-gray-400">Direct regional reporting</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-800/40 border border-gray-700/40">
-              <div className="p-3 rounded-xl bg-cyan-500/10 text-cyan-400">
-                <FileText className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="text-2xl font-black text-white">1,500+</div>
-                <div className="text-xs font-bold text-gray-200">Daily Reports</div>
-                <div className="text-[11px] text-gray-400">Updated hourly worldwide</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-800/40 border border-gray-700/40">
-              <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-400">
-                <Users className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="text-2xl font-black text-white">15,000+</div>
-                <div className="text-xs font-bold text-gray-200">Active Readers</div>
-                <div className="text-[11px] text-gray-400">Citizens & researchers</div>
-              </div>
-            </div>
-          </div>
+        <section className="space-y-3">
+          <h2 className="text-xl font-black">Our standards</h2>
+          <ul className="list-disc pl-6 space-y-2">
+            <li><strong>Independent.</strong> We don&apos;t support any party or candidate, and no one pays to shape our coverage.</li>
+            <li><strong>Fair.</strong> Claims are credited to the people who made them, and the other side&apos;s position is included where there is a dispute.</li>
+            <li><strong>Facts first, analysis labelled.</strong> Where we explain what something means, it is clearly marked.</li>
+            <li><strong>Free to read.</strong> No paywall.</li>
+          </ul>
         </section>
 
-        {/* How Voxpolis Works (3 Steps) */}
-        <section className="space-y-8">
-          <div className="text-center space-y-2">
-            <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">Simple & Transparent</span>
-            <h2 className="text-2xl sm:text-4xl font-black text-white">How Voxpolis Works</h2>
-            <p className="text-xs sm:text-sm text-gray-400 max-w-xl mx-auto">
-              Three clear steps to objective political news and regional executive summaries.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-3xl bg-gray-900/80 border border-gray-800 shadow-xl space-y-4">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-black text-lg">
-                1
-              </div>
-              <h3 className="font-bold text-lg text-white flex items-center gap-2">
-                <Newspaper className="w-5 h-5 text-blue-400" />
-                <span>Verified Ingestion</span>
-              </h3>
-              <p className="text-xs text-gray-300 leading-relaxed">
-                We gather news directly from reputable national press outlets and verified official digests across {ALL_COUNTRIES.length - 1} countries.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-3xl bg-gray-900/80 border border-gray-800 shadow-xl space-y-4">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-black text-lg">
-                2
-              </div>
-              <h3 className="font-bold text-lg text-white flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-cyan-400" />
-                <span>Editorial Breakdown</span>
-              </h3>
-              <p className="text-xs text-gray-300 leading-relaxed">
-                Our editorial team synthesizes core policy facts, contextual background, and key legislative provisions for objective clarity.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-3xl bg-gray-900/80 border border-gray-800 shadow-xl space-y-4">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-black text-lg">
-                3
-              </div>
-              <h3 className="font-bold text-lg text-white flex items-center gap-2">
-                <Vote className="w-5 h-5 text-indigo-400" />
-                <span>Citizen Dialogue</span>
-              </h3>
-              <p className="text-xs text-gray-300 leading-relaxed">
-                Participate in active sentiment polls, voice your perspective, and join non-partisan discussions with global readers.
-              </p>
-            </div>
-          </div>
+        <section className="space-y-3">
+          <h2 className="text-xl font-black">Our mission</h2>
+          <p>{d.mission}</p>
         </section>
 
-        {/* Core Editorial Standards */}
-        <section className="p-8 sm:p-12 rounded-3xl bg-gradient-to-r from-blue-950/60 via-slate-900 to-indigo-950/60 border border-blue-500/20 space-y-6">
-          <h3 className="text-xl sm:text-2xl font-black text-white text-center">Our Core Editorial Standards</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-gray-300 leading-relaxed">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-white block text-sm mb-1">Non-Partisan Objectivity</strong>
-                Voxpolis is strictly independent. We do not take political sides or endorse candidates. Every executive summary focuses on verifiable policy facts and legislative records.
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-white block text-sm mb-1">Equal National Coverage</strong>
-                Whether covering major geopolitical powers or emerging democracies, every nation receives dedicated, localized political feeds with country-specific context.
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-white block text-sm mb-1">Zero Paywalls for Public Facts</strong>
-                Core political updates and public opinion polls are freely accessible to all readers without subscription fees.
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-white block text-sm mb-1">Civilized Public Discourse</strong>
-                All member comments are moderated to prevent link spam and maintain respectful policy dialogue across borders.
-              </div>
-            </div>
-          </div>
+        <section className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+          <p>Based in {d.headquarters}. Founded {d.founded_year}.</p>
+          <p>
+            Spotted an error? <Link href="/corrections" className="text-blue-600 dark:text-blue-400 underline">Tell us</Link>. Anything else?{' '}
+            <Link href="/contact" className="text-blue-600 dark:text-blue-400 underline">Contact us</Link>.
+          </p>
         </section>
       </main>
+      <Footer />
     </div>
   );
 }
