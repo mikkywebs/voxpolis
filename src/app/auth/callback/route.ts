@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && data?.session?.user) {
       const user = data.session.user;
-      const hasCompletedProfile = !!(user.user_metadata?.username && user.user_metadata?.primary_country);
+      const hasCompletedProfile = !!user.user_metadata?.username;
 
       let targetPath = '/onboarding';
       if (next === '/reset-password') {
@@ -52,8 +52,7 @@ export async function GET(request: Request) {
       } else if (next) {
         targetPath = next;
       } else {
-        const countryObj = getCountryByCode(user.user_metadata?.primary_country || 'NG');
-        targetPath = `/${getCountrySlug(countryObj)}`;
+        targetPath = '/';
       }
 
       const finalResponse = NextResponse.redirect(`${origin}${targetPath}`);

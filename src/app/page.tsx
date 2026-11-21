@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import LiveFeed from '@/components/feed/LiveFeed';
-import { getCountryByCode, sectionOrderFor } from '@/config/countries';
 import { getLatestForCountry } from '@/lib/articles';
-import { getVisitorCountryCode } from '@/lib/geo';
+import { ArticleData } from '@/lib/news';
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
@@ -13,13 +12,27 @@ export const metadata: Metadata = {
   alternates: { canonical: '/' },
 };
 
+// Editorial mix for every visitor: 70% Nigeria, 20% Africa, 10% World.
+// Each block of 10 slots is N N A N N N A N N W; if a section runs out, the others fill in.
+const PATTERN = ['NG', 'NG', 'AFRICA', 'NG', 'NG', 'NG', 'AFRICA', 'NG', 'NG', 'WORLD'] as const;
+
+function mix(pools: Record<string, ArticleData[]>, total: number): ArticleData[] {
+  const queues: Record<string, ArticleData[]> = { NG: [...pools.NG], AFRICA: [...pools.AFRICA], WORLD: [...pools.WORLD] };
+  const out: ArticleData[] = [];
+  for (let i = 0; out.length < total && i < total * 3; i++) {
+    const want = PATTERN[i % PATTERN.length];
+    const pick = queues[want].shift() || queues.NG.shift() || queues.AFRICA.shift() || queues.WORLD.shift();
+    if (!pick) break;
+    out.push(pick);
+  }
+  return out;
+}
+
 export default async function HomePage() {
-  const code = getVisitorCountryCode();
-  const country = getCountryByCode(code);
-  // Visitor's own section first, then the other two in the order for their region.
-  const [, second, third] = sectionOrderFor(country.code);
-  const [articles, more2, more3] = await Promise.all([getLatestForCountry(country.code, 40), getLatestForCountry(second, 8), getLatestForCountry(third, 8)]);
-  const world = [...more2, ...more3];
+  const [ng, africa, world] = await Promise.all([getLatestForCountry('NG', 28), getLatestForCountry('AFRICA', 10), getLatestForCountry('WORLD', 6)]);
+  const articles = mix({ NG: ng, AFRICA: africa, WORLD: world }, 40);
+  const shown = new Set(articles.map((a) => a.id));
+  const more = [...africa, ...world].filter((a) => !shown.has(a.id));
 
   const orgLd = {
     '@context': 'https://schema.org',
@@ -53,10 +66,10 @@ export default async function HomePage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgLd) }} />
       <LiveFeed
         mode="home"
-        initialCountryCode={country.code}
+        initialCountryCode="NG"
         initialArticles={articles}
-        worldArticles={world}
-        heading={`${country.name} political news, explained`}
+        worldArticles={more}
+        heading="Nigeria, Africa and world politics, explained"
         intro="Original reporting on today’s political stories: what happened, why it matters and what comes next."
       />
     </>
