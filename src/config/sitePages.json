@@ -1,21 +1,17 @@
 {
   "about": {
-    "badge": "Global Independent News & Civic Voice",
-    "title": "Unbiased Political News Tailored to Your Nation",
-    "subtitle": "Voxpolis delivers real-time, independent political coverage and executive fact analysis across global nations with direct civic polling.",
-    "mission": "Our mission is to bring concise, factual news straight to citizens' doorsteps worldwide, with balanced regional perspectives and civic participation without corporate paywalls.",
+    "title": "Political news, explained",
+    "subtitle": "Voxpolis explains the political stories that matter: mostly Nigeria, then the rest of Africa, and the world events that affect them. Who did what, why it matters, and what comes next.",
+    "mission": "Our aim is simple: clear, fair and accurate political news that anyone can read for free, with room for readers to say what they think.",
     "founded_year": "2026",
-    "headquarters": "Abuja, Nigeria",
-    "coverage_scope": "Global Coverage across 119 Nations"
+    "headquarters": "Abuja, Nigeria"
   },
   "contact": {
     "title": "Contact Voxpolis Editorial & Operations",
     "subtitle": "Reach out directly to our editorial team, corrections desk, or executive management.",
     "email": "contact@voxpolis.app",
-    "desk_phone": "+234 (0) 906 000 0000",
-    "headquarters_address": "Plot 42, Central Business District, Abuja, Federal Capital Territory, Nigeria",
     "press_inquiries": "press@voxpolis.app",
-    "response_time": "Typically within 24 business hours"
+    "response_time": "We aim to reply within two working days."
   },
   "privacy": {
     "title": "Privacy Policy & Data Protection Standards",
