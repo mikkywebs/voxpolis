@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { getCountryByCode } from '@/config/countries';
 import { articlePath } from '@/lib/paths';
 import PhotoCredit from '@/components/article/PhotoCredit';
 import { ArticleData, getArticleImageUrl, getArticleFallbackUrl } from '@/lib/news';
@@ -54,7 +55,7 @@ export default function RelatedArticlesSection({ articles }: RelatedArticlesSect
                 </div>
 
               <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-1">
-                {art.source_name}
+                {getCountryByCode(art.country_code).name}
               </span>
               <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition line-clamp-2 leading-snug">
                 {decodeAllHtmlEntities(art.title.replace(/\s*[-–—|]\s*Voxpolis.*$/i, ''))}

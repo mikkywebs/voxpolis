@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getCountryByCode } from '@/config/countries';
 import Link from 'next/link';
 import { articlePath } from '@/lib/paths';
 import PhotoCredit from '@/components/article/PhotoCredit';
@@ -91,7 +92,7 @@ export default function StoryCard({
             />
             <PhotoCredit article={article} />
             <div className="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider">
-              {article.source_name || 'VoxPolis'}
+              {getCountryByCode(article.country_code).name}
             </div>
           </Link>
 
@@ -160,7 +161,7 @@ export default function StoryCard({
         {/* Source & Timestamp */}
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="font-extrabold text-[11px] uppercase tracking-wider text-blue-600 dark:text-blue-400">
-            {article.source_name}
+            {getCountryByCode(article.country_code).name}
           </span>
           <div className="flex items-center gap-2 text-[11px] text-gray-400 dark:text-neutral-500">
             {effectiveViews > 0 && (

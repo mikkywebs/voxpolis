@@ -14,6 +14,8 @@ export const metadata: Metadata = {
 
 // Editorial mix for every visitor: 70% Nigeria, 20% Africa, 10% World.
 // Each block of 10 slots is N N A N N N A N N W; if a section runs out, the others fill in.
+const FRESH_DAYS = 7;
+const MIN_STORIES = 12;
 const PATTERN = ['NG', 'NG', 'AFRICA', 'NG', 'NG', 'NG', 'AFRICA', 'NG', 'NG', 'WORLD'] as const;
 
 function mix(pools: Record<string, ArticleData[]>, total: number): ArticleData[] {
@@ -30,9 +32,20 @@ function mix(pools: Record<string, ArticleData[]>, total: number): ArticleData[]
 
 export default async function HomePage() {
   const [ng, africa, world, featured] = await Promise.all([getLatestForCountry('NG', 28), getLatestForCountry('AFRICA', 10), getLatestForCountry('WORLD', 6), getFeatured(5)]);
-  const articles = mix({ NG: ng, AFRICA: africa, WORLD: world }, 40);
+  // Front page = fresh news only (last 7 days). Older stories stay on the section pages and in Google.
+  // If a section has nothing fresh, Nigeria fills its slots; if fewer than 12 fresh stories exist, the newest older ones fill in.
+  const cutoff = Date.now() - FRESH_DAYS * 24 * 3600_000;
+  const fresh = (list: ArticleData[]) => list.filter((a) => new Date(a.created_at).getTime() >= cutoff);
+  let articles = mix({ NG: fresh(ng), AFRICA: fresh(africa), WORLD: fresh(world) }, 40);
+  if (articles.length < MIN_STORIES) {
+    const have = new Set(articles.map((a) => a.id));
+    const older = [...ng, ...africa, ...world]
+      .filter((a) => !have.has(a.id))
+      .sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime());
+    articles = [...articles, ...older.slice(0, MIN_STORIES - articles.length)];
+  }
   const shown = new Set(articles.map((a) => a.id));
-  const more = [...africa, ...world].filter((a) => !shown.has(a.id));
+  const more = fresh([...africa, ...world]).filter((a) => !shown.has(a.id));
 
   const orgLd = {
     '@context': 'https://schema.org',
