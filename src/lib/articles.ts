@@ -29,6 +29,8 @@ function rowToArticle(r: any): ArticleData {
     image_credit: r.image_credit || undefined,
     image_alt: r.image_alt || undefined,
     is_featured: !!r.is_featured,
+    focus_keyword: r.focus_keyword || undefined,
+    secondary_keywords: Array.isArray(r.secondary_keywords) ? r.secondary_keywords : [],
     featured_at: r.featured_at || undefined,
     image_license: r.image_license || undefined,
     image_page_url: r.image_page_url || undefined,

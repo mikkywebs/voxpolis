@@ -21,7 +21,7 @@ export const maxDuration = 60;
  */
 
 const FIELDS =
-  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, new_reports_at, fidelity, origin, category, editorial_version, updated_at, seo_title, focus_keyword, image_alt, tags, image_license, is_featured, featured_at';
+  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, new_reports_at, fidelity, origin, category, editorial_version, updated_at, seo_title, focus_keyword, image_alt, tags, image_license, is_featured, featured_at, secondary_keywords';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyAdmin(req);
@@ -310,6 +310,9 @@ export async function POST(req: NextRequest) {
     if (typeof f.meta_description === 'string') update.meta_description = clean(f.meta_description, 200) || null;
     if (typeof f.seo_title === 'string') update.seo_title = clean(f.seo_title, 120) || null;
     if (typeof f.focus_keyword === 'string') update.focus_keyword = clean(f.focus_keyword, 80) || null;
+    if (Array.isArray(f.secondary_keywords)) {
+      update.secondary_keywords = Array.from(new Set(f.secondary_keywords.map((k: unknown) => clean(k, 60)).filter(Boolean))).slice(0, 8);
+    }
     if (typeof f.image_alt === 'string') update.image_alt = clean(f.image_alt, 200) || null;
     if (Array.isArray(f.tags)) {
       update.tags = Array.from(new Set(f.tags.map((t: unknown) => clean(t, 40)).filter(Boolean))).slice(0, 10);
