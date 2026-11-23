@@ -49,6 +49,7 @@ export interface CheckInput {
   meta_description?: string | null;
   focus_keyword?: string | null;
   image_alt?: string | null;
+  is_featured?: boolean | null;
   checked_items?: string[] | null;
   review_status?: string | null;
   new_reports_at?: string | null;
@@ -312,6 +313,16 @@ export function checkStory(a: CheckInput): CheckResult {
     items.push({ level: 'stop', field: 'photo', text: 'This photo comes from a website we cannot verify.', how: 'Upload the photo here, or use one from Wikimedia Commons.' });
   }
 
+  if (a.is_featured && !img)
+    items.push({ level: 'check', field: 'photo', text: 'This story is set to feature on the homepage but has no photo. It will not show in the slider until you add one.' });
+  if (a.is_featured && img)
+    items.push({
+      level: 'check',
+      field: 'photo',
+      text: 'Featured story: check the photo has no text, logo or border in it, and is wide (at least 1200 pixels).',
+      how: 'The homepage prints the headline on top of the photo. A photo that already has words in it makes the slider look crowded and hard to read.',
+      key: `featuredphoto:${img}`,
+    });
   if (img && !(a.image_alt || '').trim())
     items.push({ level: 'check', field: 'photo', text: 'The photo has no alt text. Describe what it shows in a few words (Google Images and screen readers use it).' });
 

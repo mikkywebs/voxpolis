@@ -96,6 +96,7 @@ function Editor() {
     seoTitle: '',
     desc: '',
     keyword: '',
+    featured: false,
   });
   const [slugTouched, setSlugTouched] = useState(!!idParam);
   const [sources, setSources] = useState<{ name: string; url: string }[]>([]);
@@ -140,6 +141,7 @@ function Editor() {
         seoTitle: a.seo_title || '',
         desc: a.meta_description || '',
         keyword: a.focus_keyword || '',
+        featured: !!a.is_featured,
       });
       setSources(Array.isArray(a.sources) ? a.sources.map((x: any) => ({ name: x.name || '', url: x.url || '' })) : []);
       setStatus(a.review_status);
@@ -193,6 +195,7 @@ function Editor() {
         original_image_url: f.image,
         image_credit: f.credit,
         image_alt: f.alt,
+        is_featured: f.featured,
         meta_description: f.desc,
         focus_keyword: f.keyword,
         checked_items: checked,
@@ -235,6 +238,7 @@ function Editor() {
     meta_description: f.desc,
     focus_keyword: f.keyword,
     sources: cleanSources(),
+    is_featured: f.featured,
   });
 
   const validUrl = (u: string) => /^https?:\/\/[^\s]+\.[^\s]+/.test(u.trim());
@@ -534,6 +538,15 @@ function Editor() {
                   {busy === 'approve' ? 'Publishing…' : status === 'approved' ? 'Update live story' : 'Publish'}
                 </button>
               </div>
+              <label className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 px-3 py-2 text-sm cursor-pointer">
+                <input type="checkbox" className="mt-0.5 h-4 w-4 accent-amber-500" checked={f.featured} onChange={(e) => set({ featured: e.target.checked })} />
+                <span>
+                  <span className="font-bold">Feature on homepage</span>
+                  <span className="block text-[11px] text-gray-600 dark:text-gray-400">
+                    Big news only. Needs a clean, wide photo with no text in it. Shows in the top slider for 7 days (newest 5 picks).
+                  </span>
+                </span>
+              </label>
               {status !== 'new' && (
                 <div className="flex flex-wrap gap-3 text-xs">
                   {status === 'approved' && (
