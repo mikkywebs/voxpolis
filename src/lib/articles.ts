@@ -121,9 +121,30 @@ export const getLatestWorld = cache(async (excludeCode?: string, limit = 12): Pr
   }, [] as ArticleData[])
 );
 
+const STOP = new Set('the a an and or of to in on for at by with from as is are was were be has have had says say said over after into about its his her their this that will not new how why what who'.split(' '));
+const keyWords = (a: ArticleData) =>
+  new Set(
+    [a.title, ...(a.tags || [])]
+      .join(' ')
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !STOP.has(w))
+  );
+
+/** Related stories: same section, most shared key words (title and tags) first, stories with a photo preferred, then newest. */
 export const getRelated = cache(async (article: ArticleData, limit = 4): Promise<ArticleData[]> => {
-  const list = await getLatestForCountry(article.country_code, limit + 6);
-  return list.filter((a) => a.slug !== article.slug).slice(0, limit);
+  const list = (await getLatestForCountry(article.country_code, 40)).filter((a) => a.slug !== article.slug);
+  const mine = keyWords(article);
+  return list
+    .map((a, i) => {
+      let shared = 0;
+      keyWords(a).forEach((w) => mine.has(w) && shared++);
+      return { a, score: shared * 10 + (a.original_image_url ? 5 : 0) - i * 0.1 };
+    })
+    .sort((x, y) => y.score - x.score)
+    .slice(0, limit)
+    .map((x) => x.a);
 });
 
 export async function getSitemapEntries(limit = 5000): Promise<{ slug: string; country_code: string; created_at: string; updated_at?: string; title: string }[]> {
