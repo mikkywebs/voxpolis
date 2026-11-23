@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { CountryConfig } from '@/config/countries';
-import { WeatherData } from '@/lib/weather';
+import { AqiLevel, WeatherData } from '@/lib/weather';
 import { ArticleData } from '@/lib/news';
 import ReaderPoll, { ReaderPollData } from '@/components/poll/ReaderPoll';
 import AdSlot from '@/components/article/AdSlot';
@@ -31,6 +31,24 @@ interface LeftWidgetRailProps {
   variant?: 'rail' | 'mobile_strip';
 }
 
+// US AQI colours (EPA): green, yellow, orange, red, purple, maroon.
+const AQI_TEXT: Record<AqiLevel, string> = {
+  good: 'text-emerald-600 dark:text-emerald-400',
+  moderate: 'text-yellow-600 dark:text-yellow-400',
+  sensitive: 'text-orange-600 dark:text-orange-400',
+  unhealthy: 'text-red-600 dark:text-red-400',
+  very_unhealthy: 'text-purple-600 dark:text-purple-400',
+  hazardous: 'text-rose-800 dark:text-rose-400',
+};
+const AQI_PILL: Record<AqiLevel, string> = {
+  good: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+  moderate: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
+  sensitive: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
+  unhealthy: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+  very_unhealthy: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+  hazardous: 'bg-rose-200 text-rose-900 dark:bg-rose-900/50 dark:text-rose-200',
+};
+
 export default function LeftWidgetRail({
   country,
   trendingArticles = [],
@@ -40,19 +58,20 @@ export default function LeftWidgetRail({
   // --- 1. Weather State ---
   const [weather, setWeather] = useState<(WeatherData & { capital?: string }) | null>(null);
   const [tempUnit, setTempUnit] = useState<'C' | 'F'>('C');
+  const [weatherFailed, setWeatherFailed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     if (country.code !== 'NG') return; // weather only for Nigeria (Abuja); Africa and World are regions
     async function loadWeather() {
       try {
-        const res = await fetch(`/api/weather?country=${country.code}&lat=${country.lat}&lon=${country.lon}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted) setWeather(data);
-        }
+        const res = await fetch('/api/weather');
+        if (!res.ok) throw new Error(`weather ${res.status}`);
+        const data = await res.json();
+        if (isMounted) setWeather(data);
       } catch (e) {
         console.warn('Weather fetch error:', e);
+        if (isMounted) setWeatherFailed(true);
       }
     }
     loadWeather();
@@ -78,7 +97,7 @@ export default function LeftWidgetRail({
   if (variant === 'mobile_strip') {
     return (
       <div className="w-full space-y-3 lg:hidden my-4">
-        {country.code === 'NG' && (
+        {country.code === 'NG' && !weatherFailed && (
           <>
         {/* Compact Weather Bar */}
         <div className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3.5 shadow-xs flex items-center justify-between">
@@ -89,7 +108,18 @@ export default function LeftWidgetRail({
                 <span>{country.capital}, {country.name}</span>
               </div>
               <span className="text-[11px] text-gray-500 dark:text-neutral-400">
-                {weather ? `${weather.condition}${weather.aqi != null ? ` • AQI ${weather.aqi} (${weather.aqiLabel})` : ''}` : 'Loading weather…'}
+                {weather ? (
+                  <>
+                    {weather.condition}
+                    {weather.aqi != null && (
+                      <>
+                        {' • '}AQI {weather.aqi} <span className={`font-semibold ${AQI_TEXT[weather.aqiLevel || 'good']}`}>{weather.aqiLabel}</span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  'Loading weather…'
+                )}
               </span>
             </div>
           </div>
@@ -116,7 +146,7 @@ export default function LeftWidgetRail({
   // Desktop Left Widget Rail
   return (
     <aside className="w-full space-y-4">
-      {country.code === 'NG' && (
+      {country.code === 'NG' && !weatherFailed && (
         <>
       {/* Widget 1: Local Weather & Air Quality Card */}
       <section className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-xs transition-colors">
@@ -148,41 +178,42 @@ export default function LeftWidgetRail({
           </div>
         </div>
 
-        {/* Live Metrics: AQI, Humidity, Wind */}
-        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100 dark:border-neutral-800 text-[11px]">
-          {/* Air Quality Index */}
-          <div className="flex flex-col">
-            <span className="text-gray-400 dark:text-neutral-500 flex items-center gap-1">
-              <Gauge className="w-3 h-3 text-emerald-500" />
-              <span>AQI</span>
+        {/* Air quality on its own line (its labels can be long), then humidity and wind */}
+        {weather?.aqi != null && (
+          <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-100 dark:border-neutral-800 text-[11px]">
+            <span className="text-gray-500 dark:text-neutral-400 flex items-center gap-1">
+              <Gauge className="w-3 h-3" />
+              Air quality (AQI)
             </span>
-            <span className="font-bold text-gray-800 dark:text-gray-200 mt-0.5">
-              {weather?.aqi ?? '–'} <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">{weather?.aqiLabel ?? ''}</span>
+            <span className={`px-2 py-0.5 rounded-full font-bold ${AQI_PILL[weather.aqiLevel || 'good']}`}>
+              {weather.aqi} · {weather.aqiLabel}
             </span>
           </div>
-
-          {/* Humidity */}
+        )}
+        <div className="grid grid-cols-2 gap-2 pt-3 mt-3 border-t border-gray-100 dark:border-neutral-800 text-[11px]">
           <div className="flex flex-col">
             <span className="text-gray-400 dark:text-neutral-500 flex items-center gap-1">
               <Droplets className="w-3 h-3 text-blue-500" />
               <span>Humidity</span>
             </span>
-            <span className="font-bold text-gray-800 dark:text-gray-200 mt-0.5">
-              {weather?.humidity != null ? `${weather.humidity}%` : '–'}
-            </span>
+            <span className="font-bold text-gray-800 dark:text-gray-200 mt-0.5">{weather?.humidity != null ? `${weather.humidity}%` : '–'}</span>
           </div>
-
-          {/* Wind Speed */}
           <div className="flex flex-col">
             <span className="text-gray-400 dark:text-neutral-500 flex items-center gap-1">
               <Wind className="w-3 h-3 text-cyan-500" />
               <span>Wind</span>
             </span>
-            <span className="font-bold text-gray-800 dark:text-gray-200 mt-0.5">
-              {weather?.windSpeed != null ? `${weather.windSpeed} km/h` : '–'}
-            </span>
+            <span className="font-bold text-gray-800 dark:text-gray-200 mt-0.5">{weather?.windSpeed != null ? `${weather.windSpeed} km/h` : '–'}</span>
           </div>
         </div>
+        {weather?.observedAt && (
+          <p className="mt-3 text-[10px] text-gray-400 dark:text-neutral-500">
+            Updated {weather.observedAt} Abuja time · Data:{' '}
+            <a href="https://open-meteo.com/" target="_blank" rel="noopener" className="underline">
+              Open-Meteo
+            </a>
+          </p>
+        )}
       </section>
         </>
       )}

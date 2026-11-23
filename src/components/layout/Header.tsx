@@ -145,7 +145,7 @@ export default function Header({
   useEffect(() => {
     async function loadWeather() {
       try {
-        const res = await fetch(`/api/weather?lat=${selectedCountry.lat}&lon=${selectedCountry.lon}`);
+        const res = await fetch('/api/weather'); // always Abuja
         if (res.ok) {
           const data = await res.json();
           setWeather(data);
@@ -155,7 +155,7 @@ export default function Header({
       }
     }
     loadWeather();
-  }, [selectedCountry]);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -220,8 +220,8 @@ export default function Header({
           {weather && (
             <div className="hidden sm:flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-semibold px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm shrink-0">
               <span>{weather.icon}</span>
-              <span>{weather.tempC}°C</span>
-              <span className="hidden lg:inline text-gray-400 truncate max-w-[90px]">| {weather.condition}</span>
+              <span>Abuja {weather.tempC}°C</span>
+              <span className="hidden lg:inline text-gray-400 truncate max-w-[110px]">| {weather.condition}</span>
             </div>
           )}
 
