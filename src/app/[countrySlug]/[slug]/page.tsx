@@ -44,6 +44,14 @@ function shareImage(a: ArticleData): string {
   return a.original_image_url && !a.original_image_url.startsWith('data:') ? a.original_image_url : `/card/${encodeURIComponent(a.slug)}`;
 }
 
+/** Focus keyword, additional keywords and tags, without duplicates (used in the page's keyword data). */
+function keywordList(a: ArticleData): string[] {
+  const seen = new Set<string>();
+  return [a.focus_keyword, ...(a.secondary_keywords || []), ...(a.tags || [])]
+    .filter((k): k is string => !!k && !!k.trim())
+    .filter((k) => !seen.has(k.toLowerCase()) && !!seen.add(k.toLowerCase()));
+}
+
 function formatDate(iso?: string) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -72,7 +80,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description: description(a),
-    keywords: a.tags,
+    keywords: keywordList(a),
     alternates: { canonical: articlePath(a) },
     robots: a.review_status === 'archived'
       ? { index: false, follow: true }
@@ -128,7 +136,7 @@ export default async function ArticlePage({ params }: Props) {
         datePublished: a.created_at,
         dateModified: a.updated_at || a.created_at,
         articleSection: `${country.name} politics`,
-        keywords: a.tags?.join(', '),
+        keywords: keywordList(a).join(', ') || undefined,
         wordCount: words,
         inLanguage: 'en',
         contentLocation: { '@type': 'Country', name: country.name },

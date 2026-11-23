@@ -97,6 +97,7 @@ function Editor() {
     desc: '',
     keyword: '',
     featured: false,
+    extraKw: '',
   });
   const [slugTouched, setSlugTouched] = useState(!!idParam);
   const [sources, setSources] = useState<{ name: string; url: string }[]>([]);
@@ -142,6 +143,7 @@ function Editor() {
         desc: a.meta_description || '',
         keyword: a.focus_keyword || '',
         featured: !!a.is_featured,
+        extraKw: (a.secondary_keywords || []).join(', '),
       });
       setSources(Array.isArray(a.sources) ? a.sources.map((x: any) => ({ name: x.name || '', url: x.url || '' })) : []);
       setStatus(a.review_status);
@@ -178,6 +180,8 @@ function Editor() {
   // ---------- derived ----------
   const parsed = useMemo(() => fromBody(f.body, kinds.current), [f.body]);
   const words = countWords(f.body);
+  const extraKeywords = f.extraKw.split(',').map((k) => k.trim()).filter(Boolean).slice(0, 8);
+  const storyText = [f.title, f.dek, f.body].join(' ').toLowerCase();
   const sectionObj = getCountryByCode(f.section);
   const live = useMemo(
     () =>
@@ -198,6 +202,7 @@ function Editor() {
         is_featured: f.featured,
         meta_description: f.desc,
         focus_keyword: f.keyword,
+        secondary_keywords: extraKeywords,
         checked_items: checked,
         review_status: status === 'new' ? 'pending' : status,
         new_reports_at: meta.new_reports_at,
@@ -239,6 +244,7 @@ function Editor() {
     focus_keyword: f.keyword,
     sources: cleanSources(),
     is_featured: f.featured,
+    secondary_keywords: extraKeywords,
   });
 
   const validUrl = (u: string) => /^https?:\/\/[^\s]+\.[^\s]+/.test(u.trim());
@@ -689,6 +695,36 @@ function Editor() {
               <div>
                 <label className={label} htmlFor="kw">Focus keyword</label>
                 <input id="kw" className={input} placeholder="2027 budget" value={f.keyword} onChange={(e) => set({ keyword: e.target.value })} />
+              </div>
+              <div>
+                <label className={label} htmlFor="kw2">Additional keywords (comma separated, up to 8)</label>
+                <input
+                  id="kw2"
+                  className={input}
+                  placeholder="Appropriation bill, National Assembly, Tinubu budget"
+                  value={f.extraKw}
+                  onChange={(e) => set({ extraKw: e.target.value })}
+                />
+                {extraKeywords.length > 0 && (
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {extraKeywords.map((k) => {
+                      const used = storyText.includes(k.toLowerCase());
+                      return (
+                        <li
+                          key={k}
+                          title={used ? 'Used in the story' : 'Not in the story yet'}
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${used ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
+                        >
+                          {used ? '✓ ' : ''}
+                          {k}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Other words people search for this story. Green means it appears in your text. Google ranks what is written in the story, so use each one naturally.
+                </p>
               </div>
               <div>
                 <label className={label} htmlFor="seot">

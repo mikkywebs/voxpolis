@@ -28,6 +28,8 @@ export interface ArticleData {
   is_breaking: boolean;
   is_featured?: boolean;
   featured_at?: string;
+  focus_keyword?: string;
+  secondary_keywords?: string[];
   tags: string[];
   views_count: number;
   total_reading_time_seconds: number;

@@ -48,6 +48,7 @@ export interface CheckInput {
   image_credit?: string | null;
   meta_description?: string | null;
   focus_keyword?: string | null;
+  secondary_keywords?: string[] | null;
   image_alt?: string | null;
   is_featured?: boolean | null;
   checked_items?: string[] | null;
@@ -348,6 +349,10 @@ export function checkStory(a: CheckInput): CheckResult {
     if (!has(desc)) items.push({ level: 'check', field: 'seo', text: `The focus keyword is not in the Google description.` });
     if (a.slug && slugKw && !a.slug.includes(slugKw)) items.push({ level: 'tip', field: 'seo', text: `The web address doesn't contain the focus keyword.` });
   }
+  const allText = [a.title, a.dek, ...bodyParts.map((p) => p.text), a.what_to_watch].join(' ').toLowerCase();
+  const unused = (a.secondary_keywords || []).filter((k) => k.trim() && !allText.includes(k.trim().toLowerCase()));
+  if (unused.length)
+    items.push({ level: 'tip', field: 'seo', text: `Additional keyword${unused.length > 1 ? 's' : ''} not used in the story yet: "${unused.join('", "')}". Use each once where it reads naturally, e.g. in a subheading.` });
   if (own && flexible && sections.length === 0 && words > 350)
     items.push({ level: 'tip', field: 'lead', text: 'Long story with no subheadings. Add a line starting with "## " to break it up (Google reads these as H2 headings).' });
 
