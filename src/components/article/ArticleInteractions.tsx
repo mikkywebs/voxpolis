@@ -80,7 +80,7 @@ export default function ArticleInteractions({ part, articleId, slug, title, dek,
 
   if (part === 'top') {
     return (
-      <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-y border-gray-200 dark:border-gray-800 py-3">
         <EmojiReactions articleId={articleId} slug={slug} />
         <SocialShareButtons title={title} slug={slug} path={path} />
       </div>

@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 
-  const { data: current } = await supabaseAdmin.from('articles').select('id, slug, country_code, review_status, checked_items').eq('id', id).maybeSingle();
+  const { data: current } = await supabaseAdmin.from('articles').select('id, slug, country_code, review_status, checked_items, origin').eq('id', id).maybeSingle();
   if (!current) return NextResponse.json({ error: 'Story not found' }, { status: 404 });
 
   // "Find a free photo": licensed Wikimedia options for the people/places in the story. Nothing is changed here.
@@ -297,7 +297,8 @@ export async function POST(req: NextRequest) {
         .map((x: any) => ({ name: x.name || new URL(x.url).hostname.replace(/^www\./, ''), url: x.url }))
         .slice(0, 8);
       update.sources = list;
-      if (list[0]) {
+      // Your own stories keep source_url empty: several stories may cite the same statement or document.
+      if (list[0] && current.origin !== 'editor') {
         update.source_url = list[0].url;
         update.source_name = list[0].name;
       }

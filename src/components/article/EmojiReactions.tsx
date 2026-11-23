@@ -141,64 +141,37 @@ export default function EmojiReactions({ articleId, slug }: EmojiReactionsProps)
 
   const reactions: { type: ReactionType; emoji: string; label: string }[] = [
     { type: 'upvote', emoji: '👍', label: 'Upvote' },
-    { type: 'funny', emoji: '😝', label: 'Funny' },
-    { type: 'love', emoji: '😍', label: 'Love' },
+    { type: 'funny', emoji: '😂', label: 'Funny' },
+    { type: 'love', emoji: '❤️', label: 'Love' },
     { type: 'surprised', emoji: '😮', label: 'Surprised' },
-    { type: 'angry', emoji: '😤', label: 'Angry' },
+    { type: 'angry', emoji: '😡', label: 'Angry' },
     { type: 'sad', emoji: '😢', label: 'Sad' },
   ];
 
   return (
-    <section className="my-2 sm:my-4 py-2 px-1 sm:px-4 rounded-xl sm:rounded-2xl bg-white/70 dark:bg-gray-900/70 border border-gray-150 dark:border-gray-800 shadow-xs">
-      {/* 6 Reaction Emojis in a Single Responsive Row on Mobile and Desktop */}
-      <div className="grid grid-cols-6 items-center justify-items-center w-full max-w-xl mx-auto gap-0.5 sm:gap-3">
-        {reactions.map((r) => {
-          const isSelected = userReaction === r.type;
-          const count = counts[r.type] || 0;
-
-          return (
-            <button
-              key={r.type}
-              type="button"
-              onClick={() => handleReact(r.type)}
-              className={`group flex flex-col items-center justify-center w-full py-1 px-0.5 sm:px-2 rounded-xl transition-all duration-150 cursor-pointer ${
-                isSelected
-                  ? 'bg-blue-50 dark:bg-blue-950/60 border border-blue-400 dark:border-blue-600 scale-105 shadow-xs'
-                  : 'hover:bg-gray-100/80 dark:hover:bg-gray-800/80 border border-transparent'
-              }`}
-            >
-              {/* Emoji */}
-              <span className="text-2xl sm:text-3xl filter group-hover:scale-110 transition-transform select-none drop-shadow-xs">
-                {r.emoji}
-              </span>
-
-              {/* Label */}
-              <span
-                className={`text-[10px] sm:text-xs font-semibold mt-1 transition-colors truncate max-w-full text-center ${
-                  isSelected
-                    ? 'text-blue-600 dark:text-blue-400 font-bold'
-                    : 'text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                {r.label}
-              </span>
-
-              {/* Real count pill */}
-              <span
-                className={`text-[9px] sm:text-[10px] font-semibold mt-0.5 px-1.5 py-0.2 rounded-full transition-colors ${
-                  count > 0
-                    ? isSelected
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                    : 'text-transparent opacity-0 pointer-events-none'
-                }`}
-              >
-                {count > 0 ? count : '0'}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
+    <div role="group" aria-label="React to this story" className="flex flex-wrap items-center gap-1.5">
+      {reactions.map((r) => {
+        const isSelected = userReaction === r.type;
+        const count = counts[r.type] || 0;
+        return (
+          <button
+            key={r.type}
+            type="button"
+            onClick={() => handleReact(r.type)}
+            title={r.label}
+            aria-label={`${r.label}${count ? ` (${count})` : ''}`}
+            aria-pressed={isSelected}
+            className={`group inline-flex h-9 items-center gap-1 rounded-full border px-2.5 text-sm transition ${
+              isSelected
+                ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-lg leading-none transition-transform group-hover:scale-125 select-none">{r.emoji}</span>
+            {count > 0 && <span className="text-xs font-semibold tabular-nums">{count}</span>}
+          </button>
+        );
+      })}
+    </div>
   );
 }
