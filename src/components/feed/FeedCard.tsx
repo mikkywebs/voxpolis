@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getCountryByCode } from '@/config/countries';
 import Link from 'next/link';
 import { articlePath } from '@/lib/paths';
 import PhotoCredit from '@/components/article/PhotoCredit';
@@ -85,7 +86,7 @@ export default function FeedCard({ article, index, onCardClick }: FeedCardProps)
 
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-            {article.source_name}
+            {getCountryByCode(article.country_code).name}
           </span>
           <div className="flex items-center gap-2 text-gray-400 text-[11px]">
             {/* Viewer counter badge: Hidden at 0 views, displayed only when real visitors click */}
