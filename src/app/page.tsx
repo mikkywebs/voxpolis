@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import LiveFeed from '@/components/feed/LiveFeed';
-import { getLatestForCountry } from '@/lib/articles';
+import { getFeatured, getLatestForCountry } from '@/lib/articles';
 import { ArticleData } from '@/lib/news';
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 
@@ -29,7 +29,7 @@ function mix(pools: Record<string, ArticleData[]>, total: number): ArticleData[]
 }
 
 export default async function HomePage() {
-  const [ng, africa, world] = await Promise.all([getLatestForCountry('NG', 28), getLatestForCountry('AFRICA', 10), getLatestForCountry('WORLD', 6)]);
+  const [ng, africa, world, featured] = await Promise.all([getLatestForCountry('NG', 28), getLatestForCountry('AFRICA', 10), getLatestForCountry('WORLD', 6), getFeatured(5)]);
   const articles = mix({ NG: ng, AFRICA: africa, WORLD: world }, 40);
   const shown = new Set(articles.map((a) => a.id));
   const more = [...africa, ...world].filter((a) => !shown.has(a.id));
@@ -68,6 +68,7 @@ export default async function HomePage() {
         mode="home"
         initialCountryCode="NG"
         initialArticles={articles}
+        featuredArticles={featured}
         worldArticles={more}
         heading="Nigeria, Africa and world politics, explained"
         intro="Original reporting on today’s political stories: what happened, why it matters and what comes next."

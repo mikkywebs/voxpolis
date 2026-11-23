@@ -14,6 +14,7 @@ interface LiveFeedProps {
   initialCountryCode: string;
   initialArticles: ArticleData[];
   worldArticles: ArticleData[];
+  featuredArticles?: ArticleData[];
   heading: string;
   intro?: string;
 }
@@ -39,7 +40,7 @@ function rememberCountry(code: string) {
  * Feed page shell. The server already rendered the articles (good for Google);
  * this only adds the signed-in member's name on top. Everyone sees the same sections.
  */
-export default function LiveFeed({ mode, initialCountryCode, initialArticles, worldArticles, heading, intro }: LiveFeedProps) {
+export default function LiveFeed({ mode, initialCountryCode, initialArticles, worldArticles, featuredArticles = [], heading, intro }: LiveFeedProps) {
   const router = useRouter();
   const country = getCountryByCode(initialCountryCode);
   const articles = initialArticles;
@@ -81,6 +82,7 @@ export default function LiveFeed({ mode, initialCountryCode, initialArticles, wo
     <BentoFeedLayout
       selectedCountry={country}
       articles={articles}
+      featuredArticles={featuredArticles}
       loading={false}
       user={user}
       onSelectCountry={handleSelect}

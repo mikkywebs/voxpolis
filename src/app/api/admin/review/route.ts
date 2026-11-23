@@ -21,7 +21,7 @@ export const maxDuration = 60;
  */
 
 const FIELDS =
-  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, new_reports_at, fidelity, origin, category, editorial_version, updated_at, seo_title, focus_keyword, image_alt, tags, image_license';
+  'id, slug, title, dek, snippet, key_points, content, analysis, ai_analysis, background, what_next, country_code, source_name, source_url, importance, original_image_url, image_credit, image_page_url, created_at, review_status, reviewed_by, reviewed_at, story_type, lead, sections, what_to_watch, sources, source_facts, meta_description, checked_items, new_reports_at, fidelity, origin, category, editorial_version, updated_at, seo_title, focus_keyword, image_alt, tags, image_license, is_featured, featured_at';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyAdmin(req);
@@ -315,6 +315,12 @@ export async function POST(req: NextRequest) {
       update.tags = Array.from(new Set(f.tags.map((t: unknown) => clean(t, 40)).filter(Boolean))).slice(0, 10);
     }
     if (f.category === 'opinion' || f.category === 'politics') update.category = f.category;
+    if (typeof f.is_featured === 'boolean') {
+      const { data: was } = await supabaseAdmin.from('articles').select('is_featured').eq('id', id).maybeSingle();
+      update.is_featured = f.is_featured;
+      if (f.is_featured && !was?.is_featured) update.featured_at = new Date().toISOString();
+      if (!f.is_featured) update.featured_at = null;
+    }
     if (typeof f.image_credit === 'string') update.image_credit = f.image_credit.trim().slice(0, 160) || null;
 
     if (typeof f.poll_question === 'string') {

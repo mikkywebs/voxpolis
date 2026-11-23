@@ -6,6 +6,7 @@ import BentoHeader from './BentoHeader';
 import BreakingTicker from './BreakingTicker';
 import LeftWidgetRail from './LeftWidgetRail';
 import HeroPopularitySlider from './HeroPopularitySlider';
+import { pickFeatured } from '@/lib/featured';
 import StoryCard from './StoryCard';
 import Footer from '@/components/layout/Footer';
 import RegionalCountrySelectorModal from '@/components/layout/RegionalCountrySelectorModal';
@@ -17,6 +18,7 @@ import Link from 'next/link';
 interface BentoFeedLayoutProps {
   selectedCountry: CountryConfig;
   articles: ArticleData[];
+  featuredArticles?: ArticleData[];
   loading?: boolean;
   user?: {
     id: string;
@@ -35,6 +37,7 @@ interface BentoFeedLayoutProps {
 export default function BentoFeedLayout({
   selectedCountry,
   articles,
+  featuredArticles = [],
   loading = false,
   user,
   onSelectCountry,
@@ -64,12 +67,16 @@ export default function BentoFeedLayout({
 
   // Distinct slots for Bento layout:
   // Row 1: Hero Slider (2 cols, uses articles 0-4) + Adjacent Card (1 col, uses article 5 or 1)
-  const adjacentStory = articles[5] || articles[1] || articles[0];
+  // Slider stories are chosen first; every other story appears exactly once below.
+  const heroStories = pickFeatured(featuredArticles, articles);
+  const heroIds = new Set(heroStories.map((a) => a.id));
+  const rest = articles.filter((a) => !heroIds.has(a.id));
+  const adjacentStory = rest[0];
 
   // Grid below Row 1: Definite limit with clean pagination (6 cards per page, max 10 pages)
   const CARDS_PER_PAGE = 6;
   const MAX_PAGES = 10;
-  const feedPool = articles.length > 6 ? articles.slice(6) : (articles.length > 2 ? articles.slice(2) : articles);
+  const feedPool = rest.slice(1);
   const totalPages = Math.min(MAX_PAGES, Math.max(1, Math.ceil(feedPool.length / CARDS_PER_PAGE)));
   const startIndex = (currentPage - 1) * CARDS_PER_PAGE;
   const currentGridCards = feedPool.slice(startIndex, startIndex + CARDS_PER_PAGE);
@@ -175,7 +182,7 @@ export default function BentoFeedLayout({
               {/* Row 1: Hero Popularity Slider (2 cols) + Adjacent Story Card (1 col) */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 <HeroPopularitySlider
-                  articles={articles}
+                  articles={heroStories}
                   countryCode={selectedCountry.code}
                 />
 

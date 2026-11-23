@@ -3,11 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { articlePath } from '@/lib/paths';
-import PhotoCredit from '@/components/article/PhotoCredit';
+import { getCountryByCode } from '@/config/countries';
 import { ArticleData, formatExactTimestamp, getArticleImageUrl, getArticleFallbackUrl } from '@/lib/news';
 import { decodeAllHtmlEntities } from '@/lib/news-rewriter';
-import UniversalEngagementBar from './UniversalEngagementBar';
-import { ChevronLeft, ChevronRight, Flame, Sparkles, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
 
 interface HeroPopularitySliderProps {
   articles: ArticleData[];
@@ -20,30 +19,8 @@ export default function HeroPopularitySlider({
   countryCode,
   onRecordClick,
 }: HeroPopularitySliderProps) {
-  // 1. Filter and rank: Featured articles + top popular of last 24h
-  const now = Date.now();
-  const twentyFourHoursMs = 24 * 60 * 60 * 1000;
-
-  const candidatePool = [...articles];
-  // Sort candidate pool by popularity (views_count) with bonus for featured & fresh items
-  candidatePool.sort((a, b) => {
-    const aIsFeatured = a.is_featured || a.tags?.some((t) => /featured/i.test(t));
-    const bIsFeatured = b.is_featured || b.tags?.some((t) => /featured/i.test(t));
-    if (aIsFeatured && !bIsFeatured) return -1;
-    if (!aIsFeatured && bIsFeatured) return 1;
-
-    const aAge = now - new Date(a.created_at).getTime();
-    const bAge = now - new Date(b.created_at).getTime();
-    const aIs24h = aAge <= twentyFourHoursMs;
-    const bIs24h = bAge <= twentyFourHoursMs;
-
-    if (aIs24h && !bIs24h) return -1;
-    if (!aIs24h && bIs24h) return 1;
-
-    return (b.views_count || 0) - (a.views_count || 0);
-  });
-
-  const slideStories = candidatePool.slice(0, 5);
+  // Stories are already chosen by pickFeatured (lib/featured.ts): editor picks first, then fresh Nigeria news with photos.
+  const slideStories = articles.slice(0, 5);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -67,7 +44,7 @@ export default function HeroPopularitySlider({
   const fallbackUrl = getArticleFallbackUrl(active, currentIndex);
   const displayTitle = decodeAllHtmlEntities((active.title || '').replace(/\s*[-–—|]\s*Voxpolis.*$/i, '')).trim();
   const articleUrl = articlePath(active);
-  const isFeaturedStory = active.is_featured || active.tags?.some((t) => /featured/i.test(t));
+  const isFeaturedStory = !!active.is_featured;
 
   const handleCardClick = () => {
     if (onRecordClick) onRecordClick(active);
@@ -91,118 +68,83 @@ export default function HeroPopularitySlider({
               target.src = fallbackUrl;
             }
           }}
-          className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700 ease-out"
+          className="w-full h-full object-cover object-top"
         />
-        <div className="absolute inset-0 bg-linear-to-t from-neutral-950 via-neutral-950/70 to-neutral-950/20" />
+        {/* Strong fade at the bottom so the headline is always readable, whatever the photo */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 via-35% to-transparent to-75%" />
       </div>
 
-      {/* Slide Navigation Controls (< >) */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-md p-1 rounded-full border border-white/10 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          type="button"
-          onClick={() => setCurrentIndex((prev) => (prev - 1 + slideStories.length) % slideStories.length)}
-          className="p-1.5 rounded-full hover:bg-white/20 text-white transition cursor-pointer"
-          aria-label="Previous slide"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <span className="text-[11px] font-bold text-white/80 tabular-nums px-1">
-          {currentIndex + 1}/{slideStories.length}
-        </span>
-        <button
-          type="button"
-          onClick={() => setCurrentIndex((prev) => (prev + 1) % slideStories.length)}
-          className="p-1.5 rounded-full hover:bg-white/20 text-white transition cursor-pointer"
-          aria-label="Next slide"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Featured / Popular Badge */}
-      {/* Featured / Popular / Civic Overview Badge */}
-      <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-        {active.category === 'civic-overview' || active.source_name === 'Voxpolis Civic Desk' ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-sky-600/90 text-white shadow-xs backdrop-blur-xs">
-            <span>Civic Overview</span>
-          </span>
-        ) : isFeaturedStory ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-amber-500/90 text-white shadow-xs backdrop-blur-xs">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Featured Policy</span>
+      {/* Top row: one label on the left, photo credit on the right */}
+      <div className="absolute top-4 left-4 z-20">
+        {isFeaturedStory ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-amber-500 text-black">
+            <Star className="w-3.5 h-3.5" />
+            Featured
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-red-600/90 text-white shadow-xs backdrop-blur-xs">
-            <Flame className="w-3.5 h-3.5" />
-            <span>Top Popular</span>
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-black/60 text-white backdrop-blur-sm">
+            {getCountryByCode(active.country_code).name}
           </span>
         )}
       </div>
+      {active.image_credit && active.original_image_url && (
+        <span className="absolute top-4 right-4 z-20 max-w-[45%] truncate rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/85" title={active.image_credit}>
+          {active.image_credit.replace(/^Photo:\s*/, '')}
+        </span>
+      )}
 
-      {/* Slide Content Overlay */}
-      <PhotoCredit article={active} className="z-20" />
-      <div className="relative z-10 p-5 sm:p-6 md:p-8 space-y-3">
-        {/* Publisher & Freshness Row */}
-        <div className="flex items-center gap-2 text-xs text-white/80 font-semibold flex-wrap">
-          <span className="bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full uppercase tracking-wider text-[11px] text-white">
-            {active.source_name || 'VoxPolis'}
-          </span>
-          <span>•</span>
-          <span>{formatExactTimestamp(active.created_at)}</span>
-          {active.views_count > 0 && (
-            <>
-              <span>•</span>
-              <span className="inline-flex items-center gap-1 text-[11px] text-white/70">
-                <Eye className="w-3 h-3" />
-                <span>{active.views_count.toLocaleString()} views</span>
-              </span>
-            </>
-          )}
-        </div>
+      {/* Side arrows (show on hover; always tappable on phones) */}
+      {slideStories.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={() => setCurrentIndex((prev) => (prev - 1 + slideStories.length) % slideStories.length)}
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/45 text-white flex items-center justify-center opacity-80 sm:opacity-0 group-hover:opacity-100 transition hover:bg-black/70"
+            aria-label="Previous story"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentIndex((prev) => (prev + 1) % slideStories.length)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/45 text-white flex items-center justify-center opacity-80 sm:opacity-0 group-hover:opacity-100 transition hover:bg-black/70"
+            aria-label="Next story"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </>
+      )}
 
-        {/* Headline */}
-        <Link href={articleUrl} onClick={handleCardClick} className="block group/title">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white group-hover/title:text-blue-400 transition-colors leading-tight line-clamp-2 sm:line-clamp-3 drop-shadow-xs">
+      {/* Text: section and time, headline, one summary line */}
+      <div className="relative z-10 p-5 sm:p-7 pb-8 sm:pb-9 space-y-2 max-w-3xl">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-white/75">
+          {isFeaturedStory ? `${getCountryByCode(active.country_code).name} · ` : ''}
+          {formatExactTimestamp(active.created_at)}
+        </p>
+        <Link href={articleUrl} onClick={handleCardClick} className="block">
+          <h2 className="text-2xl sm:text-3xl md:text-[2.1rem] font-black text-white leading-tight line-clamp-3 [text-shadow:0_1px_12px_rgba(0,0,0,0.6)] hover:underline decoration-2 underline-offset-4">
             {displayTitle}
           </h2>
         </Link>
-
-        {/* Snippet */}
         {active.snippet && (
-          <p className="text-xs sm:text-sm text-neutral-200 line-clamp-2 max-w-2xl leading-relaxed">
-            {decodeAllHtmlEntities(active.snippet)}
-          </p>
+          <p className="hidden sm:block text-sm text-white/85 line-clamp-2 leading-relaxed">{decodeAllHtmlEntities(active.snippet)}</p>
         )}
-
-        {/* Bottom Bar: Universal Reaction Bar + Slide Dots */}
-        <div className="pt-2 flex items-center justify-between gap-4">
-          {/* Universal Engagement Bar on the Slider! */}
-          <UniversalEngagementBar
-            articleId={active.id}
-            articleSlug={active.slug}
-            countryCode={countryCode}
-            initialLikes={0}
-            initialDislikes={0}
-            initialComments={0}
-            variant="hero"
-          />
-
-          {/* Dots Indicator */}
-          <div className="flex items-center gap-1.5">
-            {slideStories.map((_, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setCurrentIndex(idx)}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  currentIndex === idx ? 'w-6 bg-white' : 'w-1.5 bg-white/40 hover:bg-white/60'
-                }`}
-                aria-label={`Jump to slide ${idx + 1}`}
-              />
-            ))}
-          </div>
-        </div>
       </div>
+
+      {/* Slide dots */}
+      {slideStories.length > 1 && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5">
+          {slideStories.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setCurrentIndex(idx)}
+              className={`h-1.5 rounded-full transition-all duration-300 ${currentIndex === idx ? 'w-6 bg-white' : 'w-1.5 bg-white/45 hover:bg-white/70'}`}
+              aria-label={`Show story ${idx + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

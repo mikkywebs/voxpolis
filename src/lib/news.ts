@@ -27,6 +27,7 @@ export interface ArticleData {
   author?: string;
   is_breaking: boolean;
   is_featured?: boolean;
+  featured_at?: string;
   tags: string[];
   views_count: number;
   total_reading_time_seconds: number;

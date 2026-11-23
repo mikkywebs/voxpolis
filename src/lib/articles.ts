@@ -28,6 +28,8 @@ function rowToArticle(r: any): ArticleData {
     original_image_url: isUsablePhoto(r.original_image_url, r.image_credit) ? r.original_image_url : undefined,
     image_credit: r.image_credit || undefined,
     image_alt: r.image_alt || undefined,
+    is_featured: !!r.is_featured,
+    featured_at: r.featured_at || undefined,
     image_license: r.image_license || undefined,
     image_page_url: r.image_page_url || undefined,
     review_status: r.review_status || 'pending',
@@ -131,6 +133,21 @@ const keyWords = (a: ArticleData) =>
       .split(/\s+/)
       .filter((w) => w.length > 2 && !STOP.has(w))
   );
+
+/** Stories the editor ticked "Feature on homepage" in the last 7 days, newest pick first. */
+export const getFeatured = cache(async (limit = 5): Promise<ArticleData[]> =>
+  safe(async () => {
+    const { data } = await supabaseAdmin
+      .from('articles')
+      .select(LIST_COLUMNS)
+      .eq('review_status', 'approved')
+      .eq('is_featured', true)
+      .gte('featured_at', new Date(Date.now() - 7 * 24 * 3600_000).toISOString())
+      .order('featured_at', { ascending: false })
+      .limit(limit);
+    return (data || []).filter(isPublished).map(rowToArticle);
+  }, [])
+);
 
 /** Related stories: same section, most shared key words (title and tags) first, stories with a photo preferred, then newest. */
 export const getRelated = cache(async (article: ArticleData, limit = 4): Promise<ArticleData[]> => {
