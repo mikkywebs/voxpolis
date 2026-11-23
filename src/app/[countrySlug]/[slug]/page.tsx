@@ -97,7 +97,7 @@ export default async function ArticlePage({ params }: Props) {
   const a = await load(params.countrySlug, params.slug);
   const country = getCountryByCode(a.country_code);
   const countryPath = `/${getCountrySlug(country)}`;
-  const related = await getRelated(a, 4);
+  const related = await getRelated(a, 2);
 
   const body = paragraphs(a.content);
   const analysis = realAnalysis(a);
@@ -307,17 +307,31 @@ export default async function ArticlePage({ params }: Props) {
           {related.length > 0 && (
             <section aria-labelledby="more" className="mt-10 border-t border-gray-200 dark:border-gray-800 pt-6">
               <h2 id="more" className="text-lg font-black mb-4">
-                More from {country.name}
+                Read next
               </h2>
-              <ul className="grid sm:grid-cols-2 gap-4">
+              <ul className="grid sm:grid-cols-2 gap-5">
                 {related.map((r) => (
                   <li key={r.slug}>
                     <Link
                       href={articlePath(r)}
-                      className="block h-full p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:border-blue-500 transition"
+                      className="group block h-full overflow-hidden rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:border-blue-500 hover:shadow-lg transition"
                     >
-                      <span className="text-sm font-bold leading-snug text-gray-900 dark:text-white">{r.title}</span>
-                      {r.snippet && <span className="block mt-1 text-xs text-gray-500 line-clamp-2">{r.snippet}</span>}
+                      <div className="aspect-[16/9] overflow-hidden bg-gray-100 dark:bg-gray-800">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={shareImage(r)}
+                          alt={r.image_alt || r.title}
+                          loading="lazy"
+                          className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-105"
+                        />
+                      </div>
+                      <div className="p-4">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">{getCountryByCode(r.country_code).name}</span>
+                        <span className="mt-1 block text-base font-black leading-snug text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300">
+                          {r.title}
+                        </span>
+                        {r.snippet && <span className="block mt-1.5 text-sm text-gray-500 line-clamp-2">{r.snippet}</span>}
+                      </div>
                     </Link>
                   </li>
                 ))}
