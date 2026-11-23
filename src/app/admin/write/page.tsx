@@ -98,6 +98,8 @@ function Editor() {
     keyword: '',
   });
   const [slugTouched, setSlugTouched] = useState(!!idParam);
+  const [sources, setSources] = useState<{ name: string; url: string }[]>([]);
+  const setSource = (i: number, patch: Partial<{ name: string; url: string }>) => setSources((all) => all.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const set = (patch: Partial<typeof f>) => setF((x) => ({ ...x, ...patch }));
 
   // ---------- auth + load ----------
@@ -139,6 +141,7 @@ function Editor() {
         desc: a.meta_description || '',
         keyword: a.focus_keyword || '',
       });
+      setSources(Array.isArray(a.sources) ? a.sources.map((x: any) => ({ name: x.name || '', url: x.url || '' })) : []);
       setStatus(a.review_status);
       setChecked(a.checked_items || []);
       setMeta({
@@ -231,7 +234,22 @@ function Editor() {
     seo_title: f.seoTitle,
     meta_description: f.desc,
     focus_keyword: f.keyword,
+    sources: cleanSources(),
   });
+
+  const validUrl = (u: string) => /^https?:\/\/[^\s]+\.[^\s]+/.test(u.trim());
+  const cleanSources = () =>
+    sources
+      .filter((x) => validUrl(x.url))
+      .map((x) => {
+        let name = x.name.trim();
+        if (!name) {
+          try {
+            name = new URL(x.url.trim()).hostname.replace(/^www\./, '');
+          } catch {}
+        }
+        return { name, url: x.url.trim() };
+      });
 
   const call = async (body: any) => {
     const res = await fetch('/api/admin/review', {
@@ -250,6 +268,7 @@ function Editor() {
     if (f.title.trim().length < 20) return setErr('Write the headline first (at least 20 characters).');
     if (!parsed.lead) return setErr('Write the opening paragraph before the first "##" subheading.');
     if (parsed.sections.some((s) => !s.text)) return setErr('Every "##" subheading needs text under it.');
+    if (sources.some((x) => x.url.trim() && !validUrl(x.url))) return setErr('A source link is not a full web address. It must start with https://');
     setBusy(action);
     try {
       let storyId = id;
@@ -458,6 +477,37 @@ function Editor() {
                 <label className={label} htmlFor="tags">Tags (comma separated)</label>
                 <input id="tags" className={input} placeholder="Tinubu, 2027 budget, National Assembly" value={f.tags} onChange={(e) => set({ tags: e.target.value })} />
               </div>
+            </div>
+
+            <div className={card + ' space-y-3'}>
+              <div className="flex items-center justify-between">
+                <span className={label + ' mb-0'}>Sources (shown at the end of the story)</span>
+                <button
+                  type="button"
+                  onClick={() => setSources((all) => [...all, { name: '', url: '' }])}
+                  className="text-xs font-bold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200"
+                >
+                  + Add source
+                </button>
+              </div>
+              {sources.length === 0 && (
+                <p className="text-xs text-gray-500">Link the statement, document or report your story is based on. Readers and Google trust stories that show their sources.</p>
+              )}
+              {sources.map((x, i) => (
+                <div key={i} className="grid gap-2 sm:grid-cols-[180px_minmax(0,1fr)_auto] items-start">
+                  <input className={input} aria-label={`Source ${i + 1} name`} placeholder="Name, e.g. State House" value={x.name} onChange={(e) => setSource(i, { name: e.target.value })} />
+                  <input
+                    className={`${input} ${x.url.trim() && !validUrl(x.url) ? 'border-red-400' : ''}`}
+                    aria-label={`Source ${i + 1} link`}
+                    placeholder="https://statehouse.gov.ng/news/..."
+                    value={x.url}
+                    onChange={(e) => setSource(i, { url: e.target.value })}
+                  />
+                  <button type="button" onClick={() => setSources((all) => all.filter((_, j) => j !== i))} className="px-2 py-2 text-xs font-bold text-red-600">
+                    Remove
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 

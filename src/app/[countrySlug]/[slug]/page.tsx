@@ -266,7 +266,7 @@ export default async function ArticlePage({ params }: Props) {
 
             {(a.sources?.length || a.source_url?.startsWith('http')) && (
               <p className="text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-800 pt-4">
-                <span className="font-semibold text-gray-900 dark:text-white">Reporting from: </span>
+                <span className="font-semibold text-gray-900 dark:text-white">Sources: </span>
                 {(a.sources?.length ? a.sources : [{ name: a.source_name, url: a.source_url }]).map((src, i, all) => (
                   <span key={src.url}>
                     <a href={src.url} target="_blank" rel="noopener" className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
