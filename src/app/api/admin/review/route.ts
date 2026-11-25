@@ -27,6 +27,33 @@ export async function GET(req: NextRequest) {
   const auth = await verifyAdmin(req);
   if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
+  // Source names used in earlier stories (domain → name), so the editor can fill them in. Your own stories win.
+  if (req.nextUrl.searchParams.get('sources') === 'known') {
+    const { data: rows } = await supabaseAdmin
+      .from('articles')
+      .select('sources, origin, updated_at')
+      .not('sources', 'is', null)
+      .order('updated_at', { ascending: false })
+      .limit(1500);
+    const learned: Record<string, string> = {};
+    const fromEditor = new Set<string>();
+    (rows || []).forEach((r: any) => {
+      (Array.isArray(r.sources) ? r.sources : []).forEach((x: any) => {
+        let d = '';
+        try {
+          d = new URL(String(x?.url || '')).hostname.toLowerCase().replace(/^www\.|^m\.|^amp\./, '');
+        } catch {}
+        const name = String(x?.name || '').trim();
+        if (!d || !name || name.toLowerCase() === d) return;
+        if (r.origin === 'editor' && !fromEditor.has(d)) {
+          learned[d] = name;
+          fromEditor.add(d);
+        } else if (!learned[d]) learned[d] = name;
+      });
+    });
+    return NextResponse.json({ learned });
+  }
+
   // One story, for the full-page editor (/admin/write?id=...).
   const one = req.nextUrl.searchParams.get('id');
   if (one) {

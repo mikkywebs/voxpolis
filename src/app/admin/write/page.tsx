@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { articlePath, toSlug } from '@/lib/paths';
 import { ALL_COUNTRIES, getCountryByCode, getCountrySlug } from '@/config/countries';
 import { checkStory, CheckItem } from '@/lib/editorial/prepublish';
+import { KNOWN_SOURCES, sourceNameFor } from '@/lib/sourceNames';
 
 /**
  * Voxpolis story editor (SEO layout).
@@ -102,6 +103,17 @@ function Editor() {
   const [slugTouched, setSlugTouched] = useState(!!idParam);
   const [sources, setSources] = useState<{ name: string; url: string }[]>([]);
   const setSource = (i: number, patch: Partial<{ name: string; url: string }>) => setSources((all) => all.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const [learned, setLearned] = useState<Record<string, string>>({});
+  // Paste a link: the outlet name fills in by itself (you can still change it).
+  const setSourceUrl = (i: number, url: string) =>
+    setSources((all) =>
+      all.map((x, j) => {
+        if (j !== i) return x;
+        const auto = sourceNameFor(x.url, learned);
+        const keepName = x.name.trim() && x.name !== auto; // name typed by hand
+        return { url, name: keepName ? x.name : sourceNameFor(url, learned) };
+      })
+    );
   const set = (patch: Partial<typeof f>) => setF((x) => ({ ...x, ...patch }));
 
   // ---------- auth + load ----------
@@ -170,6 +182,15 @@ function Editor() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch('/api/admin/review?sources=known', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.learned && setLearned(d.learned))
+      .catch(() => {});
+  }, [token]);
+  const sourceNameList = useMemo(() => Array.from(new Set([...Object.values(KNOWN_SOURCES), ...Object.values(learned)])).sort(), [learned]);
 
   // Web address follows the headline until you edit it (drafts only).
   useEffect(() => {
@@ -252,12 +273,7 @@ function Editor() {
     sources
       .filter((x) => validUrl(x.url))
       .map((x) => {
-        let name = x.name.trim();
-        if (!name) {
-          try {
-            name = new URL(x.url.trim()).hostname.replace(/^www\./, '');
-          } catch {}
-        }
+        const name = x.name.trim() || sourceNameFor(x.url, learned);
         return { name, url: x.url.trim() };
       });
 
@@ -501,17 +517,33 @@ function Editor() {
                 </button>
               </div>
               {sources.length === 0 && (
-                <p className="text-xs text-gray-500">Link the statement, document or report your story is based on. Readers and Google trust stories that show their sources.</p>
+                <p className="text-xs text-gray-500">
+                  Paste the link to the statement, document or report your story is based on. Known outlets (Punch, Vanguard, Daily Post, Channels TV…)
+                  fill in their name by themselves.
+                </p>
               )}
+              <datalist id="source-names">
+                {sourceNameList.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
               {sources.map((x, i) => (
-                <div key={i} className="grid gap-2 sm:grid-cols-[180px_minmax(0,1fr)_auto] items-start">
-                  <input className={input} aria-label={`Source ${i + 1} name`} placeholder="Name, e.g. State House" value={x.name} onChange={(e) => setSource(i, { name: e.target.value })} />
+                <div key={i} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_170px_auto] items-start">
                   <input
                     className={`${input} ${x.url.trim() && !validUrl(x.url) ? 'border-red-400' : ''}`}
                     aria-label={`Source ${i + 1} link`}
-                    placeholder="https://statehouse.gov.ng/news/..."
+                    placeholder="Paste the news link: https://www.vanguardngr.com/2026/11/..."
                     value={x.url}
-                    onChange={(e) => setSource(i, { url: e.target.value })}
+                    onChange={(e) => setSourceUrl(i, e.target.value)}
+                    autoFocus={!x.url && i === sources.length - 1}
+                  />
+                  <input
+                    className={input}
+                    list="source-names"
+                    aria-label={`Source ${i + 1} name`}
+                    placeholder="Name (fills in)"
+                    value={x.name}
+                    onChange={(e) => setSource(i, { name: e.target.value })}
                   />
                   <button type="button" onClick={() => setSources((all) => all.filter((_, j) => j !== i))} className="px-2 py-2 text-xs font-bold text-red-600">
                     Remove
