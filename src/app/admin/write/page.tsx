@@ -506,6 +506,44 @@ function Editor() {
             </div>
 
             <div className={card + ' space-y-3'}>
+              <span className={label + ' mb-0'}>Keywords (what people search for)</span>
+              <div>
+                <label className={label} htmlFor="kw">Focus keyword</label>
+                <input id="kw" className={input} placeholder="2027 budget" value={f.keyword} onChange={(e) => set({ keyword: e.target.value })} />
+              </div>
+              <div>
+                <label className={label} htmlFor="kw2">Additional keywords (comma separated, up to 8)</label>
+                <input
+                  id="kw2"
+                  className={input}
+                  placeholder="Appropriation bill, National Assembly, Tinubu budget"
+                  value={f.extraKw}
+                  onChange={(e) => set({ extraKw: e.target.value })}
+                />
+                {extraKeywords.length > 0 && (
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {extraKeywords.map((k) => {
+                      const used = storyText.includes(k.toLowerCase());
+                      return (
+                        <li
+                          key={k}
+                          title={used ? 'Used in the story' : 'Not in the story yet'}
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${used ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
+                        >
+                          {used ? '✓ ' : ''}
+                          {k}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Other words people search for this story. Green means it appears in your text. Google ranks what is written in the story, so use each one naturally.
+                </p>
+              </div>
+            </div>
+
+            <div className={card + ' space-y-3'}>
               <div className="flex items-center justify-between">
                 <span className={label + ' mb-0'}>Sources (shown at the end of the story)</span>
                 <button
@@ -722,40 +760,6 @@ function Editor() {
                 </p>
                 <p className="text-[13px] text-gray-700 dark:text-gray-300 line-clamp-2">
                   {googleDesc ? (googleDesc.length > 160 ? googleDesc.slice(0, 157).trimEnd() + '…' : googleDesc) : 'Write a description so Google shows what the story is about.'}
-                </p>
-              </div>
-              <div>
-                <label className={label} htmlFor="kw">Focus keyword</label>
-                <input id="kw" className={input} placeholder="2027 budget" value={f.keyword} onChange={(e) => set({ keyword: e.target.value })} />
-              </div>
-              <div>
-                <label className={label} htmlFor="kw2">Additional keywords (comma separated, up to 8)</label>
-                <input
-                  id="kw2"
-                  className={input}
-                  placeholder="Appropriation bill, National Assembly, Tinubu budget"
-                  value={f.extraKw}
-                  onChange={(e) => set({ extraKw: e.target.value })}
-                />
-                {extraKeywords.length > 0 && (
-                  <ul className="mt-2 flex flex-wrap gap-1.5">
-                    {extraKeywords.map((k) => {
-                      const used = storyText.includes(k.toLowerCase());
-                      return (
-                        <li
-                          key={k}
-                          title={used ? 'Used in the story' : 'Not in the story yet'}
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${used ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
-                        >
-                          {used ? '✓ ' : ''}
-                          {k}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                <p className="text-[11px] text-gray-500 mt-1">
-                  Other words people search for this story. Green means it appears in your text. Google ranks what is written in the story, so use each one naturally.
                 </p>
               </div>
               <div>
