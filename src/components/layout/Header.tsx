@@ -35,7 +35,7 @@ export default function Header({
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState(user || null);
   const [greeting, setGreeting] = useState<string>('');
-  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weather, setWeather] = useState<(WeatherData & { capital?: string }) | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -145,7 +145,7 @@ export default function Header({
   useEffect(() => {
     async function loadWeather() {
       try {
-        const res = await fetch('/api/weather'); // always Abuja
+        const res = await fetch('/api/weather'); // reader's own city (Abuja if unknown)
         if (res.ok) {
           const data = await res.json();
           setWeather(data);
@@ -220,7 +220,7 @@ export default function Header({
           {weather && (
             <div className="hidden sm:flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-semibold px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm shrink-0">
               <span>{weather.icon}</span>
-              <span>Abuja {weather.tempC}°C</span>
+              <span className="truncate max-w-[110px]">{weather.capital} {weather.tempC}°C</span>
               <span className="hidden lg:inline text-gray-400 truncate max-w-[110px]">| {weather.condition}</span>
             </div>
           )}

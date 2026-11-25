@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/privacy' },
 };
 
-const UPDATED = '21 November 2026';
+const UPDATED = '25 November 2026';
 const EMAIL = 'contact@voxpolis.app';
 
 export default function PrivacyPage() {
@@ -33,6 +33,7 @@ export default function PrivacyPage() {
             <li><strong>What you post:</strong> comments, poll votes and reactions, linked to your account.</li>
             <li><strong>Reading statistics:</strong> how many times each story is read. We use this to see which stories readers find useful.</li>
             <li><strong>If you email us:</strong> your email address and what you send.</li>
+            <li><strong>Approximate location for the weather box:</strong> our host tells us roughly which city your connection comes from, so we can show your local weather. It is used only for that and is not stored.</li>
           </ul>
         </section>
 
