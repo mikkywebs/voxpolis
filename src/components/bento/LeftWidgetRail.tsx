@@ -56,9 +56,10 @@ export default function LeftWidgetRail({
   variant = 'rail',
 }: LeftWidgetRailProps) {
   // --- 1. Weather State ---
-  const [weather, setWeather] = useState<(WeatherData & { capital?: string }) | null>(null);
+  const [weather, setWeather] = useState<(WeatherData & { capital?: string; countryName?: string }) | null>(null);
   const [tempUnit, setTempUnit] = useState<'C' | 'F'>('C');
   const [weatherFailed, setWeatherFailed] = useState(false);
+  const placeLabel = weather ? [weather.capital, weather.countryName].filter((x, i, all) => x && all.indexOf(x) === i).join(', ') : 'Your area';
 
   useEffect(() => {
     let isMounted = true;
@@ -105,7 +106,7 @@ export default function LeftWidgetRail({
             <span className="text-2xl">{weather?.icon || ''}</span>
             <div>
               <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-white">
-                <span>{country.capital}, {country.name}</span>
+                <span>{placeLabel}</span>
               </div>
               <span className="text-[11px] text-gray-500 dark:text-neutral-400">
                 {weather ? (
@@ -153,7 +154,7 @@ export default function LeftWidgetRail({
         <div className="flex items-center justify-between text-xs mb-3">
           <div className="flex items-center gap-1.5 text-gray-500 dark:text-neutral-400 font-semibold truncate">
             <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-            <span className="truncate">{country.capital}, {country.name}</span>
+            <span className="truncate">{placeLabel}</span>
           </div>
           <button
             onClick={() => setTempUnit(tempUnit === 'C' ? 'F' : 'C')}
@@ -208,7 +209,7 @@ export default function LeftWidgetRail({
         </div>
         {weather?.observedAt && (
           <p className="mt-3 text-[10px] text-gray-400 dark:text-neutral-500">
-            Updated {weather.observedAt} Abuja time · Data:{' '}
+            Updated {weather.observedAt} local time · Data:{' '}
             <a href="https://open-meteo.com/" target="_blank" rel="noopener" className="underline">
               Open-Meteo
             </a>
